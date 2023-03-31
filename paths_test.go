@@ -23,13 +23,13 @@ func TestNewValidator_BadParam(t *testing.T) {
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/pet/doggy", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.Nil(t, pathItem)
     assert.Equal(t, "Match for path '/pet/doggy', but the parameter '{petId}' is not a number",
-        v.ValidationErrors()[0].Message)
+        v.AllValidationErrors()[0].Message)
     assert.Equal(t, "The parameter 'petId' is defined as a number, but the value 'doggy' is not a number",
-        v.ValidationErrors()[0].Reason)
-    assert.Equal(t, 306, v.ValidationErrors()[0].SpecLine)
+        v.AllValidationErrors()[0].Reason)
+    assert.Equal(t, 306, v.AllValidationErrors()[0].SpecLine)
 }
 
 func TestNewValidator_GoodParamFloat(t *testing.T) {
@@ -44,7 +44,7 @@ func TestNewValidator_GoodParamFloat(t *testing.T) {
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/pet/232.233", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
 }
 
@@ -60,7 +60,7 @@ func TestNewValidator_GoodParamInt(t *testing.T) {
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/pet/12334", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
 }
 
@@ -76,7 +76,7 @@ func TestNewValidator_FindPathPost(t *testing.T) {
 
     request, _ := http.NewRequest(http.MethodPost, "https://things.com/pet/12334", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
 }
 
@@ -92,7 +92,7 @@ func TestNewValidator_FindPathDelete(t *testing.T) {
 
     request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pet/12334", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
 }
 
@@ -113,7 +113,7 @@ paths:
 
     request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/12345", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
     assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 
@@ -136,7 +136,7 @@ paths:
 
     request, _ := http.NewRequest(http.MethodOptions, "https://things.com/burgers/12345", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
     assert.Equal(t, "locateBurger", pathItem.Options.OperationId)
 
@@ -159,7 +159,7 @@ paths:
 
     request, _ := http.NewRequest(http.MethodTrace, "https://things.com/burgers/12345", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
     assert.Equal(t, "locateBurger", pathItem.Trace.OperationId)
 
@@ -182,7 +182,7 @@ paths:
 
     request, _ := http.NewRequest(http.MethodPut, "https://things.com/burgers/12345", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
     assert.Equal(t, "locateBurger", pathItem.Put.OperationId)
 
@@ -205,8 +205,32 @@ paths:
 
     request, _ := http.NewRequest(http.MethodHead, "https://things.com/burgers/12345", nil)
 
-    pathItem := v.FindPath(request)
+    pathItem, _ := v.FindPath(request)
     assert.NotNil(t, pathItem)
     assert.Equal(t, "locateBurger", pathItem.Head.OperationId)
+
+}
+
+func TestNewValidator_FindPathMissing(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    head:
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodHead, "https://things.com/not/here", nil)
+
+    pathItem, errs := v.FindPath(request)
+    assert.Nil(t, pathItem)
+    assert.NotNil(t, errs)
+    assert.Equal(t, "Path '/not/here' not found", v.AllValidationErrors()[0].Message)
 
 }
