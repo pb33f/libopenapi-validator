@@ -36,13 +36,19 @@ type ValidationError struct {
 	Reason            string                   `json:"reason" yaml:"reason"`
 	SpecLine          int                      `json:"specLine" yaml:"specLine"`
 	SpecCol           int                      `json:"specColumn" yaml:"specColumn"`
+	HowToFix          string                   `json:"howToFix" yaml:"howToFix"`
 	ValidationError   *SchemaValidationFailure `json:"validationError,omitempty" yaml:"validationError,omitempty"`
 	Context           interface{}              `json:"-" yaml:"-"`
 }
 
 func (v *ValidationError) Error() string {
-	return fmt.Sprintf("Error: %s, Reason: %s, Line: %d, Column: %d",
-		v.Message, v.Reason, v.SpecLine, v.SpecCol)
+	if v.ValidationError != nil {
+		return fmt.Sprintf("Error: %s, Reason: %s, Validation Error: %s, Line: %d, Column: %d",
+			v.Message, v.Reason, v.ValidationError.Reason, v.SpecLine, v.SpecCol)
+	} else {
+		return fmt.Sprintf("Error: %s, Reason: %s, Line: %d, Column: %d",
+			v.Message, v.Reason, v.SpecLine, v.SpecCol)
+	}
 }
 
 type Validator interface {
@@ -82,6 +88,7 @@ func (v *validator) AllValidationErrors() []*ValidationError {
 
 func (v *validator) validateSchema(
 	schema *base.Schema,
+	rawObject interface{},
 	rawBlob string,
 	entity, reasonEntity, name, validationType, subValType string) []*ValidationError {
 
@@ -92,14 +99,17 @@ func (v *validator) validateSchema(
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
 	// 2. decode the object into a json blob.
-	decodedString, _ := url.QueryUnescape(rawBlob)
 	var decodedObj any
-	_ = json.Unmarshal([]byte(decodedString), &decodedObj)
-
+	if rawObject != nil {
+		decodedObj = rawObject
+	} else {
+		decodedString, _ := url.QueryUnescape(rawBlob)
+		_ = json.Unmarshal([]byte(decodedString), &decodedObj)
+	}
 	// 3. create a new json schema compiler and add the schema to it
 	compiler := jsonschema.NewCompiler()
-	_ = compiler.AddResource("schema.json", strings.NewReader(string(jsonSchema)))
-	jsch, _ := compiler.Compile("schema.json")
+	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), strings.NewReader(string(jsonSchema)))
+	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
 
 	// 4. validate the object against the schema
 	scErrs := jsch.Validate(decodedObj)
@@ -127,6 +137,7 @@ func (v *validator) validateSchema(
 					Location:      er.KeywordLocation,
 					OriginalError: jk,
 				},
+				HowToFix: HowToFixParamInvalidSchema,
 			})
 		}
 	}
