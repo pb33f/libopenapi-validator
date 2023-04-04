@@ -5,6 +5,7 @@ package main
 
 import (
     "fmt"
+    "github.com/pb33f/libopenapi/datamodel/high/base"
     v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
     "net/url"
@@ -69,6 +70,27 @@ stopValidation:
         for i := range qp.values {
 
             switch param.Style {
+
+            case MatrixStyle:
+                // check if explode is false, but we have used an array style
+                if param.Explode == nil || !*param.Explode {
+                    if len(qp.values) > 1 {
+                        errors = append(errors, &ValidationError{
+                            ValidationType:    ParameterValidation,
+                            ValidationSubType: ParameterValidationQuery,
+                            Message:           fmt.Sprintf("Query parameter '%s' is not encoded correctly", param.Name),
+                            Reason: fmt.Sprintf("The query parameter '%s' has the 'matrix' style defined, "+
+                                "and has explode set to 'false'. There are multiple values (%d) supplied, instead of a single "+
+                                "value", param.Name, len(qp.values)),
+                            SpecLine: param.GoLow().Style.ValueNode.Line,
+                            SpecCol:  param.GoLow().Style.ValueNode.Column,
+                            Context:  param,
+                            HowToFix: fmt.Sprintf(HowToFixParamInvalidMatrixMultipleValues,
+                                collapseParamsIntoMatrixArrayStyle(param.Name, qp.values)),
+                        })
+                        break stopValidation
+                    }
+                }
 
             case DeepObject:
                 if len(qp.values) > 1 {
@@ -230,12 +252,16 @@ func collapseCSVIntoFormStyle(key string, value string) string {
         strings.Join(strings.Split(value, ","), fmt.Sprintf("&%s=", key)))
 }
 
+func collapseParamsIntoMatrixArrayStyle(key string, values []string) string {
+    return fmt.Sprintf(";%s=%s", key, strings.Join(values, ","))
+}
+
 func collapseCSVIntoSpaceDelimitedStyle(key string, values []string) string {
     return fmt.Sprintf("%s=%s", key, strings.Join(values, "%20"))
 }
 
 func collapseCSVIntoPipeDelimitedStyle(key string, values []string) string {
-    return fmt.Sprintf("%s=%s", key, strings.Join(values, "|"))
+    return fmt.Sprintf("%s=%s", key, strings.Join(values, Pipe))
 }
 
 func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*ValidationError) {
@@ -262,6 +288,35 @@ func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*Validat
         }
     }
 
+    // check if there is a raw query string, but no params were extracted and then try to decode it.
+    if request.URL.RawQuery != "" && len(queryParams) == 0 {
+        if strings.Contains(request.URL.RawQuery, SemiColon) {
+            // parse matrix style params.
+            paramPairs := strings.Split(request.URL.RawQuery, SemiColon)
+            for p := range paramPairs {
+                if paramPairs[p] == "" {
+                    continue
+                }
+                kvArr := strings.Split(paramPairs[p], Equals)
+                if len(kvArr) == 2 {
+
+                    if qp, ok := queryParams[kvArr[0]]; ok {
+                        qp[0].values = append(qp[0].values, kvArr[1])
+                    } else {
+                        queryParams[kvArr[0]] = append(queryParams[kvArr[0]], &queryParam{
+                            key:    kvArr[0],
+                            values: []string{kvArr[1]},
+                        })
+                    }
+                }
+            }
+        }
+        if strings.Contains(request.URL.RawQuery, Period) {
+            // TODO: this needs completing, however, I don't know why on earth anyone in their right mind would use this.
+            // type of encoding for http APIs.
+        }
+    }
+
     // find path
     pathItem, errs := v.FindPath(request)
     if pathItem == nil || errs != nil {
@@ -272,7 +327,7 @@ func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*Validat
 
     // look through the params for the query key
     for p := range params {
-        if params[p].In == "query" {
+        if params[p].In == Query {
             // check if this param is found as a set of query strings
             if jk, ok := queryParams[params[p].Name]; ok {
             skipValues:
@@ -281,7 +336,22 @@ func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*Validat
                     errors = append(errors, v.validateParamStyle(params[p], jk)...)
 
                     // there is a match, is the type correct
-                    sch := params[p].Schema.Schema()
+                    // this context is extracted from the 3.1 spec to explain what is going on here:
+                    // For more complex scenarios, the content property can define the media type and schema of the
+                    // parameter. A parameter MUST contain either a schema property, or a content property, but not both.
+                    // The map MUST only contain one entry. (for content)
+                    var sch *base.Schema
+                    if params[p].Schema != nil {
+                        sch = params[p].Schema.Schema()
+                    } else {
+                        // ok, no schema, check for a content type
+                        if params[p].Content != nil {
+                            for _, ct := range params[p].Content {
+                                sch = ct.Schema.Schema()
+                                break
+                            }
+                        }
+                    }
                     pType := sch.Type
 
                     // for each param, check each type
@@ -291,7 +361,7 @@ func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*Validat
                         // following characters
                         //  :/?#[]@!$&'()*+,;=
                         // to be present as they are, without being URLEncoded.
-                        if !params[p].AllowReserved {
+                        if !params[p].AllowReserved && params[p].Style != MatrixStyle {
                             rx := `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
                             regexp.MustCompile(rx)
                             if regexp.MustCompile(rx).MatchString(ef) && params[p].Explode != nil && *params[p].Explode {
@@ -341,12 +411,17 @@ func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*Validat
                                 }
                             case Object:
 
-                                // check if the object is encoded as a deepObject, if so, construct a map[string]interface{}
+                                // check if the object is encoded as a deepObject or matrix, if so, construct a map[string]interface{}
                                 // and pass that in as encoded JSON.
                                 var encodedObj map[string]interface{}
-                                if params[p].Style == "deepObject" {
-                                    encodedObj = constructDeepObject(jk)
+                                if params[p].Style == DeepObject {
+                                    encodedObj = constructParamMapFromDeepObjectEncoding(jk)
                                 }
+
+                                if params[p].Style == MatrixStyle {
+                                    encodedObj = constructParamMapFromMatrixEncoding(jk)
+                                }
+
                                 numErrors := len(errors)
                                 errors = append(errors, v.validateSchema(sch, encodedObj[params[p].Name], ef,
                                     "Query parameter",
@@ -474,27 +549,26 @@ func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*Validat
     return true, nil
 }
 
-// deepObject encoding is a technique used to encode objects into query parameters.
-func constructDeepObject(values []*queryParam) map[string]interface{} {
-    decoded := make(map[string]interface{})
+func cast(v string) any {
 
-    cast := func(v string) any {
-
-        if v == "true" || v == "false" {
-            b, _ := strconv.ParseBool(v)
-            return b
-        }
-        if i, err := strconv.ParseFloat(v, 64); err == nil {
-            // check if this is an int or not
-            if !strings.Contains(v, ".") {
-                iv, _ := strconv.ParseInt(v, 10, 64)
-                return iv
-            }
-            return i
-        }
-        return v
+    if v == "true" || v == "false" {
+        b, _ := strconv.ParseBool(v)
+        return b
     }
+    if i, err := strconv.ParseFloat(v, 64); err == nil {
+        // check if this is an int or not
+        if !strings.Contains(v, ".") {
+            iv, _ := strconv.ParseInt(v, 10, 64)
+            return iv
+        }
+        return i
+    }
+    return v
+}
 
+// deepObject encoding is a technique used to encode objects into query parameters.
+func constructParamMapFromDeepObjectEncoding(values []*queryParam) map[string]interface{} {
+    decoded := make(map[string]interface{})
     for _, v := range values {
         if decoded[v.key] == nil {
             props := make(map[string]interface{})
@@ -503,6 +577,23 @@ func constructDeepObject(values []*queryParam) map[string]interface{} {
         } else {
             decoded[v.key].(map[string]interface{})[v.property] = cast(v.values[0])
         }
+    }
+    return decoded
+}
+
+// deepObject encoding is a technique used to encode objects into query parameters.
+func constructParamMapFromMatrixEncoding(values []*queryParam) map[string]interface{} {
+    decoded := make(map[string]interface{})
+    for _, v := range values {
+        props := make(map[string]interface{})
+        // explode CSV into array
+        exploded := strings.Split(v.values[0], ",")
+        for i := range exploded {
+            if i%2 == 0 {
+                props[exploded[i]] = cast(exploded[i+1])
+            }
+        }
+        decoded[v.key] = props
     }
     return decoded
 }

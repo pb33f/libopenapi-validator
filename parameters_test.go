@@ -870,6 +870,49 @@ paths:
 
 }
 
+func TestNewValidator_QueryParamValidTypeObjectPropType_RefViaContent(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+components:
+  parameters:
+    fishy:
+      name: fishy
+      in: query
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              vinegar:
+                type: boolean
+              chips:
+                type: number
+            required:
+              - vinegar
+              - chips
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/fishy"
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":false,\"chips\":999}", nil)
+    pathItem, _ := v.FindPath(request)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.NotNil(t, pathItem)
+    assert.Len(t, errors, 0)
+
+}
+
 func TestNewValidator_QueryParamInvalidTypeObjectPropType_Ref(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -1431,4 +1474,166 @@ paths:
     assert.Equal(t, "expected boolean, but got number", errors[0].ValidationError.Reason)
     assert.Equal(t, "expected number, but got boolean", errors[1].ValidationError.Reason)
     assert.Equal(t, "expected number, but got boolean", errors[2].ValidationError.Reason)
+}
+
+func TestNewValidator_QueryParamMatrixEncoding_ExplodeValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         explode: true
+         style: matrix
+         schema:
+           type: string
+     operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?;fishy=haddock;fishy=cod", nil)
+    pathItem, _ := v.FindPath(request)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.NotNil(t, pathItem)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamMatrixEncoding_ExplodeInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         style: matrix
+         schema:
+           type: array
+           items:
+             type: string
+       - name: dishy
+         in: query
+         required: true
+         style: matrix
+         schema:
+           type: array
+           items: 
+             type: string
+     operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?;fishy=haddock;fishy=cod;dishy=bowl;dishy=round;dishy=square", nil)
+    pathItem, _ := v.FindPath(request)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.NotNil(t, pathItem)
+    assert.Len(t, errors, 2)
+    assert.Equal(t, "The query parameter 'fishy' has the 'matrix' style defined, and has explode set to "+
+        "'false'. There are multiple values (2) supplied, instead of a single value", errors[0].Reason)
+    assert.Equal(t, "The query parameter 'dishy' has the 'matrix' style defined, and has explode set to "+
+        "'false'. There are multiple values (3) supplied, instead of a single value", errors[1].Reason)
+
+}
+
+func TestNewValidator_QueryParamMatrixEncoding_SchemaInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         style: matrix
+         schema:
+           type: object
+           properties:
+             ocean:
+               type: string
+             salt:
+               type: boolean
+           required:
+             - ocean
+             - salt
+     operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?;fishy=ocean,atlantic,salt,200", nil)
+    pathItem, _ := v.FindPath(request)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.NotNil(t, pathItem)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "expected boolean, but got number", errors[0].ValidationError.Reason)
+}
+
+func TestNewValidator_QueryParamMatrixEncoding_SchemaValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         style: matrix
+         schema:
+           type: object
+           properties:
+             ocean:
+               type: string
+             salt:
+               type: boolean
+           required:
+             - ocean
+             - salt
+       - name: dishy
+         in: query
+         required: true
+         style: matrix
+         schema:
+           type: object
+           properties:
+             plate:
+               type: string
+             spoons:
+               type: integer
+           required:
+             - plate
+             - spoons
+     operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet,
+        "https://things.com/a/fishy/on/a/dishy?;fishy=ocean,atlantic,salt,true;dishy=plate,round,spoons,5", nil)
+    valid, errors := v.ValidateQueryParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
 }
