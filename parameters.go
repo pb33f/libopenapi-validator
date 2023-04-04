@@ -144,6 +144,7 @@ stopValidation:
                             HowToFix: fmt.Sprintf(HowToFixParamInvalidPipeDelimitedObjectExplode,
                                 collapseCSVIntoPipeDelimitedStyle(param.Name, qp.values)),
                         })
+                        break stopValidation
                     }
                 }
 
@@ -205,6 +206,7 @@ stopValidation:
                             HowToFix: fmt.Sprintf(HowToFixParamInvalidFormEncode,
                                 collapseCSVIntoFormStyle(param.Name, qp.values[i])),
                         })
+                        break stopValidation
                     }
                 }
             }
