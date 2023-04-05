@@ -20,6 +20,5 @@ const (
         "they should be separated by pipes '|'. For example: '%s'"
     HowToFixParamInvalidDeepObjectMultipleValues string = "There can only be a single value per property name, " +
         "deepObject parameters should contain the property key in square brackets next to the parameter name. For example: '%s'"
-    HowToFixParamInvalidMatrixMultipleValues string = "There can only be a single value per property name, " +
-        "matrix parameters with no 'explode' should use commas to separate values. For example: '%s'"
+    HowToFixInvalidJSON string = "The JSON submitted is invalid, please check the syntax"
 )
