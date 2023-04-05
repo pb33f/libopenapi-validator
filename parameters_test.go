@@ -360,6 +360,35 @@ paths:
     assert.Nil(t, errors)
 }
 
+func TestNewValidator_QueryParamValidTypeFloat(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: number
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=123.223", nil)
+    pathItem, _ := v.FindPath(request)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.NotNil(t, pathItem)
+    assert.Nil(t, errors)
+}
+
 func TestNewValidator_QueryParamWrongTypeBool(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -646,6 +675,96 @@ operationId: locateFishy`
         "however the value 'haddock' is not a valid true/false value", errors[1].Reason)
 }
 
+func TestNewValidator_QueryParamInvalidTypeArrayFloat(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         schema:
+           type: array
+           items:
+             type: number
+operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=12&fishy=12.12&fishy=1234567789.1233456657", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamInvalidTypeArrayFloatPipeDelimited(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         style: pipeDelimited
+         required: true
+         schema:
+           type: array
+           items:
+             type: number
+operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=12|12345.2344|22111233444.342452435", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamInvalidTypeArrayObjectPipeDelimited(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         style: pipeDelimited
+         required: true
+         schema:
+           type: object
+           properties:
+             ocean:
+               type: number
+             silver:
+               type: number
+           required: [ocean, silver]
+operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=ocean|12|silver|12.2345", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
 func TestNewValidator_QueryParamValidTypeObject(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -689,7 +808,7 @@ paths:
     assert.Equal(t, "/required", errors[0].ValidationError.Location)
 }
 
-func TestNewValidator_QueryParamValidTypeObjectPropType(t *testing.T) {
+func TestNewValidator_QueryParamValidTypeObjectPropType_Invalid(t *testing.T) {
 
     spec := `openapi: 3.1.0
 paths:
@@ -702,17 +821,16 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    vinegar:
+
+                type: object
+                properties:
+                  vinegar:
                     type: boolean
                   chips:
                     type: number
-                required:
-                  - vinegar
-                  - chips
+                  required:
+                    - vinegar
+                    - chips
       operationId: locateFishy`
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
@@ -721,7 +839,44 @@ paths:
 
     v := NewValidator(&m.Model)
 
-    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":\"cakes\",\"chips\":\"hello\"}&fishy={\"vinegar\":true,\"chips\":123}", nil)
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":\"cakes\",\"chips\":\"hello\"}&fishy={\"vinegar\":true,\"chips\":123.223}", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 2)
+
+}
+
+func TestNewValidator_QueryParamValidTypeObjectPropTypeFloat(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vinegar:
+                    type: boolean
+                  chips:
+                    type: number
+              required:
+                - vinegar
+                - chips
+      operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":true,\"chips\":12}&fishy={\"vinegar\":true,\"chips\":123.333}", nil)
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
     assert.Len(t, errors, 0)
@@ -985,6 +1140,48 @@ paths:
 
 }
 
+func TestNewValidator_QueryParamValidTypeObjectPropType_JSONInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+components:
+  parameters:
+    fishy:
+      name: fishy
+      in: query
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              vinegar:
+                type: boolean
+              chips:
+                type: number
+            required:
+              - vinegar
+              - chips
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - $ref: "#/components/parameters/fishy"
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=I am not json", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Query parameter 'fishy' is not valid JSON", errors[0].Message)
+
+}
+
 func TestNewValidator_QueryParamInvalidTypeObjectPropType_Ref(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -1126,39 +1323,6 @@ paths:
     assert.Equal(t, "Query parameter 'fishy' is not exploded correctly", errors[0].Message)
 }
 
-func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedInvalid(t *testing.T) {
-
-    spec := `openapi: 3.1.0
-paths:
- /a/fishy/on/a/dishy:
-   get:
-     parameters:
-       - name: fishy
-         in: query
-         required: true
-         style: spaceDelimited
-         schema:
-           type: array
-           items:
-             type: string
-     operationId: locateFishy`
-
-    doc, _ := libopenapi.NewDocument([]byte(spec))
-
-    m, _ := doc.BuildV3Model()
-
-    v := NewValidator(&m.Model)
-
-    request, _ := http.NewRequest(http.MethodGet,
-        "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
-    pathItem, _ := v.FindPath(request)
-    valid, errors := v.ValidateQueryParams(request)
-    assert.False(t, valid)
-    assert.NotNil(t, pathItem)
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
-}
-
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedIncorrectlyExploded(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -1192,39 +1356,6 @@ paths:
     assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
 }
 
-func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalid(t *testing.T) {
-
-    spec := `openapi: 3.1.0
-paths:
- /a/fishy/on/a/dishy:
-   get:
-     parameters:
-       - name: fishy
-         in: query
-         required: true
-         style: pipeDelimited
-         schema:
-           type: array
-           items:
-             type: string
-     operationId: locateFishy`
-
-    doc, _ := libopenapi.NewDocument([]byte(spec))
-
-    m, _ := doc.BuildV3Model()
-
-    v := NewValidator(&m.Model)
-
-    request, _ := http.NewRequest(http.MethodGet,
-        "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
-    pathItem, _ := v.FindPath(request)
-    valid, errors := v.ValidateQueryParams(request)
-    assert.False(t, valid)
-    assert.NotNil(t, pathItem)
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
-}
-
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidExplode(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -1250,39 +1381,6 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&fishy=shark|crab|plaice", nil)
-    pathItem, _ := v.FindPath(request)
-    valid, errors := v.ValidateQueryParams(request)
-    assert.False(t, valid)
-    assert.NotNil(t, pathItem)
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
-}
-
-func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObject(t *testing.T) {
-
-    spec := `openapi: 3.1.0
-paths:
- /a/fishy/on/a/dishy:
-   get:
-     parameters:
-       - name: fishy
-         in: query
-         required: true
-         style: pipeDelimited
-         schema:
-           type: array
-           items:
-             type: string
-     operationId: locateFishy`
-
-    doc, _ := libopenapi.NewDocument([]byte(spec))
-
-    m, _ := doc.BuildV3Model()
-
-    v := NewValidator(&m.Model)
-
-    request, _ := http.NewRequest(http.MethodGet,
-        "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
     pathItem, _ := v.FindPath(request)
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
@@ -1550,11 +1648,9 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&plate=flat,round", nil)
-    pathItem, _ := v.FindPath(request)
     valid, errors := v.ValidateQueryParams(request)
-    assert.False(t, valid)
-    assert.NotNil(t, pathItem)
-    assert.Len(t, errors, 1)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesNoSchema(t *testing.T) {
@@ -1834,6 +1930,124 @@ paths:
     assert.Equal(t, "The query parameter 'fishy' has a default or 'form' encoding defined, however the "+
         "value '1,2,3' is encoded as an object or an array using commas. "+
         "The contract defines the explode value to set to 'true'", errors[0].Reason)
+}
+
+func TestNewValidator_QueryParamValidateStyle_PipeDelimitedValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          style: pipeDelimited  
+          schema:
+            type: array
+            items:
+              type: number
+        - name: dishy
+          in: query
+          style: pipeDelimited
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet,
+        "https://things.com/a/fishy/on/a/dishy?fishy=1|2|3&dishy=little|dishy", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          style: spaceDelimited  
+          schema:
+            type: array
+            items:
+              type: number
+        - name: dishy
+          in: query
+          style: spaceDelimited
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet,
+        "https://things.com/a/fishy/on/a/dishy?fishy=1%202%203&dishy=little%20dishy", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedInvalidSchema(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          style: spaceDelimited  
+          schema:
+            type: array
+            items:
+              type: number
+        - name: dishy
+          in: query
+          style: spaceDelimited
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet,
+        "https://things.com/a/fishy/on/a/dishy?fishy=1|%202%203&dishy=little%20dishy", nil)
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Convert the value '1|' into a number", errors[0].HowToFix)
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesFailedSchema(t *testing.T) {

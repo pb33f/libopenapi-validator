@@ -16,6 +16,7 @@ const (
     Integer         = "integer"
     Number          = "number"
     Object          = "object"
+    String          = "string"
     Array           = "array"
     Boolean         = "boolean"
     DeepObject      = "deepObject"
