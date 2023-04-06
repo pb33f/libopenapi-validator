@@ -32,10 +32,9 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
     assert.Equal(t, 1, len(errors))
     assert.Equal(t, "Query parameter 'fishy' is missing", errors[0].Message)
 }
@@ -62,10 +61,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -91,10 +90,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodPost, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -120,10 +119,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodPut, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -149,10 +148,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodDelete, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -178,10 +177,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodOptions, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -207,10 +206,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodHead, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -236,10 +235,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodPatch, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -265,10 +264,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodTrace, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -294,10 +293,9 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/Not/Found/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.Nil(t, pathItem)
     assert.NotNil(t, errors)
 }
 
@@ -323,10 +321,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.NotNil(t, errors)
     assert.Equal(t, "Query parameter 'fishy' is not a valid number", errors[0].Message)
 }
@@ -353,10 +351,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=123", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -382,10 +380,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=123.223", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -411,10 +409,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.NotNil(t, errors)
     assert.Equal(t, "Query parameter 'fishy' is not a valid boolean", errors[0].Message)
 }
@@ -441,10 +439,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=true", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -472,10 +470,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Nil(t, errors)
 }
 
@@ -503,10 +501,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 2)
     assert.Equal(t, "Query array parameter 'fishy' is not a valid number", errors[0].Message)
     assert.Equal(t, "The query parameter (which is an array) 'fishy' is defined as being a number, "+
@@ -541,10 +539,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 2)
 }
 
@@ -601,10 +599,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=haddock&fishy=cod", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 2)
 }
 
@@ -632,10 +630,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -662,10 +660,10 @@ operationId: locateFishy`
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 2)
     assert.Equal(t, "Query array parameter 'fishy' is not a valid boolean", errors[0].Message)
     assert.Equal(t, "The query parameter (which is an array) 'fishy' is defined as being a boolean, "+
@@ -796,16 +794,16 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"cod\":\"cakes\"}&fishy={\"crab\":\"legs\"}", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 2)
     assert.Equal(t, "Query array parameter 'fishy' failed to validate", errors[0].Message)
     assert.Equal(t, "The query parameter (which is an array) 'fishy' is defined as an object, "+
         "however it failed to pass a schema validation", errors[0].Reason)
-    assert.Equal(t, "missing properties: 'vinegar', 'chips'", errors[0].ValidationError.Reason)
-    assert.Equal(t, "/required", errors[0].ValidationError.Location)
+    assert.Equal(t, "missing properties: 'vinegar', 'chips'", errors[0].SchemaValidationErrors[0].Reason)
+    assert.Equal(t, "/required", errors[0].SchemaValidationErrors[0].Location)
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_Invalid(t *testing.T) {
@@ -821,7 +819,6 @@ paths:
           content:
             application/json:
               schema:
-
                 type: object
                 properties:
                   vinegar:
@@ -842,7 +839,8 @@ paths:
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":\"cakes\",\"chips\":\"hello\"}&fishy={\"vinegar\":true,\"chips\":123.223}", nil)
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.Len(t, errors, 2)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 2)
 
 }
 
@@ -926,7 +924,8 @@ paths:
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":\"cakes\",\"chips\":\"hello\"}&fishy={\"vinegar\":true,\"chips\":123}", nil)
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.Len(t, errors, 2)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
 func TestNewValidator_QueryParamValidTypeObjectArrayPropType_Ref(t *testing.T) {
@@ -1051,7 +1050,7 @@ paths:
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "expected number, but got boolean", errors[0].ValidationError.Reason)
+    assert.Equal(t, "expected number, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
 
 }
 
@@ -1090,10 +1089,10 @@ paths:
     v := NewValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":false,\"chips\":999}", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 
 }
@@ -1136,7 +1135,7 @@ paths:
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "expected number, but got string", errors[0].ValidationError.Reason)
+    assert.Equal(t, "expected number, but got string", errors[0].SchemaValidationErrors[0].Reason)
 
 }
 
@@ -1220,7 +1219,8 @@ paths:
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":1234,\"chips\":false}", nil)
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.Len(t, errors, 2)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 2)
 
 }
 
@@ -1249,10 +1249,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=$$oh", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
     assert.Equal(t, "parameter values need to URL Encoded to ensure "+
         "reserved values are correctly encoded, for example: '%24%24oh'", errors[0].HowToFix)
@@ -1282,10 +1282,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1315,10 +1315,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
     assert.Equal(t, "Query parameter 'fishy' is not exploded correctly", errors[0].Message)
 }
@@ -1348,10 +1348,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock&fishy=mackrel", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
     assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
 }
@@ -1381,10 +1381,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&fishy=shark|crab|plaice", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
     assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
 }
@@ -1423,10 +1423,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&plate=flat|round", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1469,10 +1469,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish|salmon|dish|stew", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1515,12 +1515,12 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish|salmon|dish|cakes", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
-    assert.Equal(t, "value must be one of \"salad\", \"soup\", \"stew\"", errors[0].ValidationError.Reason)
+    assert.Equal(t, "value must be one of \"salad\", \"soup\", \"stew\"", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedObjectDecode(t *testing.T) {
@@ -1562,10 +1562,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish%20salmon%20dish%20stew", nil) // dumb, don't do this.
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1611,7 +1611,7 @@ paths:
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "value must be one of \"salad\", \"soup\", \"stew\"", errors[0].ValidationError.Reason)
+    assert.Equal(t, "value must be one of \"salad\", \"soup\", \"stew\"", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidMultiple(t *testing.T) {
@@ -1677,10 +1677,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1708,10 +1708,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=atlantic&fishy=12", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
     assert.Equal(t, "The query parameter 'fishy' has the 'deepObject' style defined, "+
         "There are multiple values (2) supplied, instead of a single value", errors[0].Reason)
@@ -1755,10 +1755,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=ocean,atlantic,fins,4&dishy=hot,true,salty,true", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1800,13 +1800,13 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=ocean,atlantic,fins,4&dishy=hot,no,salty,why", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
-    assert.Len(t, errors, 2)
-    assert.Equal(t, "expected boolean, but got string", errors[0].ValidationError.Reason)
-    assert.Equal(t, "expected boolean, but got string", errors[1].ValidationError.Reason)
+
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[0].Reason)
+    assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[1].Reason)
 
 }
 
@@ -1842,10 +1842,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1,2,3&dishy=a,little,plate", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -1883,10 +1883,10 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1&fishy=2&fishy=3&dishy=a&dishy=little&dishy=dish", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 0)
 }
 
@@ -2080,12 +2080,12 @@ paths:
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 1)
-    assert.Equal(t, "expected boolean, but got number", errors[0].ValidationError.Reason)
+    assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesFailedMultipleSchemas(t *testing.T) {
@@ -2150,12 +2150,12 @@ paths:
         "https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12"+
             "&dishy[size]=big&dishy[numCracks]=false"+
             "&cake[message]=happy%20birthday&cake[numCandles]=false", nil)
-    pathItem, _ := v.FindPath(request)
+
     valid, errors := v.ValidateQueryParams(request)
     assert.False(t, valid)
-    assert.NotNil(t, pathItem)
+
     assert.Len(t, errors, 3)
-    assert.Equal(t, "expected boolean, but got number", errors[0].ValidationError.Reason)
-    assert.Equal(t, "expected number, but got boolean", errors[1].ValidationError.Reason)
-    assert.Equal(t, "expected number, but got boolean", errors[2].ValidationError.Reason)
+    assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
+    assert.Equal(t, "expected number, but got boolean", errors[1].SchemaValidationErrors[0].Reason)
+    assert.Equal(t, "expected number, but got boolean", errors[2].SchemaValidationErrors[0].Reason)
 }

@@ -59,7 +59,7 @@ doneLooking:
             skipValues:
                 for _, fp := range jk {
                     // let's check styles first.
-                    errors = append(errors, v.validateParamStyle(params[p], jk)...)
+                    errors = append(errors, v.validateQueryParamStyle(params[p], jk)...)
 
                     // there is a match, is the type correct
                     // this context is extracted from the 3.1 spec to explain what is going on here:
@@ -140,7 +140,7 @@ doneLooking:
                                 }
 
                                 numErrors := len(errors)
-                                errors = append(errors, v.validateSchema(sch, encodedObj[params[p].Name], ef,
+                                errors = append(errors, v.validateSchema(sch, encodedObj[params[p].Name].(map[string]interface{}), ef,
                                     "Query parameter",
                                     "The query parameter",
                                     params[p].Name,
@@ -156,7 +156,7 @@ doneLooking:
                                 // to ensure this array items matches the type
                                 // only check if items is a schema, not a boolean
                                 if sch.Items.IsA() {
-                                    errors = append(errors, v.validateArray(sch, params[p], ef, contentWrapped)...)
+                                    errors = append(errors, v.validateQueryArray(sch, params[p], ef, contentWrapped)...)
                                 }
                             }
                         }
@@ -169,7 +169,7 @@ doneLooking:
                 if params[p].Schema != nil {
                     sch := params[p].Schema.Schema()
 
-                    if sch.Type[0] == Object && params[p].IsDefaultEncoding() {
+                    if sch.Type[0] == Object && params[p].IsDefaultFormEncoding() {
                         // if the param is an object, and we're using default encoding, then we need to
                         // validate the schema.
                         decoded := constructParamMapFromQueryParamInput(queryParams)
@@ -184,7 +184,7 @@ doneLooking:
                 }
                 // if there is no match, check if the param is required or not.
                 if params[p].Required {
-                    errors = v.parameterMissing(errors, params, p)
+                    errors = append(errors, v.queryParameterMissing(params[p]))
                 }
             }
         }
@@ -196,7 +196,7 @@ doneLooking:
     return true, nil
 }
 
-func (v *validator) validateArray(
+func (v *validator) validateQueryArray(
     sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool) []*ValidationError {
 
     var errors []*ValidationError
@@ -255,7 +255,7 @@ func (v *validator) validateArray(
     return errors
 }
 
-func (v *validator) validateParamStyle(param *v3.Parameter, as []*queryParam) []*ValidationError {
+func (v *validator) validateQueryParamStyle(param *v3.Parameter, as []*queryParam) []*ValidationError {
     var errors []*ValidationError
 stopValidation:
     for _, qp := range as {

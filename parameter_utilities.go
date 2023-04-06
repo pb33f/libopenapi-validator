@@ -135,6 +135,21 @@ func constructParamMapFromSpaceEncoding(values []*queryParam) map[string]interfa
     return decoded
 }
 
+func constructMapFromCSV(csv string) map[string]interface{} {
+    decoded := make(map[string]interface{})
+    // explode SSV into array
+    exploded := strings.Split(csv, Comma)
+    for i := range exploded {
+        if i%2 == 0 {
+            if len(exploded) == i+1 {
+                break
+            }
+            decoded[exploded[i]] = cast(exploded[i+1])
+        }
+    }
+    return decoded
+}
+
 func constructParamMapFromFormEncodingArray(values []*queryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {

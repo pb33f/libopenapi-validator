@@ -4,6 +4,7 @@ import (
     "fmt"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+    "gopkg.in/yaml.v3"
     "net/url"
 )
 
@@ -71,15 +72,33 @@ func (v *validator) invalidDeepObject(param *v3.Parameter, qp *queryParam) *Vali
     }
 }
 
-func (v *validator) parameterMissing(errors []*ValidationError, params []*v3.Parameter, p int) []*ValidationError {
-    errors = append(errors, &ValidationError{
-        Message: fmt.Sprintf("Query parameter '%s' is missing", params[p].Name),
+func (v *validator) queryParameterMissing(param *v3.Parameter) *ValidationError {
+    return &ValidationError{
+        Message: fmt.Sprintf("Query parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being required, "+
-            "however it's missing from the request", params[p].Name),
-        SpecLine: params[p].GoLow().Required.KeyNode.Line,
-        SpecCol:  params[p].GoLow().Required.KeyNode.Column,
-    })
-    return errors
+            "however it's missing from the request", param.Name),
+        SpecLine: param.GoLow().Required.KeyNode.Line,
+        SpecCol:  param.GoLow().Required.KeyNode.Column,
+    }
+}
+
+func (v *validator) headerParameterMissing(param *v3.Parameter) *ValidationError {
+    return &ValidationError{
+        Message: fmt.Sprintf("Header parameter '%s' is missing", param.Name),
+        Reason: fmt.Sprintf("The header parameter '%s' is defined as being required, "+
+            "however it's missing from the request", param.Name),
+        SpecLine: param.GoLow().Required.KeyNode.Line,
+        SpecCol:  param.GoLow().Required.KeyNode.Column,
+    }
+}
+
+func (v *validator) headerParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
+    return &ValidationError{
+        Message:  fmt.Sprintf("Header parameter '%s' is not defined", paramName),
+        Reason:   fmt.Sprintf("The header parameter '%s' is not defined as part of the specification", paramName),
+        SpecLine: kn.Line,
+        SpecCol:  kn.Column,
+    }
 }
 
 func (v *validator) incorrectQueryParamArrayBoolean(
@@ -165,5 +184,33 @@ func (v *validator) incorrectReservedValues(param *v3.Parameter, ef string, sch 
         SpecCol:  param.GoLow().Schema.KeyNode.Column,
         Context:  sch,
         HowToFix: fmt.Sprintf(HowToFixReservedValues, url.QueryEscape(ef)),
+    }
+}
+
+func (v *validator) invalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header parameter '%s' is not a valid number", param.Name),
+        Reason: fmt.Sprintf("The header parameter '%s' is defined as being a number, "+
+            "however the value '%s' is not a valid number", param.Name, ef),
+        SpecLine: param.GoLow().Schema.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, ef),
+    }
+}
+
+func (v *validator) incorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header parameter '%s' is not a valid boolean", param.Name),
+        Reason: fmt.Sprintf("The header parameter '%s' is defined as being a boolean, "+
+            "however the value '%s' is not a valid boolean", param.Name, ef),
+        SpecLine: param.GoLow().Schema.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
     }
 }
