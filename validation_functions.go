@@ -60,6 +60,7 @@ type Validator interface {
     ValidateHttpRequest(request *http.Request) (bool, []*ValidationError)
     ValidateQueryParams(request *http.Request) (bool, []*ValidationError)
     ValidateHeaderParams(request *http.Request) (bool, []*ValidationError)
+    ValidateCookieParams(request *http.Request) (bool, []*ValidationError)
     FindPath(request *http.Request) (*v3.PathItem, []*ValidationError)
     AllValidationErrors() []*ValidationError
 }
@@ -137,7 +138,6 @@ func (v *validator) validateSchema(
             if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
                 continue // ignore this error,
             }
-
             schemaValidationErrors = append(schemaValidationErrors, &SchemaValidationFailure{
                 Reason:        er.Error,
                 Location:      er.KeywordLocation,
@@ -175,7 +175,6 @@ func (v *validator) validateSchema(
                     HowToFix: HowToFixDecodingError,
                 })
             }
-
         }
     }
     return errors

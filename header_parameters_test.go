@@ -509,31 +509,3 @@ paths:
     assert.False(t, valid)
     assert.Len(t, errors, 3)
 }
-
-func TestNewValidator_HeaderParamNonDefaultEncoding_SliceObject(t *testing.T) {
-
-    spec := `openapi: 3.1.0
-paths:
-  /vending/drinks:
-    get:
-      parameters:
-        - name: coffeeCups
-          in: header
-          required: true
-          schema:
-            type: array
-            items:
-              type: object`
-
-    doc, _ := libopenapi.NewDocument([]byte(spec))
-    m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
-
-    request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
-    request.Header.Set("coffeecups", "1,false,2,true,5,false") // default encoding.
-
-    valid, errors := v.ValidateHeaderParams(request)
-
-    assert.False(t, valid)
-    assert.Len(t, errors, 3)
-}

@@ -22,6 +22,7 @@ const (
     Boolean          = "boolean"
     DeepObject       = "deepObject"
     Header           = "header"
+    Cookie           = "cookie"
     Form             = "form"
     Query            = "query"
     Simple           = "simple"

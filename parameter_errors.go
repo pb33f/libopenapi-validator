@@ -214,3 +214,33 @@ func (v *validator) incorrectHeaderParamBool(param *v3.Parameter, ef string, sch
         HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
     }
 }
+
+func (v *validator) incorrectHeaderParamArrayBoolean(
+    param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header array parameter '%s' is not a valid boolean", param.Name),
+        Reason: fmt.Sprintf("The header parameter (which is an array) '%s' is defined as being a boolean, "+
+            "however the value '%s' is not a valid true/false value", param.Name, item),
+        SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+        SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+        Context:  itemsSchema,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, item),
+    }
+}
+
+func (v *validator) incorrectHeaderParamArrayNumber(
+    param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header array parameter '%s' is not a valid number", param.Name),
+        Reason: fmt.Sprintf("The header parameter (which is an array) '%s' is defined as being a number, "+
+            "however the value '%s' is not a valid number", param.Name, item),
+        SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+        SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+        Context:  itemsSchema,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, item),
+    }
+}

@@ -124,18 +124,18 @@ func (v *validator) validateHeaderArray(
             case Integer, Number:
                 if _, err := strconv.ParseFloat(item, 64); err != nil {
                     errors = append(errors,
-                        v.incorrectQueryParamArrayNumber(param, item, sch, itemsSchema))
+                        v.incorrectHeaderParamArrayNumber(param, item, sch, itemsSchema))
                 }
             case Boolean:
                 if _, err := strconv.ParseBool(item); err != nil {
                     errors = append(errors,
-                        v.incorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+                        v.incorrectHeaderParamArrayBoolean(param, item, sch, itemsSchema))
                     break
                 }
                 // check for edge-cases "0" and "1" which can also be parsed into valid booleans
                 if item == "0" || item == "1" {
                     errors = append(errors,
-                        v.incorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+                        v.incorrectHeaderParamArrayBoolean(param, item, sch, itemsSchema))
                 }
             case String:
                 // do nothing for now.
