@@ -6,7 +6,7 @@ package main
 import (
     "encoding/json"
     "github.com/pb33f/libopenapi/datamodel/high/base"
-    v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+    "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
     "regexp"
     "strconv"

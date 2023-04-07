@@ -150,6 +150,18 @@ func constructMapFromCSV(csv string) map[string]interface{} {
     return decoded
 }
 
+func constructKVFromCSV(values string) map[string]interface{} {
+    props := make(map[string]interface{})
+    exploded := strings.Split(values, Comma)
+    for i := range exploded {
+        obK := strings.Split(exploded[i], Equals)
+        if len(obK) == 2 {
+            props[obK[0]] = cast(obK[1])
+        }
+    }
+    return props
+}
+
 func constructParamMapFromFormEncodingArray(values []*queryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {
@@ -179,8 +191,10 @@ func explodeQueryValue(value, style string) []string {
         return strings.Split(value, Space)
     case PipeDelimited:
         return strings.Split(value, Pipe)
+    default:
+        return strings.Split(value, Comma)
     }
-    return strings.Split(value, Comma)
+
 }
 
 func collapseCSVIntoFormStyle(key string, value string) string {

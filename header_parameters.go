@@ -4,13 +4,15 @@
 package main
 
 import (
-    "fmt"
     "github.com/pb33f/libopenapi/datamodel/high/base"
+    "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
     "strconv"
     "strings"
 )
 
+// ValidateHeaderParams validates the header parameters contained within *http.Request. It returns a boolean stating true
+// if validation passed (false for failed), and a slice of errors if validation failed.
 func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*ValidationError) {
 
     // find path
@@ -29,27 +31,11 @@ func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*Valida
 
             seenHeaders[strings.ToLower(p.Name)] = true
             if param := request.Header.Get(p.Name); param != "" {
-                contentWrapped := false
-                var contentType string
-                // skipValues:
-
-                // for _, ef := range param {
 
                 var sch *base.Schema
 
                 if p.Schema != nil {
                     sch = p.Schema.Schema()
-                } else {
-                    // ok, no schema, check for a content type
-                    // currently we only support one content type if used.
-                    if p.Content != nil {
-                        for k, ct := range p.Content {
-                            sch = ct.Schema.Schema()
-                            contentWrapped = true
-                            contentType = k
-                            break
-                        }
-                    }
                 }
 
                 pType := sch.Type
@@ -66,35 +52,36 @@ func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*Valida
                         }
                     case Object:
 
-                        // check what style of encoding was used and then construct a map[string]interface{}
-                        // and pass that in as encoded JSON.
-                        var encodedObj map[string]interface{}
+                        // check if the header is default encoded or not
+                        var encodedObj interface{}
                         // we have found our header, check the explode type.
                         if p.IsDefaultHeaderEncoding() {
                             encodedObj = constructMapFromCSV(param)
                         } else {
-                            fmt.Print(contentType)
-                            panic("oh my stars")
+                            if p.IsExploded() { // only option is to be exploded for KV extraction.
+                                encodedObj = constructKVFromCSV(param)
+                            }
                         }
 
-                        errors = append(errors, v.validateSchema(sch, encodedObj, param,
-                            "Header parameter",
-                            "The header parameter",
-                            p.Name,
-                            ParameterValidation,
-                            ParameterValidationQuery)...)
+                        // if a schema was extracted
+                        if sch != nil {
+                            errors = append(errors, v.validateSchema(sch, encodedObj, "",
+                                "Header parameter",
+                                "The header parameter",
+                                p.Name,
+                                ParameterValidation,
+                                ParameterValidationQuery)...)
+                        }
 
                     case Array:
                         // well we're already in an array, so we need to check the items schema
                         // to ensure this array items matches the type
                         // only check if items is a schema, not a boolean
                         if sch.Items.IsA() {
-                            errors = append(errors, v.validateQueryArray(sch, p, param, contentWrapped)...)
+                            errors = append(errors, v.validateHeaderArray(sch, p, param)...)
                         }
                     }
                 }
-
-                // }
             } else {
                 if p.Required {
                     errors = append(errors, v.headerParameterMissing(p))
@@ -104,7 +91,7 @@ func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*Valida
     }
 
     // check for any headers that are not defined in the spec
-    for k, _ := range request.Header {
+    for k := range request.Header {
         if _, ok := seenHeaders[strings.ToLower(k)]; !ok {
             ps := pathItem.GetOperations()[strings.ToLower(request.Method)].GoLow().Parameters
             if ps.KeyNode != nil {
@@ -120,7 +107,41 @@ func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*Valida
 
 }
 
-type headerParam struct {
-    key    string
-    values []string
+func (v *validator) validateHeaderArray(
+    sch *base.Schema, param *v3.Parameter, value string) []*ValidationError {
+
+    var errors []*ValidationError
+    itemsSchema := sch.Items.A.Schema()
+
+    // header arrays can only be encoded as CSV
+    items := explodeQueryValue(value, DefaultDelimited)
+
+    // now check each item in the array
+    for _, item := range items {
+        // for each type defined in the item's schema, check the item
+        for _, itemType := range itemsSchema.Type {
+            switch itemType {
+            case Integer, Number:
+                if _, err := strconv.ParseFloat(item, 64); err != nil {
+                    errors = append(errors,
+                        v.incorrectQueryParamArrayNumber(param, item, sch, itemsSchema))
+                }
+            case Boolean:
+                if _, err := strconv.ParseBool(item); err != nil {
+                    errors = append(errors,
+                        v.incorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+                    break
+                }
+                // check for edge-cases "0" and "1" which can also be parsed into valid booleans
+                if item == "0" || item == "1" {
+                    errors = append(errors,
+                        v.incorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+                }
+            case String:
+                // do nothing for now.
+                continue
+            }
+        }
+    }
+    return errors
 }

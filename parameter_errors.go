@@ -3,7 +3,7 @@ package main
 import (
     "fmt"
     "github.com/pb33f/libopenapi/datamodel/high/base"
-    v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+    "github.com/pb33f/libopenapi/datamodel/high/v3"
     "gopkg.in/yaml.v3"
     "net/url"
 )

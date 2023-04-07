@@ -12,6 +12,7 @@ import (
     "github.com/santhosh-tekuri/jsonschema/v5"
     "net/http"
     "net/url"
+    "reflect"
     "strings"
 )
 
@@ -93,7 +94,7 @@ func (v *validator) AllValidationErrors() []*ValidationError {
 
 func (v *validator) validateSchema(
     schema *base.Schema,
-    rawObject map[string]interface{},
+    rawObject any,
     rawBlob string,
     entity, reasonEntity, name, validationType, subValType string) []*ValidationError {
 
@@ -104,9 +105,16 @@ func (v *validator) validateSchema(
     jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
     // 2. decode the object into a json blob.
-    var decodedObj map[string]interface{}
+    var decodedObj interface{}
+    rawIsMap := false
     if rawObject != nil {
-        decodedObj = rawObject
+        // check what type of object it is
+        ot := reflect.TypeOf(rawObject)
+        switch ot.Kind() {
+        case reflect.Map:
+            decodedObj = rawObject.(map[string]interface{})
+            rawIsMap = true
+        }
     } else {
         decodedString, _ := url.QueryUnescape(rawBlob)
         _ = json.Unmarshal([]byte(decodedString), &decodedObj)
@@ -152,18 +160,21 @@ func (v *validator) validateSchema(
 
     // if there are no errors, check that the supplied value is even JSON
     if len(errors) == 0 {
-        if decodedObj == nil || len(decodedObj) == 0 {
-            // add the error to the list
-            errors = append(errors, &ValidationError{
-                ValidationType:    validationType,
-                ValidationSubType: subValType,
-                Message:           fmt.Sprintf("%s '%s' cannot be decoded", entity, name),
-                Reason: fmt.Sprintf("%s '%s' is defined as an object, "+
-                    "however it failed to be decoded as an object", reasonEntity, name),
-                SpecLine: schema.GoLow().Type.KeyNode.Line,
-                SpecCol:  schema.GoLow().Type.KeyNode.Column,
-                HowToFix: HowToFixDecodingError,
-            })
+        if rawIsMap {
+            decodedMap := decodedObj.(map[string]interface{})
+            if decodedMap == nil || len(decodedMap) == 0 {
+                // add the error to the list
+                errors = append(errors, &ValidationError{
+                    ValidationType:    validationType,
+                    ValidationSubType: subValType,
+                    Message:           fmt.Sprintf("%s '%s' cannot be decoded", entity, name),
+                    Reason: fmt.Sprintf("%s '%s' is defined as an object, "+
+                        "however it failed to be decoded as an object", reasonEntity, name),
+                    SpecLine: schema.GoLow().Type.KeyNode.Line,
+                    SpecCol:  schema.GoLow().Type.KeyNode.Column,
+                    HowToFix: HowToFixDecodingError,
+                })
+            }
 
         }
     }
