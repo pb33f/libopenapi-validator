@@ -95,7 +95,16 @@ func (v *validator) headerParameterMissing(param *v3.Parameter) *ValidationError
 func (v *validator) headerParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
     return &ValidationError{
         Message:  fmt.Sprintf("Header parameter '%s' is not defined", paramName),
-        Reason:   fmt.Sprintf("The header parameter '%s' is not defined as part of the specification", paramName),
+        Reason:   fmt.Sprintf("The header parameter '%s' is not defined as part of the specification for the operation", paramName),
+        SpecLine: kn.Line,
+        SpecCol:  kn.Column,
+    }
+}
+
+func (v *validator) queryParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
+    return &ValidationError{
+        Message:  fmt.Sprintf("Query parameter '%s' is not defined", paramName),
+        Reason:   fmt.Sprintf("The query parameter '%s' is not defined as part of the specification for the operation", paramName),
         SpecLine: kn.Line,
         SpecCol:  kn.Column,
     }
@@ -116,6 +125,21 @@ func (v *validator) incorrectQueryParamArrayBoolean(
     }
 }
 
+func (v *validator) incorrectCookieParamArrayBoolean(
+    param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationCookie,
+        Message:           fmt.Sprintf("Cookie array parameter '%s' is not a valid boolean", param.Name),
+        Reason: fmt.Sprintf("The cookie parameter (which is an array) '%s' is defined as being a boolean, "+
+            "however the value '%s' is not a valid true/false value", param.Name, item),
+        SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+        SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+        Context:  itemsSchema,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, item),
+    }
+}
+
 func (v *validator) incorrectQueryParamArrayNumber(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
@@ -123,6 +147,21 @@ func (v *validator) incorrectQueryParamArrayNumber(
         ValidationSubType: ParameterValidationQuery,
         Message:           fmt.Sprintf("Query array parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The query parameter (which is an array) '%s' is defined as being a number, "+
+            "however the value '%s' is not a valid number", param.Name, item),
+        SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+        SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+        Context:  itemsSchema,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, item),
+    }
+}
+
+func (v *validator) incorrectCookieParamArrayNumber(
+    param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationCookie,
+        Message:           fmt.Sprintf("Cookie array parameter '%s' is not a valid number", param.Name),
+        Reason: fmt.Sprintf("The cookie parameter (which is an array) '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
         SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
         SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
@@ -201,12 +240,40 @@ func (v *validator) invalidHeaderParamNumber(param *v3.Parameter, ef string, sch
     }
 }
 
+func (v *validator) invalidCookieParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationCookie,
+        Message:           fmt.Sprintf("Cookie parameter '%s' is not a valid number", param.Name),
+        Reason: fmt.Sprintf("The cookie parameter '%s' is defined as being a number, "+
+            "however the value '%s' is not a valid number", param.Name, ef),
+        SpecLine: param.GoLow().Schema.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, ef),
+    }
+}
+
 func (v *validator) incorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
         ValidationType:    ParameterValidation,
         ValidationSubType: ParameterValidationHeader,
         Message:           fmt.Sprintf("Header parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' is defined as being a boolean, "+
+            "however the value '%s' is not a valid boolean", param.Name, ef),
+        SpecLine: param.GoLow().Schema.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
+    }
+}
+
+func (v *validator) incorrectCookieParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationCookie,
+        Message:           fmt.Sprintf("Cookie parameter '%s' is not a valid boolean", param.Name),
+        Reason: fmt.Sprintf("The cookie parameter '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid boolean", param.Name, ef),
         SpecLine: param.GoLow().Schema.KeyNode.Line,
         SpecCol:  param.GoLow().Schema.KeyNode.Column,
@@ -237,6 +304,49 @@ func (v *validator) incorrectHeaderParamArrayNumber(
         ValidationSubType: ParameterValidationHeader,
         Message:           fmt.Sprintf("Header array parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The header parameter (which is an array) '%s' is defined as being a number, "+
+            "however the value '%s' is not a valid number", param.Name, item),
+        SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+        SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+        Context:  itemsSchema,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, item),
+    }
+}
+
+func (v *validator) incorrectPathParamBool(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationPath,
+        Message:           fmt.Sprintf("Path parameter '%s' is not a valid boolean", param.Name),
+        Reason: fmt.Sprintf("The path parameter '%s' is defined as being a boolean, "+
+            "however the value '%s' is not a valid boolean", param.Name, item),
+        SpecLine: param.GoLow().Schema.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, item),
+    }
+}
+
+func (v *validator) incorrectPathParamNumber(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationPath,
+        Message:           fmt.Sprintf("Path parameter '%s' is not a valid number", param.Name),
+        Reason: fmt.Sprintf("The path parameter '%s' is defined as being a number, "+
+            "however the value '%s' is not a valid number", param.Name, item),
+        SpecLine: param.GoLow().Schema.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, item),
+    }
+}
+
+func (v *validator) incorrectPathParamArrayNumber(
+    param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationPath,
+        Message:           fmt.Sprintf("Path array parameter '%s' is not a valid number", param.Name),
+        Reason: fmt.Sprintf("The path parameter (which is an array) '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
         SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
         SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,

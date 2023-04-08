@@ -61,7 +61,8 @@ type Validator interface {
     ValidateQueryParams(request *http.Request) (bool, []*ValidationError)
     ValidateHeaderParams(request *http.Request) (bool, []*ValidationError)
     ValidateCookieParams(request *http.Request) (bool, []*ValidationError)
-    FindPath(request *http.Request) (*v3.PathItem, []*ValidationError)
+    ValidatePathParams(request *http.Request) (bool, []*ValidationError)
+    FindPath(request *http.Request) (*v3.PathItem, []*ValidationError, string)
     AllValidationErrors() []*ValidationError
 }
 
@@ -77,7 +78,7 @@ func NewValidator(document *v3.Document) Validator {
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*ValidationError) {
 
     // find path
-    pathItem, errs := v.FindPath(request)
+    pathItem, errs, _ := v.FindPath(request)
     if pathItem == nil || errs != nil {
         return false, errs
     }

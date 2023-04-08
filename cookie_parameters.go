@@ -16,14 +16,13 @@ import (
 func (v *validator) ValidateCookieParams(request *http.Request) (bool, []*ValidationError) {
 
     // find path
-    pathItem, errs := v.FindPath(request)
+    pathItem, errs, _ := v.FindPath(request)
     if pathItem == nil || errs != nil {
         return false, errs
     }
 
     // extract params for the operation
     var params = extractParamsForOperation(request, pathItem)
-    // headerParams := make(map[string][]*headerParam)
     var errors []*ValidationError
     for _, p := range params {
         if p.In == Cookie {
@@ -42,11 +41,11 @@ func (v *validator) ValidateCookieParams(request *http.Request) (bool, []*Valida
                         switch ty {
                         case Integer, Number:
                             if _, err := strconv.ParseFloat(cookie.Value, 64); err != nil {
-                                errors = append(errors, v.invalidHeaderParamNumber(p, strings.ToLower(cookie.Value), sch))
+                                errors = append(errors, v.invalidCookieParamNumber(p, strings.ToLower(cookie.Value), sch))
                             }
                         case Boolean:
                             if _, err := strconv.ParseBool(cookie.Value); err != nil {
-                                errors = append(errors, v.incorrectHeaderParamBool(p, strings.ToLower(cookie.Value), sch))
+                                errors = append(errors, v.incorrectCookieParamBool(p, strings.ToLower(cookie.Value), sch))
                             }
                         case Object:
                             if !p.IsExploded() {
@@ -72,7 +71,7 @@ func (v *validator) ValidateCookieParams(request *http.Request) (bool, []*Valida
                                 // to ensure this array items matches the type
                                 // only check if items is a schema, not a boolean
                                 if sch.Items.IsA() {
-                                    errors = append(errors, v.validateHeaderArray(sch, p, cookie.Value)...)
+                                    errors = append(errors, v.validateCookieArray(sch, p, cookie.Value)...)
                                 }
                             }
                         }
@@ -80,22 +79,12 @@ func (v *validator) ValidateCookieParams(request *http.Request) (bool, []*Valida
 
                 }
             }
-
-            //if param := request.C.Get(p.Name); param != "" {
-            //
-            //} else {
-            //    if p.Required {
-            //        errors = append(errors, v.headerParameterMissing(p))
-            //    }
-            //}
         }
     }
-
     if len(errors) > 0 {
         return false, errors
     }
     return true, nil
-
 }
 
 func (v *validator) validateCookieArray(
@@ -115,18 +104,18 @@ func (v *validator) validateCookieArray(
             case Integer, Number:
                 if _, err := strconv.ParseFloat(item, 64); err != nil {
                     errors = append(errors,
-                        v.incorrectQueryParamArrayNumber(param, item, sch, itemsSchema))
+                        v.incorrectCookieParamArrayNumber(param, item, sch, itemsSchema))
                 }
             case Boolean:
                 if _, err := strconv.ParseBool(item); err != nil {
                     errors = append(errors,
-                        v.incorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+                        v.incorrectCookieParamArrayBoolean(param, item, sch, itemsSchema))
                     break
                 }
                 // check for edge-cases "0" and "1" which can also be parsed into valid booleans
                 if item == "0" || item == "1" {
                     errors = append(errors,
-                        v.incorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+                        v.incorrectCookieParamArrayBoolean(param, item, sch, itemsSchema))
                 }
             case String:
                 // do nothing for now.

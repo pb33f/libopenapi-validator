@@ -18,7 +18,7 @@ import (
 // will be matched and validated against what has been supplied in the http.Request query string.
 func (v *validator) ValidateQueryParams(request *http.Request) (bool, []*ValidationError) {
     // find path
-    pathItem, errs := v.FindPath(request)
+    pathItem, errs, _ := v.FindPath(request)
     if pathItem == nil || errs != nil {
         return false, errs
     }
@@ -53,7 +53,6 @@ doneLooking:
 
             contentWrapped := false
             var contentType string
-
             // check if this param is found as a set of query strings
             if jk, ok := queryParams[params[p].Name]; ok {
             skipValues:
@@ -189,6 +188,7 @@ doneLooking:
             }
         }
     }
+
     v.errors = errors
     if len(errors) > 0 {
         return false, errors

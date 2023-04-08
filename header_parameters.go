@@ -16,7 +16,7 @@ import (
 func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*ValidationError) {
 
     // find path
-    pathItem, errs := v.FindPath(request)
+    pathItem, errs, _ := v.FindPath(request)
     if pathItem == nil || errs != nil {
         return false, errs
     }
@@ -74,11 +74,10 @@ func (v *validator) ValidateHeaderParams(request *http.Request) (bool, []*Valida
                         }
 
                     case Array:
-                        // well we're already in an array, so we need to check the items schema
-                        // to ensure this array items matches the type
-                        // only check if items is a schema, not a boolean
-                        if sch.Items.IsA() {
-                            errors = append(errors, v.validateHeaderArray(sch, p, param)...)
+                        if !p.IsExploded() { // only unexploded arrays are supported for cookie params
+                            if sch.Items.IsA() {
+                                errors = append(errors, v.validateHeaderArray(sch, p, param)...)
+                            }
                         }
                     }
                 }

@@ -12,13 +12,14 @@ import (
     "strings"
 )
 
-func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*ValidationError) {
+func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*ValidationError, string) {
 
     reqPathSegments := strings.Split(request.URL.Path, "/")
     if reqPathSegments[0] == "" {
         reqPathSegments = reqPathSegments[1:]
     }
     var pItem *v3.PathItem
+    var foundPath string
     for path, pathItem := range v.document.Paths.PathItems {
         segs := strings.Split(path, "/")
         if segs[0] == "" {
@@ -34,6 +35,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Get.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -42,6 +44,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Post.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -50,6 +53,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Put.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -58,6 +62,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Delete.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -66,6 +71,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Options.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -74,6 +80,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Head.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -82,6 +89,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Patch.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -90,6 +98,7 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 p := append(params, pathItem.Trace.Parameters...)
                 if ok, _ := v.comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
                     pItem = pathItem
+                    foundPath = path
                     break
                 }
             }
@@ -107,9 +116,9 @@ func (v *validator) FindPath(request *http.Request) (*v3.PathItem, []*Validation
                 SpecCol:  -1,
             }}
         v.errors = errs
-        return pItem, errs
+        return pItem, errs, foundPath
     } else {
-        return pItem, nil
+        return pItem, nil, foundPath
     }
 }
 
@@ -136,7 +145,7 @@ func (v *validator) comparePaths(mapped, requested []string,
                 if params[p].Name == h {
                     schema := params[p].Schema.Schema()
                     for t := range schema.Type {
-                        if schema.Type[t] == "number" || schema.Type[t] == "integer" {
+                        if schema.Type[t] == Number || schema.Type[t] == Integer {
                             notaNumber := false
                             // will return no error on floats or int
                             if _, err := strconv.ParseFloat(s, 64); err != nil {
