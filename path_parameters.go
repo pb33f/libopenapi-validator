@@ -40,8 +40,8 @@ func (v *validator) ValidatePathParams(request *http.Request) (bool, []*Validati
                     isLabel := false
                     //isExplode := false
                     isSimple := true
-                    var paramName string
                     paramTemplate := pathSegments[x][i+1 : len(pathSegments[x])-1]
+                    paramName := paramTemplate
                     // check for an asterisk on the end of the parameter (explode)
                     if strings.HasSuffix(paramTemplate, Asterisk) {
                         //isExplode = true
@@ -50,12 +50,12 @@ func (v *validator) ValidatePathParams(request *http.Request) (bool, []*Validati
                     if strings.HasPrefix(paramTemplate, Period) {
                         isLabel = true
                         isSimple = false
-                        paramName = paramTemplate[:len(paramTemplate)-1]
+                        paramName = paramName[1:]
                     }
                     if strings.HasPrefix(paramTemplate, SemiColon) {
                         isMatrix = true
                         isSimple = false
-                        paramName = paramTemplate[:len(paramTemplate)-1]
+                        paramName = paramName[1:]
                     }
 
                     // does this param name match the current path segment param name
@@ -73,45 +73,104 @@ func (v *validator) ValidatePathParams(request *http.Request) (bool, []*Validati
 
                         switch sch.Type[typ] {
                         case Integer, Number:
-                            // primitives were checked already in FindPath,
-                            // now we need to validate arrays and objects
-                            // with interesting and strange encoding schemes
-                            break
-                        case Boolean:
-                            if _, err := strconv.ParseBool(paramValue); err != nil {
-                                errors = append(errors, v.incorrectPathParamBool(p, paramValue, sch))
+                            if isSimple {
+                                if _, err := strconv.ParseFloat(paramValue, 64); err != nil {
+                                    errors = append(errors, v.incorrectPathParamNumber(p, paramValue, sch))
+                                }
                             }
+                            if isLabel && p.Style == LabelStyle {
+                                if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
+                                    errors = append(errors, v.incorrectPathParamNumber(p, paramValue[1:], sch))
+                                }
+                            }
+                        case Boolean:
+                            if isLabel && p.Style == LabelStyle {
+                                if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
+                                    errors = append(errors, v.incorrectPathParamNumber(p, paramValue[1:], sch))
+                                }
+                            }
+                            if isSimple {
+                                if _, err := strconv.ParseBool(paramValue); err != nil {
+                                    errors = append(errors, v.incorrectPathParamBool(p, paramValue, sch))
+                                }
+                            }
+                        case Object:
+                            var encodedObject interface{}
+
+                            if p.IsDefaultPathEncoding() {
+                                encodedObject = constructMapFromCSV(paramValue)
+                            } else {
+
+                                switch p.Style {
+                                case LabelStyle:
+                                    if !p.IsExploded() {
+                                        encodedObject = constructMapFromCSV(paramValue[1:])
+                                    } else {
+                                        // todo
+                                    }
+                                case MatrixStyle:
+                                    // TODO: break
+                                default:
+                                    if p.IsExploded() {
+                                        encodedObject = constructKVFromCSV(paramValue)
+                                    }
+                                }
+                            }
+                            // if a schema was extracted
+                            if sch != nil {
+                                errors = append(errors,
+                                    v.validateSchema(sch, encodedObject, "",
+                                        "Path parameter",
+                                        "The path parameter",
+                                        p.Name,
+                                        ParameterValidation,
+                                        ParameterValidationPath)...)
+                            }
+
                         case Array:
 
                             // extract the items schema in order to validate the array items.
                             if sch.Items != nil && sch.Items.IsA() {
                                 iSch := sch.Items.A.Schema()
                                 for n := range iSch.Type {
+                                    // determine how to explode the array
+                                    var arrayValues []string
+                                    if isSimple {
+                                        arrayValues = strings.Split(paramValue, Comma)
+                                    }
+                                    if isLabel {
+                                        arrayValues = strings.Split(paramValue, Period)
+                                    }
+                                    if isMatrix {
+                                        panic("oh my stars")
+                                    }
                                     switch iSch.Type[n] {
                                     case Integer, Number:
-
-                                        // determine how to explode the array
-                                        var arrayValues []string
-                                        if isSimple {
-                                            arrayValues = strings.Split(paramValue, Comma)
-                                        }
-                                        if isLabel {
-                                            arrayValues = strings.Split(paramValue, Period)
-                                        }
-                                        if isMatrix {
-                                            panic("oh my stars")
-                                        }
                                         for pv := range arrayValues {
                                             if _, err := strconv.ParseFloat(arrayValues[pv], 64); err != nil {
-                                                errors = append(errors, v.incorrectPathParamArrayNumber(p, arrayValues[pv], sch, iSch))
+                                                errors = append(errors,
+                                                    v.incorrectPathParamArrayNumber(p, arrayValues[pv], sch, iSch))
                                             }
                                         }
                                     case Boolean:
-                                        if _, err := strconv.ParseBool(paramValue); err != nil {
-                                            errors = append(errors, v.incorrectPathParamBool(p, paramValue, sch))
+                                        for pv := range arrayValues {
+                                            bc := len(errors)
+                                            if _, err := strconv.ParseBool(arrayValues[pv]); err != nil {
+                                                errors = append(errors,
+                                                    v.incorrectPathParamArrayBoolean(p, arrayValues[pv], sch, iSch))
+                                                continue
+                                            }
+                                            if len(errors) == bc {
+                                                // ParseBool will parse 0 or 1 as false/true to we
+                                                // need to catch this edge case.
+                                                if arrayValues[pv] == "0" || arrayValues[pv] == "1" {
+                                                    errors = append(errors,
+                                                        v.incorrectPathParamArrayBoolean(p, arrayValues[pv], sch, iSch))
+                                                    continue
+                                                }
+                                            }
                                         }
                                     }
-
                                 }
                             }
                         }

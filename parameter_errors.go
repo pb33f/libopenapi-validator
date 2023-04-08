@@ -354,3 +354,18 @@ func (v *validator) incorrectPathParamArrayNumber(
         HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, item),
     }
 }
+
+func (v *validator) incorrectPathParamArrayBoolean(
+    param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+    return &ValidationError{
+        ValidationType:    ParameterValidation,
+        ValidationSubType: ParameterValidationPath,
+        Message:           fmt.Sprintf("Path array parameter '%s' is not a valid boolean", param.Name),
+        Reason: fmt.Sprintf("The path parameter (which is an array) '%s' is defined as being a boolean, "+
+            "however the value '%s' is not a valid boolean", param.Name, item),
+        SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+        SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+        Context:  itemsSchema,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, item),
+    }
+}

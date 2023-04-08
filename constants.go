@@ -8,6 +8,7 @@ const (
     PipeDelimited    = "pipeDelimited"
     DefaultDelimited = "default"
     MatrixStyle      = "matrix"
+    LabelStyle       = "label"
     Pipe             = "|"
     Comma            = ","
     Space            = " "
