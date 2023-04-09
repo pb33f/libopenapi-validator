@@ -162,6 +162,18 @@ func constructKVFromCSV(values string) map[string]interface{} {
     return props
 }
 
+func constructKVFromLabelEncoding(values string) map[string]interface{} {
+    props := make(map[string]interface{})
+    exploded := strings.Split(values, Period)
+    for i := range exploded {
+        obK := strings.Split(exploded[i], Equals)
+        if len(obK) == 2 {
+            props[obK[0]] = cast(obK[1])
+        }
+    }
+    return props
+}
+
 func constructParamMapFromFormEncodingArray(values []*queryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {

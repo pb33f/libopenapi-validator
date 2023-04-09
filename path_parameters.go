@@ -4,6 +4,7 @@
 package main
 
 import (
+    "fmt"
     "net/http"
     "strconv"
     "strings"
@@ -83,6 +84,14 @@ func (v *validator) ValidatePathParams(request *http.Request) (bool, []*Validati
                                     errors = append(errors, v.incorrectPathParamNumber(p, paramValue[1:], sch))
                                 }
                             }
+                            if isMatrix && p.Style == MatrixStyle {
+                                // strip off the colon and the parameter name
+                                paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+                                if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
+                                    errors = append(errors, v.incorrectPathParamNumber(p, paramValue[1:], sch))
+                                }
+                            }
+
                         case Boolean:
                             if isLabel && p.Style == LabelStyle {
                                 if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
@@ -94,22 +103,29 @@ func (v *validator) ValidatePathParams(request *http.Request) (bool, []*Validati
                                     errors = append(errors, v.incorrectPathParamBool(p, paramValue, sch))
                                 }
                             }
+                            if isMatrix && p.Style == MatrixStyle {
+                                // strip off the colon and the parameter name
+                                paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+                                if _, err := strconv.ParseBool(paramValue); err != nil {
+                                    errors = append(errors, v.incorrectPathParamBool(p, paramValue, sch))
+                                }
+                            }
                         case Object:
                             var encodedObject interface{}
 
                             if p.IsDefaultPathEncoding() {
                                 encodedObject = constructMapFromCSV(paramValue)
                             } else {
-
                                 switch p.Style {
                                 case LabelStyle:
                                     if !p.IsExploded() {
                                         encodedObject = constructMapFromCSV(paramValue[1:])
                                     } else {
-                                        // todo
+                                        encodedObject = constructKVFromLabelEncoding(paramValue)
                                     }
                                 case MatrixStyle:
-                                    // TODO: break
+                                    fmt.Print(paramValue[1:])
+
                                 default:
                                     if p.IsExploded() {
                                         encodedObject = constructKVFromCSV(paramValue)

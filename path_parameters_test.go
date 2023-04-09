@@ -369,3 +369,224 @@ paths:
     assert.Len(t, errors, 1)
     assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
+
+func TestNewValidator_LabelEncodedPath_InvalidObject_Exploded(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{.burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: label
+        explode: true
+        schema:
+          type: object
+          properties:
+            id:
+              type: integer
+            vegetarian:
+              type: boolean
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/.id=hello.vegetarian=why/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 2)
+}
+
+func TestNewValidator_LabelEncodedPath_ValidMultiParam(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{.burgerId}/locate/{.query}:
+    parameters:
+      - name: query
+        in: path
+        style: label
+        schema:
+          type: string
+      - name: burgerId
+        in: path
+        style: label
+        explode: true
+        schema:
+          type: object
+          properties:
+            id:
+              type: integer
+            vegetarian:
+              type: boolean
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/.id=1234.vegetarian=true/locate/bigMac", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_LabelEncodedPath_InvalidMultiParam(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{.burgerId}/locate/{.query}:
+    parameters:
+      - name: query
+        in: path
+        style: label
+        schema:
+          type: integer
+      - name: burgerId
+        in: path
+        style: label
+        explode: true
+        schema:
+          type: object
+          properties:
+            id:
+              type: integer
+            vegetarian:
+              type: boolean
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/.id=1234.vegetarian=true/locate/bigMac", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+}
+
+func TestNewValidator_MatrixEncodedPath_ValidPrimitiveNumber(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: integer
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=5/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_MatrixEncodedPath_InvalidPrimitiveNumber(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: integer
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=I am not a number/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path parameter 'burgerId' is not a valid number", errors[0].Message)
+}
+
+func TestNewValidator_MatrixEncodedPath_ValidPrimitiveBoolean(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: boolean
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=false/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_MatrixEncodedPath_InvalidPrimitiveBoolean(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: boolean
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=I am also not a bool/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path parameter 'burgerId' is not a valid boolean", errors[0].Message)
+
+}
