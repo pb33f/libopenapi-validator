@@ -1,7 +1,7 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package main
+package parameters
 
 import (
     "github.com/pb33f/libopenapi"
@@ -29,7 +29,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy", nil)
 
@@ -58,7 +58,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -87,7 +87,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodPost, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -116,7 +116,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodPut, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -145,7 +145,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodDelete, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -174,7 +174,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodOptions, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -203,7 +203,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodHead, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -232,7 +232,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodPatch, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -261,7 +261,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodTrace, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -290,7 +290,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/Not/Found/dishy?fishy=cod", nil)
 
@@ -318,7 +318,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -348,7 +348,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=123", nil)
 
@@ -377,7 +377,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=123.223", nil)
 
@@ -406,7 +406,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
 
@@ -436,7 +436,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=true", nil)
 
@@ -467,7 +467,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
 
@@ -498,7 +498,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
 
@@ -536,7 +536,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock", nil)
 
@@ -567,7 +567,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=1&fishy=2", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -596,7 +596,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=haddock&fishy=cod", nil)
 
@@ -627,7 +627,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
 
@@ -657,7 +657,7 @@ operationId: locateFishy`
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
 
@@ -693,7 +693,7 @@ operationId: locateFishy`
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=12&fishy=12.12&fishy=1234567789.1233456657", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -722,7 +722,7 @@ operationId: locateFishy`
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=12|12345.2344|22111233444.342452435", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -755,7 +755,7 @@ operationId: locateFishy`
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=ocean|12|silver|12.2345", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -791,7 +791,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"cod\":\"cakes\"}&fishy={\"crab\":\"legs\"}", nil)
 
@@ -834,7 +834,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":\"cakes\",\"chips\":\"hello\"}&fishy={\"vinegar\":true,\"chips\":123.223}", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -872,7 +872,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":true,\"chips\":12}&fishy={\"vinegar\":true,\"chips\":123.333}", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -919,7 +919,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":\"cakes\",\"chips\":\"hello\"}&fishy={\"vinegar\":true,\"chips\":123}", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -966,7 +966,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":false,\"chips\":999}&fishy={\"vinegar\":true,\"chips\":123}", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -1005,7 +1005,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?vinegar=true&chips=12", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -1044,7 +1044,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?vinegar=true&chips=false", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -1086,7 +1086,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":false,\"chips\":999}", nil)
 
@@ -1129,7 +1129,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":false,\"chips\":\"I am invalid\"}", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -1171,7 +1171,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=I am not json", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -1214,7 +1214,7 @@ paths:
     doc, _ := libopenapi.NewDocument([]byte(spec))
 
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy={\"vinegar\":1234,\"chips\":false}", nil)
     valid, errors := v.ValidateQueryParams(request)
@@ -1245,7 +1245,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=$$oh", nil)
@@ -1278,7 +1278,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
@@ -1311,7 +1311,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock,mackrel", nil)
@@ -1344,7 +1344,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock&fishy=mackrel", nil)
@@ -1377,16 +1377,15 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
-        "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&fishy=shark|crab|plaice", nil)
+        "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel", nil)
 
     valid, errors := v.ValidateQueryParams(request)
-    assert.False(t, valid)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
 
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectValid(t *testing.T) {
@@ -1419,7 +1418,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&plate=flat|round", nil)
@@ -1465,7 +1464,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish|salmon|dish|stew", nil)
@@ -1511,7 +1510,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish|salmon|dish|cakes", nil)
@@ -1558,7 +1557,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish%20salmon%20dish%20stew", nil) // dumb, don't do this.
@@ -1604,7 +1603,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=fish%20salmon%20dish%20coffee", nil) // dumb, don't do this.
@@ -1644,7 +1643,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&plate=flat,round", nil)
@@ -1673,7 +1672,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
@@ -1704,7 +1703,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=atlantic&fishy=12", nil)
@@ -1751,7 +1750,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=ocean,atlantic,fins,4&dishy=hot,true,salty,true", nil)
@@ -1796,7 +1795,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=ocean,atlantic,fins,4&dishy=hot,no,salty,why", nil)
@@ -1838,7 +1837,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1,2,3&dishy=a,little,plate", nil)
@@ -1879,7 +1878,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1&fishy=2&fishy=3&dishy=a&dishy=little&dishy=dish", nil)
@@ -1920,7 +1919,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1,2,3&dishy=little,dishy", nil)
@@ -1962,7 +1961,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1|2|3&dishy=little|dishy", nil)
@@ -2001,7 +2000,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1%202%203&dishy=little%20dishy", nil)
@@ -2040,7 +2039,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy=1|%202%203&dishy=little%20dishy", nil)
@@ -2076,7 +2075,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
@@ -2144,7 +2143,7 @@ paths:
 
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet,
         "https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12"+

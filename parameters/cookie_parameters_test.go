@@ -1,7 +1,7 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package main
+package parameters
 
 import (
     "github.com/pb33f/libopenapi"
@@ -25,7 +25,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/I/do/not/exist", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "1"})
@@ -51,7 +51,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "1"})
@@ -77,7 +77,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "123.455"})
@@ -103,7 +103,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "false"})
@@ -130,7 +130,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "true"})
@@ -156,7 +156,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "12345"})
@@ -190,7 +190,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "pink,true,number,2"})
@@ -223,7 +223,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "pink,2,number,2"})
@@ -252,7 +252,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "2,3,4"})
@@ -280,7 +280,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "2,true,4,'hello'"})
@@ -308,7 +308,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "true,false,true,false,true"})
@@ -336,7 +336,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "true,1,hey,ho"})
@@ -364,7 +364,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "true,false,pb33f,false,99.99"})
@@ -392,7 +392,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
     request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "true,false,0,false,1"})

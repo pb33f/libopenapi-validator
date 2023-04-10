@@ -1,7 +1,7 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package main
+package parameters
 
 import (
     "github.com/pb33f/libopenapi"
@@ -26,7 +26,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/bish/bosh", nil)
 
@@ -53,7 +53,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/I/do/not/exist", nil)
 
@@ -80,7 +80,7 @@ paths:
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
 
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("Mushypeas", "yes please") //https://github.com/golang/go/issues/5022
@@ -107,7 +107,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "two") // headers are case-insensitive
@@ -134,7 +134,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "two") // headers are case-insensitive
@@ -166,7 +166,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "I am not an object") // headers are case-insensitive
@@ -198,7 +198,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "milk,true,sugar,true") // default encoding.
@@ -230,7 +230,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "milk,true,sugar,true") // default encoding.
@@ -262,7 +262,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "milk,123,sugar,true") // default encoding.
@@ -294,7 +294,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "milk,123,sugar,true") // default encoding.
@@ -326,7 +326,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "milk=123,sugar=true") // default encoding.
@@ -358,7 +358,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "milk=true,sugar=true") // default encoding.
@@ -387,7 +387,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "1,2,3,4,5") // default encoding.
@@ -415,7 +415,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "1,2,3,4,5") // default encoding.
@@ -443,7 +443,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "true,false,true,false,true") // default encoding.
@@ -471,7 +471,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "true,false,true,false,true") // default encoding.
@@ -499,7 +499,7 @@ paths:
 
     doc, _ := libopenapi.NewDocument([]byte(spec))
     m, _ := doc.BuildV3Model()
-    v := NewValidator(&m.Model)
+    v := NewParameterValidator(&m.Model)
 
     request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
     request.Header.Set("coffeecups", "1,false,2,true,5,false") // default encoding.

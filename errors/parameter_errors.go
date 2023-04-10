@@ -1,78 +1,79 @@
-package main
+package errors
 
 import (
     "fmt"
+    "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "github.com/pb33f/libopenapi/datamodel/high/v3"
     "gopkg.in/yaml.v3"
     "net/url"
 )
 
-func (v *validator) incorrectFormEncoding(param *v3.Parameter, qp *queryParam, i int) *ValidationError {
+func IncorrectFormEncoding(param *v3.Parameter, qp *helpers.QueryParam, i int) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' is not exploded correctly", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' has a default or 'form' encoding defined, "+
             "however the value '%s' is encoded as an object or an array using commas. The contract defines "+
-            "the explode value to set to 'true'", param.Name, qp.values[i]),
+            "the explode value to set to 'true'", param.Name, qp.Values[i]),
         SpecLine: param.GoLow().Explode.ValueNode.Line,
         SpecCol:  param.GoLow().Explode.ValueNode.Column,
         Context:  param,
         HowToFix: fmt.Sprintf(HowToFixParamInvalidFormEncode,
-            collapseCSVIntoFormStyle(param.Name, qp.values[i])),
+            helpers.CollapseCSVIntoFormStyle(param.Name, qp.Values[i])),
     }
 }
 
-func (v *validator) incorrectSpaceDelimiting(param *v3.Parameter, qp *queryParam) *ValidationError {
+func IncorrectSpaceDelimiting(param *v3.Parameter, qp *helpers.QueryParam) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' delimited incorrectly", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' has 'spaceDelimited' style defined, "+
             "and explode is defined as false. There are multiple values (%d) supplied, instead of a single"+
-            " space delimited value", param.Name, len(qp.values)),
+            " space delimited value", param.Name, len(qp.Values)),
         SpecLine: param.GoLow().Style.ValueNode.Line,
         SpecCol:  param.GoLow().Style.ValueNode.Column,
         Context:  param,
         HowToFix: fmt.Sprintf(HowToFixParamInvalidSpaceDelimitedObjectExplode,
-            collapseCSVIntoSpaceDelimitedStyle(param.Name, qp.values)),
+            helpers.CollapseCSVIntoSpaceDelimitedStyle(param.Name, qp.Values)),
     }
 }
 
-func (v *validator) incorrectPipeDelimiting(param *v3.Parameter, qp *queryParam) *ValidationError {
+func IncorrectPipeDelimiting(param *v3.Parameter, qp *helpers.QueryParam) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' delimited incorrectly", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' has 'pipeDelimited' style defined, "+
             "and explode is defined as false. There are multiple values (%d) supplied, instead of a single"+
-            " space delimited value", param.Name, len(qp.values)),
+            " space delimited value", param.Name, len(qp.Values)),
         SpecLine: param.GoLow().Style.ValueNode.Line,
         SpecCol:  param.GoLow().Style.ValueNode.Column,
         Context:  param,
         HowToFix: fmt.Sprintf(HowToFixParamInvalidPipeDelimitedObjectExplode,
-            collapseCSVIntoPipeDelimitedStyle(param.Name, qp.values)),
+            helpers.CollapseCSVIntoPipeDelimitedStyle(param.Name, qp.Values)),
     }
 }
 
-func (v *validator) invalidDeepObject(param *v3.Parameter, qp *queryParam) *ValidationError {
+func InvalidDeepObject(param *v3.Parameter, qp *helpers.QueryParam) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' is not a valid deepObject", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' has the 'deepObject' style defined, "+
             "There are multiple values (%d) supplied, instead of a single "+
-            "value", param.Name, len(qp.values)),
+            "value", param.Name, len(qp.Values)),
         SpecLine: param.GoLow().Style.ValueNode.Line,
         SpecCol:  param.GoLow().Style.ValueNode.Column,
         Context:  param,
         HowToFix: fmt.Sprintf(HowToFixParamInvalidDeepObjectMultipleValues,
-            collapseCSVIntoPipeDelimitedStyle(param.Name, qp.values)),
+            helpers.CollapseCSVIntoPipeDelimitedStyle(param.Name, qp.Values)),
     }
 }
 
-func (v *validator) queryParameterMissing(param *v3.Parameter) *ValidationError {
+func QueryParameterMissing(param *v3.Parameter) *ValidationError {
     return &ValidationError{
         Message: fmt.Sprintf("Query parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being required, "+
@@ -82,7 +83,7 @@ func (v *validator) queryParameterMissing(param *v3.Parameter) *ValidationError 
     }
 }
 
-func (v *validator) headerParameterMissing(param *v3.Parameter) *ValidationError {
+func HeaderParameterMissing(param *v3.Parameter) *ValidationError {
     return &ValidationError{
         Message: fmt.Sprintf("Header parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' is defined as being required, "+
@@ -92,7 +93,7 @@ func (v *validator) headerParameterMissing(param *v3.Parameter) *ValidationError
     }
 }
 
-func (v *validator) headerParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
+func HeaderParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
     return &ValidationError{
         Message:  fmt.Sprintf("Header parameter '%s' is not defined", paramName),
         Reason:   fmt.Sprintf("The header parameter '%s' is not defined as part of the specification for the operation", paramName),
@@ -101,20 +102,20 @@ func (v *validator) headerParameterNotDefined(paramName string, kn *yaml.Node) *
     }
 }
 
-func (v *validator) queryParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
-    return &ValidationError{
-        Message:  fmt.Sprintf("Query parameter '%s' is not defined", paramName),
-        Reason:   fmt.Sprintf("The query parameter '%s' is not defined as part of the specification for the operation", paramName),
-        SpecLine: kn.Line,
-        SpecCol:  kn.Column,
-    }
-}
+//func (v *validator) queryParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
+//    return &ValidationError{
+//        Message:  fmt.Sprintf("Query parameter '%s' is not defined", paramName),
+//        Reason:   fmt.Sprintf("The query parameter '%s' is not defined as part of the specification for the operation", paramName),
+//        SpecLine: kn.Line,
+//        SpecCol:  kn.Column,
+//    }
+//}
 
-func (v *validator) incorrectQueryParamArrayBoolean(
+func IncorrectQueryParamArrayBoolean(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query array parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The query parameter (which is an array) '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid true/false value", param.Name, item),
@@ -125,11 +126,11 @@ func (v *validator) incorrectQueryParamArrayBoolean(
     }
 }
 
-func (v *validator) incorrectCookieParamArrayBoolean(
+func IncorrectCookieParamArrayBoolean(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationCookie,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationCookie,
         Message:           fmt.Sprintf("Cookie array parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The cookie parameter (which is an array) '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid true/false value", param.Name, item),
@@ -140,11 +141,11 @@ func (v *validator) incorrectCookieParamArrayBoolean(
     }
 }
 
-func (v *validator) incorrectQueryParamArrayNumber(
+func IncorrectQueryParamArrayNumber(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query array parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The query parameter (which is an array) '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
@@ -155,11 +156,11 @@ func (v *validator) incorrectQueryParamArrayNumber(
     }
 }
 
-func (v *validator) incorrectCookieParamArrayNumber(
+func IncorrectCookieParamArrayNumber(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationCookie,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationCookie,
         Message:           fmt.Sprintf("Cookie array parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The cookie parameter (which is an array) '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
@@ -170,24 +171,24 @@ func (v *validator) incorrectCookieParamArrayNumber(
     }
 }
 
-func (v *validator) incorrectParamEncodingJSON(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func IncorrectParamEncodingJSON(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' is not valid JSON", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being a JSON object, "+
             "however the value '%s' is not valid JSON", param.Name, ef),
-        SpecLine: param.GoLow().FindContent(JSONContentType).ValueNode.Line,
-        SpecCol:  param.GoLow().FindContent(JSONContentType).ValueNode.Column,
+        SpecLine: param.GoLow().FindContent(helpers.JSONContentType).ValueNode.Line,
+        SpecCol:  param.GoLow().FindContent(helpers.JSONContentType).ValueNode.Column,
         Context:  sch,
         HowToFix: HowToFixInvalidJSON,
     }
 }
 
-func (v *validator) incorrectQueryParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func IncorrectQueryParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid boolean", param.Name, ef),
@@ -198,10 +199,10 @@ func (v *validator) incorrectQueryParamBool(param *v3.Parameter, ef string, sch 
     }
 }
 
-func (v *validator) invalidQueryParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func InvalidQueryParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, ef),
@@ -212,10 +213,10 @@ func (v *validator) invalidQueryParamNumber(param *v3.Parameter, ef string, sch 
     }
 }
 
-func (v *validator) incorrectReservedValues(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func IncorrectReservedValues(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationQuery,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
         Message:           fmt.Sprintf("Query parameter '%s' value contains reserved values", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' has 'allowReserved' set to false, "+
             "however the value '%s' contains one of the following characters: :/?#[]@!$&'()*+,;=", param.Name, ef),
@@ -226,10 +227,10 @@ func (v *validator) incorrectReservedValues(param *v3.Parameter, ef string, sch 
     }
 }
 
-func (v *validator) invalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func InvalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationHeader,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
         Message:           fmt.Sprintf("Header parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, ef),
@@ -240,10 +241,10 @@ func (v *validator) invalidHeaderParamNumber(param *v3.Parameter, ef string, sch
     }
 }
 
-func (v *validator) invalidCookieParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func InvalidCookieParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationCookie,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationCookie,
         Message:           fmt.Sprintf("Cookie parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The cookie parameter '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, ef),
@@ -254,10 +255,10 @@ func (v *validator) invalidCookieParamNumber(param *v3.Parameter, ef string, sch
     }
 }
 
-func (v *validator) incorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func IncorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationHeader,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
         Message:           fmt.Sprintf("Header parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid boolean", param.Name, ef),
@@ -268,10 +269,10 @@ func (v *validator) incorrectHeaderParamBool(param *v3.Parameter, ef string, sch
     }
 }
 
-func (v *validator) incorrectCookieParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+func IncorrectCookieParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationCookie,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationCookie,
         Message:           fmt.Sprintf("Cookie parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The cookie parameter '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid boolean", param.Name, ef),
@@ -282,11 +283,11 @@ func (v *validator) incorrectCookieParamBool(param *v3.Parameter, ef string, sch
     }
 }
 
-func (v *validator) incorrectHeaderParamArrayBoolean(
+func IncorrectHeaderParamArrayBoolean(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationHeader,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
         Message:           fmt.Sprintf("Header array parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The header parameter (which is an array) '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid true/false value", param.Name, item),
@@ -297,11 +298,11 @@ func (v *validator) incorrectHeaderParamArrayBoolean(
     }
 }
 
-func (v *validator) incorrectHeaderParamArrayNumber(
+func IncorrectHeaderParamArrayNumber(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationHeader,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
         Message:           fmt.Sprintf("Header array parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The header parameter (which is an array) '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
@@ -312,10 +313,10 @@ func (v *validator) incorrectHeaderParamArrayNumber(
     }
 }
 
-func (v *validator) incorrectPathParamBool(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
+func IncorrectPathParamBool(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationPath,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationPath,
         Message:           fmt.Sprintf("Path parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The path parameter '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid boolean", param.Name, item),
@@ -326,10 +327,10 @@ func (v *validator) incorrectPathParamBool(param *v3.Parameter, item string, sch
     }
 }
 
-func (v *validator) incorrectPathParamNumber(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
+func IncorrectPathParamNumber(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationPath,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationPath,
         Message:           fmt.Sprintf("Path parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The path parameter '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
@@ -340,11 +341,11 @@ func (v *validator) incorrectPathParamNumber(param *v3.Parameter, item string, s
     }
 }
 
-func (v *validator) incorrectPathParamArrayNumber(
+func IncorrectPathParamArrayNumber(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationPath,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationPath,
         Message:           fmt.Sprintf("Path array parameter '%s' is not a valid number", param.Name),
         Reason: fmt.Sprintf("The path parameter (which is an array) '%s' is defined as being a number, "+
             "however the value '%s' is not a valid number", param.Name, item),
@@ -355,11 +356,11 @@ func (v *validator) incorrectPathParamArrayNumber(
     }
 }
 
-func (v *validator) incorrectPathParamArrayBoolean(
+func IncorrectPathParamArrayBoolean(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
     return &ValidationError{
-        ValidationType:    ParameterValidation,
-        ValidationSubType: ParameterValidationPath,
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationPath,
         Message:           fmt.Sprintf("Path array parameter '%s' is not a valid boolean", param.Name),
         Reason: fmt.Sprintf("The path parameter (which is an array) '%s' is defined as being a boolean, "+
             "however the value '%s' is not a valid boolean", param.Name, item),

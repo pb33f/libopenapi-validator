@@ -1,7 +1,7 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package main
+package helpers
 
 import (
     "fmt"
@@ -11,14 +11,13 @@ import (
     "strings"
 )
 
-// There is nothing public in here.
-type queryParam struct {
-    key      string
-    values   []string
-    property string
+type QueryParam struct {
+    Key      string
+    Values   []string
+    Property string
 }
 
-func extractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.Parameter {
+func ExtractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.Parameter {
     params := item.Parameters
     switch request.Method {
     case http.MethodGet:
@@ -75,25 +74,25 @@ func cast(v string) any {
 }
 
 // deepObject encoding is a technique used to encode objects into query parameters. Kinda nuts.
-func constructParamMapFromDeepObjectEncoding(values []*queryParam) map[string]interface{} {
+func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {
-        if decoded[v.key] == nil {
+        if decoded[v.Key] == nil {
             props := make(map[string]interface{})
-            props[v.property] = cast(v.values[0])
-            decoded[v.key] = props
+            props[v.Property] = cast(v.Values[0])
+            decoded[v.Key] = props
         } else {
-            decoded[v.key].(map[string]interface{})[v.property] = cast(v.values[0])
+            decoded[v.Key].(map[string]interface{})[v.Property] = cast(v.Values[0])
         }
     }
     return decoded
 }
 
-func constructParamMapFromQueryParamInput(values map[string][]*queryParam) map[string]interface{} {
+func ConstructParamMapFromQueryParamInput(values map[string][]*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, q := range values {
         for _, v := range q {
-            decoded[v.key] = cast(v.values[0])
+            decoded[v.Key] = cast(v.Values[0])
         }
     }
     return decoded
@@ -101,41 +100,41 @@ func constructParamMapFromQueryParamInput(values map[string][]*queryParam) map[s
 
 // Pipes are always a good alternative to commas, personally I think they're better, if I were encoding, I would
 // use pipes instead of commas, so much can go wrong with a comma, but a pipe? hardly ever.
-func constructParamMapFromPipeEncoding(values []*queryParam) map[string]interface{} {
+func ConstructParamMapFromPipeEncoding(values []*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {
         props := make(map[string]interface{})
         // explode PSV into array
-        exploded := strings.Split(v.values[0], Pipe)
+        exploded := strings.Split(v.Values[0], Pipe)
         for i := range exploded {
             if i%2 == 0 {
                 props[exploded[i]] = cast(exploded[i+1])
             }
         }
-        decoded[v.key] = props
+        decoded[v.Key] = props
     }
     return decoded
 }
 
 // Don't use spaces to delimit anything unless you really know what the hell you're doing. Perhaps the
 // easiest way to blow something up, unless you're tokenizing strings... don't do this.
-func constructParamMapFromSpaceEncoding(values []*queryParam) map[string]interface{} {
+func ConstructParamMapFromSpaceEncoding(values []*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {
         props := make(map[string]interface{})
         // explode SSV into array
-        exploded := strings.Split(v.values[0], Space)
+        exploded := strings.Split(v.Values[0], Space)
         for i := range exploded {
             if i%2 == 0 {
                 props[exploded[i]] = cast(exploded[i+1])
             }
         }
-        decoded[v.key] = props
+        decoded[v.Key] = props
     }
     return decoded
 }
 
-func constructMapFromCSV(csv string) map[string]interface{} {
+func ConstructMapFromCSV(csv string) map[string]interface{} {
     decoded := make(map[string]interface{})
     // explode SSV into array
     exploded := strings.Split(csv, Comma)
@@ -150,7 +149,7 @@ func constructMapFromCSV(csv string) map[string]interface{} {
     return decoded
 }
 
-func constructKVFromCSV(values string) map[string]interface{} {
+func ConstructKVFromCSV(values string) map[string]interface{} {
     props := make(map[string]interface{})
     exploded := strings.Split(values, Comma)
     for i := range exploded {
@@ -162,7 +161,7 @@ func constructKVFromCSV(values string) map[string]interface{} {
     return props
 }
 
-func constructKVFromLabelEncoding(values string) map[string]interface{} {
+func ConstructKVFromLabelEncoding(values string) map[string]interface{} {
     props := make(map[string]interface{})
     exploded := strings.Split(values, Period)
     for i := range exploded {
@@ -174,30 +173,42 @@ func constructKVFromLabelEncoding(values string) map[string]interface{} {
     return props
 }
 
-func constructParamMapFromFormEncodingArray(values []*queryParam) map[string]interface{} {
+func ConstructKVFromMatrixCSV(values string) map[string]interface{} {
+    props := make(map[string]interface{})
+    exploded := strings.Split(values, SemiColon)
+    for i := range exploded {
+        obK := strings.Split(exploded[i], Equals)
+        if len(obK) == 2 {
+            props[obK[0]] = cast(obK[1])
+        }
+    }
+    return props
+}
+
+func ConstructParamMapFromFormEncodingArray(values []*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {
         props := make(map[string]interface{})
         // explode SSV into array
-        exploded := strings.Split(v.values[0], Comma)
+        exploded := strings.Split(v.Values[0], Comma)
         for i := range exploded {
             if i%2 == 0 {
                 props[exploded[i]] = cast(exploded[i+1])
             }
         }
-        decoded[v.key] = props
+        decoded[v.Key] = props
     }
     return decoded
 }
 
-func doesFormParamContainDelimiter(value, style string) bool {
+func DoesFormParamContainDelimiter(value, style string) bool {
     if strings.Contains(value, Comma) && (style == "" || style == Form) {
         return true
     }
     return false
 }
 
-func explodeQueryValue(value, style string) []string {
+func ExplodeQueryValue(value, style string) []string {
     switch style {
     case SpaceDelimited:
         return strings.Split(value, Space)
@@ -209,15 +220,15 @@ func explodeQueryValue(value, style string) []string {
 
 }
 
-func collapseCSVIntoFormStyle(key string, value string) string {
+func CollapseCSVIntoFormStyle(key string, value string) string {
     return fmt.Sprintf("&%s=%s", key,
         strings.Join(strings.Split(value, ","), fmt.Sprintf("&%s=", key)))
 }
 
-func collapseCSVIntoSpaceDelimitedStyle(key string, values []string) string {
+func CollapseCSVIntoSpaceDelimitedStyle(key string, values []string) string {
     return fmt.Sprintf("%s=%s", key, strings.Join(values, "%20"))
 }
 
-func collapseCSVIntoPipeDelimitedStyle(key string, values []string) string {
+func CollapseCSVIntoPipeDelimitedStyle(key string, values []string) string {
     return fmt.Sprintf("%s=%s", key, strings.Join(values, Pipe))
 }
