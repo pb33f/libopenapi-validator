@@ -34,7 +34,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
     }
 
     // validate query params
-    //if !v.validateQueryParams(request) {
+    //if !v.validateQueryParams(requests) {
     //    return false, v.errors
     //}
     return false, nil

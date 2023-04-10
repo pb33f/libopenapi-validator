@@ -120,7 +120,7 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
             ValidationType:    helpers.ParameterValidationPath,
             ValidationSubType: "missing",
             Message:           fmt.Sprintf("Path '%s' not found", request.URL.Path),
-            Reason: fmt.Sprintf("The request contains a path of '%s' "+
+            Reason: fmt.Sprintf("The requests contains a path of '%s' "+
                 "however that path does not exist in the specification", request.URL.Path),
             SpecLine: -1,
             SpecCol:  -1,

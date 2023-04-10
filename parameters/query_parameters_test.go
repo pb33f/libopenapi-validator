@@ -1356,7 +1356,7 @@ paths:
     assert.Equal(t, "Query parameter 'fishy' delimited incorrectly", errors[0].Message)
 }
 
-func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidExplode(t *testing.T) {
+func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectValidExplode(t *testing.T) {
 
     spec := `openapi: 3.1.0
 paths:
@@ -1385,6 +1385,38 @@ paths:
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
     assert.Len(t, errors, 0)
+
+}
+
+func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidExplode(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         style: pipeDelimited
+         schema:
+           type: array
+           items:
+             type: string
+     operationId: locateFishy`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet,
+        "https://things.com/a/fishy/on/a/dishy?fishy=cod|haddock|mackrel&fishy=breaded|cooked|fried", nil)
+
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
 
 }
 

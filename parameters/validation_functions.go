@@ -166,7 +166,7 @@ stopValidation:
 
             case helpers.PipeDelimited:
                 // check if explode is false, but we have used an array style
-                if param.IsExploded() {
+                if !param.IsExploded() {
                     if len(qp.Values) > 1 {
                         validationErrors = append(validationErrors, errors.IncorrectPipeDelimiting(param, qp))
                         break stopValidation

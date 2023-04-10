@@ -173,7 +173,7 @@ doneLooking:
                 }
 
             } else {
-                // if the param is not in the request, so let's check if this param is an
+                // if the param is not in the requests, so let's check if this param is an
                 // object, and if we should use default encoding and explode values.
                 if params[p].Schema != nil {
                     sch := params[p].Schema.Schema()

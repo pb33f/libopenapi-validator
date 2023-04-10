@@ -79,12 +79,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 
                         switch sch.Type[typ] {
                         case helpers.Integer, helpers.Number:
-                            if isSimple {
-                                if _, err := strconv.ParseFloat(paramValue, 64); err != nil {
-                                    validationErrors = append(validationErrors,
-                                        errors.IncorrectPathParamNumber(p, paramValue, sch))
-                                }
-                            }
+                            // simple use case is already handled in find param.
                             if isLabel && p.Style == helpers.LabelStyle {
                                 if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
                                     validationErrors = append(validationErrors,

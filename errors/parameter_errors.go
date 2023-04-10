@@ -77,7 +77,7 @@ func QueryParameterMissing(param *v3.Parameter) *ValidationError {
     return &ValidationError{
         Message: fmt.Sprintf("Query parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being required, "+
-            "however it's missing from the request", param.Name),
+            "however it's missing from the requests", param.Name),
         SpecLine: param.GoLow().Required.KeyNode.Line,
         SpecCol:  param.GoLow().Required.KeyNode.Column,
     }
@@ -87,7 +87,7 @@ func HeaderParameterMissing(param *v3.Parameter) *ValidationError {
     return &ValidationError{
         Message: fmt.Sprintf("Header parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' is defined as being required, "+
-            "however it's missing from the request", param.Name),
+            "however it's missing from the requests", param.Name),
         SpecLine: param.GoLow().Required.KeyNode.Line,
         SpecCol:  param.GoLow().Required.KeyNode.Column,
     }
