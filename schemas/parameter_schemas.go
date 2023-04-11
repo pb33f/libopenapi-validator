@@ -62,7 +62,7 @@ func ValidateParameterSchema(
         for q := range schFlatErrs {
             er := schFlatErrs[q]
             if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
-                continue // ignore this error,
+                continue // ignore this error, it's not useful
             }
             schemaValidationErrors = append(schemaValidationErrors, &errors.SchemaValidationFailure{
                 Reason:        er.Error,
@@ -80,7 +80,7 @@ func ValidateParameterSchema(
             SpecLine:               schema.GoLow().Type.KeyNode.Line,
             SpecCol:                schema.GoLow().Type.KeyNode.Column,
             SchemaValidationErrors: schemaValidationErrors,
-            HowToFix:               errors.HowToFixParamInvalidSchema,
+            HowToFix:               errors.HowToFixInvalidSchema,
         })
     }
 

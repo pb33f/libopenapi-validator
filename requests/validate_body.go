@@ -31,16 +31,16 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
         if mediaType, ok := operation.RequestBody.Content[contentType]; ok {
 
             // we currently only support JSON validation for request bodies
-            if strings.ToLower(contentType) == "application/json" {
+            if strings.ToLower(contentType) == helpers.JSONContentType {
 
                 // extract schema from media type
                 if mediaType.Schema != nil {
                     schema := mediaType.Schema.Schema()
 
                     // render the schema, to be used for validation
-                    valid, errs := schemas.ValidateRequestSchema(request, schema)
+                    valid, verrs := schemas.ValidateRequestSchema(request, schema)
                     if !valid {
-                        validationErrors = append(validationErrors, errs...)
+                        validationErrors = append(validationErrors, verrs...)
                     }
                 }
             }
@@ -49,5 +49,8 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
             // TODO: content type not found in operation request
         }
     }
-    return false, validationErrors
+    if len(validationErrors) > 0 {
+        return false, validationErrors
+    }
+    return true, nil
 }

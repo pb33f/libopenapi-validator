@@ -9,7 +9,7 @@ const (
     HowToFixParamInvalidNumber                      string = "Convert the value '%s' into a number"
     HowToFixParamInvalidBoolean                     string = "Convert the value '%s' into a true/false value"
     HowToFixParamInvalidFormEncode                  string = "Use a form style encoding for parameter values, for example: '%s'"
-    HowToFixParamInvalidSchema                      string = "Ensure that the object being submitted, matches the schema correctly"
+    HowToFixInvalidSchema                           string = "Ensure that the object being submitted, matches the schema correctly"
     HowToFixParamInvalidSpaceDelimitedObjectExplode string = "When using 'explode' with space delimited parameters, " +
         "they should be separated by spaces. For example: '%s'"
     HowToFixParamInvalidPipeDelimitedObjectExplode string = "When using 'explode' with pipe delimited parameters, " +
