@@ -229,5 +229,293 @@ components:
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 3) // throws 'allOf failure' in addition
+}
+
+func TestValidateBody_ValidSchemaUsingAllOfAnyOf(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestBody' 
+components:
+  schemas:
+    Uncooked:
+      type: object
+      required: [uncookedWeight, uncookedHeight]
+      properties:
+        uncookedWeight:
+          type: number
+        uncookedHeight:
+          type: number
+    Cooked:
+      type: object
+      required: [usedOil, usedAnimalFat]
+      properties:
+        usedOil:
+          type: boolean
+        usedAnimalFat:
+          type: boolean
+    Nutrients:
+      type: object
+      required: [fat, salt, meat]
+      properties:
+        fat:
+          type: number
+        salt:
+          type: number
+        meat:
+          type: string
+          enum:
+            - beef
+            - pork
+            - lamb
+            - vegetables      
+    TestBody:
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/Uncooked'
+        - $ref: '#/components/schemas/Cooked'
+      allOf:
+        - $ref: '#/components/schemas/Nutrients'
+      properties:
+        name:
+          type: string
+        patties:
+          type: integer
+        vegetarian:
+          type: boolean
+      required: [name, patties, vegetarian]    `
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":          "Big Mac",
+        "patties":       2,
+        "vegetarian":    true,
+        "fat":           10.0,
+        "salt":          0.5,
+        "meat":          "beef",
+        "usedOil":       true,
+        "usedAnimalFat": false,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json")
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_InvalidSchemaUsingOneOf(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestBody' 
+components:
+  schemas:
+    Uncooked:
+      type: object
+      required: [uncookedWeight, uncookedHeight]
+      properties:
+        uncookedWeight:
+          type: number
+        uncookedHeight:
+          type: number
+    Cooked:
+      type: object
+      required: [usedOil, usedAnimalFat]
+      properties:
+        usedOil:
+          type: boolean
+        usedAnimalFat:
+          type: boolean
+    Nutrients:
+      type: object
+      required: [fat, salt, meat]
+      properties:
+        fat:
+          type: number
+        salt:
+          type: number
+        meat:
+          type: string
+          enum:
+            - beef
+            - pork
+            - lamb
+            - vegetables      
+    TestBody:
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/Uncooked'
+        - $ref: '#/components/schemas/Cooked'
+      allOf:
+        - $ref: '#/components/schemas/Nutrients'
+      properties:
+        name:
+          type: string
+        patties:
+          type: integer
+        vegetarian:
+          type: boolean
+      required: [name, patties, vegetarian]    `
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": true,
+        "fat":        10.0,
+        "salt":       0.5,
+        "meat":       "beef",
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json")
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
     assert.Len(t, errors[0].SchemaValidationErrors, 3)
+    assert.Equal(t, "oneOf failed", errors[0].SchemaValidationErrors[0].Reason)
+    assert.Equal(t, "missing properties: 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[1].Reason)
+    assert.Equal(t, "missing properties: 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[2].Reason)
+
+}
+
+func TestValidateBody_InvalidSchemaMinMax(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestBody' 
+components:
+  schemas:
+    TestBody:
+      type: object
+      properties:
+        name:
+          type: string
+        patties:
+          type: integer
+          maximum: 3
+          minimum: 1
+        vegetarian:
+          type: boolean
+      required: [name, patties, vegetarian]    `
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    5,
+        "vegetarian": true,
+        "fat":        10.0,
+        "salt":       0.5,
+        "meat":       "beef",
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json")
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 1)
+    assert.Equal(t, "must be <= 3 but found 5", errors[0].SchemaValidationErrors[0].Reason)
+
+}
+
+func TestValidateBody_InvalidSchemaMaxItems(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestBody' 
+components:
+  schemas:
+    TestBody:
+      type: array
+      maxItems: 2
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          patties:
+            type: integer
+            maximum: 3
+            minimum: 1
+          vegetarian:
+            type: boolean
+        required: [name, patties, vegetarian]    `
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": true,
+        "fat":        10.0,
+        "salt":       0.5,
+        "meat":       "beef",
+    }
+    bodyArray := []interface{}{body, body, body, body} // two too many!
+    bodyBytes, _ := json.Marshal(bodyArray)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json")
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 1)
+    assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
+
 }
