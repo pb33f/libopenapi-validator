@@ -47,7 +47,7 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
             }
         } else {
             // content type not found in the contract
-            validationErrors = append(validationErrors, errors.ContentTypeNotFound(operation, request))
+            validationErrors = append(validationErrors, errors.RequestContentTypeNotFound(operation, request))
         }
     }
     if len(validationErrors) > 0 {

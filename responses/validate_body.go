@@ -9,6 +9,7 @@ import (
     "github.com/pb33f/libopenapi-validator/paths"
     "github.com/pb33f/libopenapi-validator/schemas"
     "net/http"
+    "strconv"
     "strings"
 )
 
@@ -56,7 +57,10 @@ func (v *responseBodyValidator) ValidateResponseBody(
             }
 
         } else {
-            // TODO: content type not found in the contract
+            // content type not found in the contract
+            codeStr := strconv.Itoa(httpCode)
+            validationErrors = append(validationErrors,
+                errors.ResponseContentTypeNotFound(operation, request, response, codeStr))
         }
     } else {
 
