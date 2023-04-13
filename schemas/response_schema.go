@@ -17,8 +17,9 @@ import (
     "strings"
 )
 
-func ValidateRequestSchema(
+func ValidateResponseSchema(
     request *http.Request,
+    response *http.Response,
     schema *base.Schema) (bool, []*errors.ValidationError) {
 
     var validationErrors []*errors.ValidationError
@@ -26,16 +27,19 @@ func ValidateRequestSchema(
     // render the schema, to be used for validation
     renderedSchema, _ := schema.RenderInline()
     jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
-    requestBody, _ := io.ReadAll(request.Body)
+    responseBody, _ := io.ReadAll(response.Body)
 
     var decodedObj interface{}
-    _ = json.Unmarshal(requestBody, &decodedObj)
+    _ = json.Unmarshal(responseBody, &decodedObj)
 
+    // create a new jsonschema compiler and add in the rendered JSON schema.
     compiler := jsonschema.NewCompiler()
-    _ = compiler.AddResource("requestBody.json", strings.NewReader(string(jsonSchema)))
-    jsch, _ := compiler.Compile("requestBody.json")
+    fName := fmt.Sprintf("%s.json", helpers.ResponseBodyValidation)
+    _ = compiler.AddResource(fName,
+        strings.NewReader(string(jsonSchema)))
+    jsch, _ := compiler.Compile(fName)
 
-    // 4. validate the object against the schema
+    // validate the object against the schema
     scErrs := jsch.Validate(decodedObj)
     if scErrs != nil {
         jk := scErrs.(*jsonschema.ValidationError)
@@ -73,11 +77,11 @@ func ValidateRequestSchema(
 
         // add the error to the list
         validationErrors = append(validationErrors, &errors.ValidationError{
-            ValidationType:    helpers.RequestBodyValidation,
+            ValidationType:    helpers.ResponseBodyValidation,
             ValidationSubType: helpers.Schema,
-            Message: fmt.Sprintf("%s request body for '%s' failed to validate schema",
-                request.Method, request.URL.Path),
-            Reason: "The request body is defined as an object. " +
+            Message: fmt.Sprintf("%d response body for '%s' failed to validate schema",
+                response.StatusCode, request.URL.Path),
+            Reason: "The response body for status code '%d' is defined as an object. " +
                 "However, it does not meet the schema requirements of the specification",
             SpecLine:               schema.GoLow().Type.KeyNode.Line,
             SpecCol:                schema.GoLow().Type.KeyNode.Column,

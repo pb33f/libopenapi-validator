@@ -11,6 +11,8 @@ import (
 type SchemaValidationFailure struct {
     Reason        string                      `json:"reason,omitempty" yaml:"reason,omitempty"`
     Location      string                      `json:"location,omitempty" yaml:"location,omitempty"`
+    Line          int                         `json:"line,omitempty" yaml:"line,omitempty"`
+    Column        int                         `json:"column,omitempty" yaml:"column,omitempty"`
     OriginalError *jsonschema.ValidationError `json:"-" yaml:"-"`
 }
 

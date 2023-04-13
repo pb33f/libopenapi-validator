@@ -1,7 +1,7 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package requests
+package responses
 
 import (
     "github.com/pb33f/libopenapi-validator/errors"
@@ -12,7 +12,9 @@ import (
     "strings"
 )
 
-func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
+func (v *responseBodyValidator) ValidateResponseBody(
+    request *http.Request,
+    response *http.Response) (bool, []*errors.ValidationError) {
 
     // find path
     pathItem, errs, _ := paths.FindPath(request, v.document)
@@ -24,14 +26,21 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
     var validationErrors []*errors.ValidationError
     operation := helpers.ExtractOperation(request, pathItem)
 
-    var contentType string
-    // extract the content type from the request
+    // extract the response code from the response
+    httpCode := response.StatusCode
+    contentType := response.Header.Get(helpers.ContentTypeHeader)
 
-    if contentType = request.Header.Get(helpers.ContentTypeHeader); contentType != "" {
-        if mediaType, ok := operation.RequestBody.Content[contentType]; ok {
+    // check if the response code is in the contract
+    foundResponse := operation.Responses.FindResponseByCode(httpCode)
+    if foundResponse != nil {
 
-            // we currently only support JSON validation for request bodies
-            // this will capture *everything* that contains some form of 'json' in the content type
+        // check content type has been defined in the contract
+        if mediaType, ok := foundResponse.Content[contentType]; ok {
+
+            // currently, we can only validate JSON based responses, so check for the presence
+            // of 'json' in the content type (what ever it may be) so we can perform a schema check on it.
+            // anything other than JSON, will be ignored.
+
             if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
 
                 // extract schema from media type
@@ -39,16 +48,19 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
                     schema := mediaType.Schema.Schema()
 
                     // render the schema, to be used for validation
-                    valid, vErrs := schemas.ValidateRequestSchema(request, schema)
+                    valid, vErrs := schemas.ValidateResponseSchema(request, response, schema)
                     if !valid {
                         validationErrors = append(validationErrors, vErrs...)
                     }
                 }
             }
+
         } else {
-            // content type not found in the contract
-            validationErrors = append(validationErrors, errors.ContentTypeNotFound(operation, request))
+            // TODO: content type not found in the contract
         }
+    } else {
+
+        // TODO: response code not defined, check for default response, or fail.
     }
     if len(validationErrors) > 0 {
         return false, validationErrors

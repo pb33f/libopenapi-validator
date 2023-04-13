@@ -12,6 +12,94 @@ import (
     "testing"
 )
 
+func TestValidateBody_MissingContentType(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    // mix up the primitives to fire two schema violations.
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    false,
+        "vegetarian": 2,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "thomas/tank-engine") // wtf kinda content type is this?
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "POST operation request content type 'thomas/tank-engine' does not exist", errors[0].Message)
+    assert.Equal(t, "The content type is invalid, Use one of the 1 "+
+        "supported types for this operation: application/json", errors[0].HowToFix)
+}
+
+func TestValidateBody_PathNotFound(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    // mix up the primitives to fire two schema violations.
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    false,
+        "vegetarian": 2,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json") // wtf kinda content type is this?
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path '/I do not exist' not found", errors[0].Message)
+}
+
 func TestValidateBody_InvalidBasicSchema(t *testing.T) {
     spec := `openapi: 3.1.0
 paths:
@@ -517,5 +605,7 @@ components:
     assert.Len(t, errors, 1)
     assert.Len(t, errors[0].SchemaValidationErrors, 1)
     assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
-
+    assert.Equal(t, 2, errors[0].SchemaValidationErrors[0].Line)
+    assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
+    assert.Equal(t, 11, errors[0].SchemaValidationErrors[0].Column)
 }
