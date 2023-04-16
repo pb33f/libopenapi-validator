@@ -74,6 +74,123 @@ paths:
         "supported types for this operation: application/json", errors[0].HowToFix)
 }
 
+func TestValidateBody_MissingPath(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    false,
+        "vegetarian": 2,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
+        w.WriteHeader(http.StatusUnprocessableEntity)              // does not matter.
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path '/I do not exist' not found", errors[0].Message)
+}
+
+func TestValidateBody_MissingStatusCode(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    false,
+        "vegetarian": 2,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
+        w.WriteHeader(http.StatusUnprocessableEntity)              // undefined in the spec.
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "POST operation request response code '422' does not exist", errors[0].Message)
+    assert.Equal(t, "The service is responding with a code that is not defined in the spec, fix the service!", errors[0].HowToFix)
+}
+
 func TestValidateBody_InvalidBasicSchema(t *testing.T) {
     spec := `openapi: 3.1.0
 paths:
@@ -135,6 +252,215 @@ paths:
     assert.Equal(t, "expected integer, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
     assert.Equal(t, 6, errors[0].SchemaValidationErrors[0].Line)
     assert.Equal(t, 8, errors[0].SchemaValidationErrors[1].Line)
+}
+
+func TestValidateBody_ValidComplexSchema(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestBody' 
+components:
+  schemas:
+    Uncooked:
+      type: object
+      required: [uncookedWeight, uncookedHeight]
+      properties:
+        uncookedWeight:
+          type: number
+        uncookedHeight:
+          type: number
+    Cooked:
+      type: object
+      required: [usedOil, usedAnimalFat]
+      properties:
+        usedOil:
+          type: boolean
+        usedAnimalFat:
+          type: boolean
+    Nutrients:
+      type: object
+      required: [fat, salt, meat]
+      properties:
+        fat:
+          type: number
+        salt:
+          type: number
+        meat:
+          type: string
+          enum:
+            - beef
+            - pork
+            - lamb
+            - vegetables      
+    TestBody:
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/Uncooked'
+        - $ref: '#/components/schemas/Cooked'
+      allOf:
+        - $ref: '#/components/schemas/Nutrients'
+      properties:
+        name:
+          type: string
+        patties:
+          type: integer
+        vegetarian:
+          type: boolean
+      required: [name, patties, vegetarian]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":          "Big Mac",
+        "patties":       2,
+        "vegetarian":    true,
+        "fat":           10.0,
+        "salt":          0.5,
+        "meat":          "beef",
+        "usedOil":       true,
+        "usedAnimalFat": false,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_InvalidComplexSchema(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestBody' 
+components:
+  schemas:
+    Uncooked:
+      type: object
+      required: [uncookedWeight, uncookedHeight]
+      properties:
+        uncookedWeight:
+          type: number
+        uncookedHeight:
+          type: number
+    Cooked:
+      type: object
+      required: [usedOil, usedAnimalFat]
+      properties:
+        usedOil:
+          type: boolean
+        usedAnimalFat:
+          type: boolean
+    Nutrients:
+      type: object
+      required: [fat, salt, meat]
+      properties:
+        fat:
+          type: number
+        salt:
+          type: number
+        meat:
+          type: string
+          enum:
+            - beef
+            - pork
+            - lamb
+            - vegetables      
+    TestBody:
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/Uncooked'
+        - $ref: '#/components/schemas/Cooked'
+      allOf:
+        - $ref: '#/components/schemas/Nutrients'
+      properties:
+        name:
+          type: string
+        patties:
+          type: integer
+        vegetarian:
+          type: boolean
+      required: [name, patties, vegetarian]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":          "Big Mac",
+        "patties":       2,
+        "vegetarian":    true,
+        "fat":           10.0,
+        "salt":          0.5,
+        "meat":          "beef",
+        "usedOil":       12345, // invalid, should be bool
+        "usedAnimalFat": false,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "I am a peanut", errors[0].Error())
+    assert.Equal(t, "I am a lemon", errors[0].Error())
+
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {

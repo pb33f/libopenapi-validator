@@ -16,7 +16,8 @@ const (
         "they should be separated by pipes '|'. For example: '%s'"
     HowToFixParamInvalidDeepObjectMultipleValues string = "There can only be a single value per property name, " +
         "deepObject parameters should contain the property key in square brackets next to the parameter name. For example: '%s'"
-    HowToFixInvalidJSON        string = "The JSON submitted is invalid, please check the syntax"
-    HowToFixDecodingError             = "The object can't be decoded, so make sure it's being encoded correctly according to the spec."
-    HowToFixInvalidContentType        = "The content type is invalid, Use one of the %d supported types for this operation: %s"
+    HowToFixInvalidJSON         string = "The JSON submitted is invalid, please check the syntax"
+    HowToFixDecodingError              = "The object can't be decoded, so make sure it's being encoded correctly according to the spec."
+    HowToFixInvalidContentType         = "The content type is invalid, Use one of the %d supported types for this operation: %s"
+    HowToFixInvalidResponseCode        = "The service is responding with a code that is not defined in the spec, fix the service!"
 )

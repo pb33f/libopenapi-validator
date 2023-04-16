@@ -13,6 +13,7 @@ const (
     Schema                    = "schema"
     ResponseBodyValidation    = "response"
     RequestBodyContentType    = "contentType"
+    ResponseBodyResponseCode  = "statusCode"
     SpaceDelimited            = "spaceDelimited"
     PipeDelimited             = "pipeDelimited"
     DefaultDelimited          = "default"

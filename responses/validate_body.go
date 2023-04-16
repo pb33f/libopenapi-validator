@@ -63,8 +63,9 @@ func (v *responseBodyValidator) ValidateResponseBody(
                 errors.ResponseContentTypeNotFound(operation, request, response, codeStr))
         }
     } else {
-
-        // TODO: response code not defined, check for default response, or fail.
+        // response code not found in the contract
+        validationErrors = append(validationErrors,
+            errors.ResponseCodeNotFound(operation, request, httpCode))
     }
     if len(validationErrors) > 0 {
         return false, validationErrors
