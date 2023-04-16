@@ -187,6 +187,48 @@ paths:
 
 }
 
+func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": true,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json; charset=utf-8; boundary=12345")
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+
+}
+
 func TestValidateBody_ValidSchemaUsingAllOf(t *testing.T) {
     spec := `openapi: 3.1.0
 paths:

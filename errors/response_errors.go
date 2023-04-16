@@ -14,11 +14,28 @@ import (
 func ResponseContentTypeNotFound(op *v3.Operation,
     request *http.Request,
     response *http.Response,
-    code string) *ValidationError {
+    code string,
+    isDefault bool) *ValidationError {
     ct := response.Header.Get(helpers.ContentTypeHeader)
     var ctypes []string
-    for k := range op.Responses.Codes[code].Content {
-        ctypes = append(ctypes, k)
+    var specLine, specCol int
+    var contentMap map[string]*v3.MediaType
+
+    // check for a default type (applies to all codes without a match)
+    if !isDefault {
+        for k := range op.Responses.Codes[code].Content {
+            ctypes = append(ctypes, k)
+        }
+        specLine = op.Responses.Codes[code].GoLow().Content.KeyNode.Line
+        specCol = op.Responses.Codes[code].GoLow().Content.KeyNode.Column
+        contentMap = op.Responses.Codes[code].Content
+    } else {
+        for k := range op.Responses.Default.Content {
+            ctypes = append(ctypes, k)
+        }
+        specLine = op.Responses.Default.GoLow().Content.KeyNode.Line
+        specCol = op.Responses.Default.GoLow().Content.KeyNode.Column
+        contentMap = op.Responses.Default.Content
     }
     return &ValidationError{
         ValidationType:    helpers.ResponseBodyValidation,
@@ -27,11 +44,11 @@ func ResponseContentTypeNotFound(op *v3.Operation,
             request.Method, code, ct),
         Reason: fmt.Sprintf("The content type '%s' of the %s response received has not "+
             "been defined, it's an unknown type", ct, request.Method),
-        SpecLine: op.Responses.Codes[code].GoLow().Content.KeyNode.Line,
-        SpecCol:  op.Responses.Codes[code].GoLow().Content.KeyNode.Column,
+        SpecLine: specLine,
+        SpecCol:  specCol,
         Context:  op,
         HowToFix: fmt.Sprintf(HowToFixInvalidContentType,
-            len(op.Responses.Codes[code].Content), strings.Join(ctypes, ", ")),
+            len(contentMap), strings.Join(ctypes, ", ")),
     }
 }
 

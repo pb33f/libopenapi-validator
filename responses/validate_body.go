@@ -8,6 +8,7 @@ import (
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
     "github.com/pb33f/libopenapi-validator/schemas"
+    "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
     "strconv"
     "strings"
@@ -31,44 +32,89 @@ func (v *responseBodyValidator) ValidateResponseBody(
     httpCode := response.StatusCode
     contentType := response.Header.Get(helpers.ContentTypeHeader)
 
+    // extract the media type from the content type header.
+    mediaTypeSting, _, _ := helpers.ExtractContentType(contentType)
+
     // check if the response code is in the contract
     foundResponse := operation.Responses.FindResponseByCode(httpCode)
     if foundResponse != nil {
 
         // check content type has been defined in the contract
-        if mediaType, ok := foundResponse.Content[contentType]; ok {
+        if mediaType, ok := foundResponse.Content[mediaTypeSting]; ok {
 
-            // currently, we can only validate JSON based responses, so check for the presence
-            // of 'json' in the content type (what ever it may be) so we can perform a schema check on it.
-            // anything other than JSON, will be ignored.
+            validationErrors = append(validationErrors,
+                v.checkResponseSchema(request, response, mediaTypeSting, mediaType)...)
 
-            if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
+        } else {
 
-                // extract schema from media type
-                if mediaType.Schema != nil {
-                    schema := mediaType.Schema.Schema()
+            // check that the operation *actually* returns a body. (i.e. a 204 response)
+            if foundResponse.Content != nil {
 
-                    // render the schema, to be used for validation
-                    valid, vErrs := schemas.ValidateResponseSchema(request, response, schema)
-                    if !valid {
-                        validationErrors = append(validationErrors, vErrs...)
-                    }
+                // content type not found in the contract
+                codeStr := strconv.Itoa(httpCode)
+                validationErrors = append(validationErrors,
+                    errors.ResponseContentTypeNotFound(operation, request, response, codeStr, false))
+
+            }
+        }
+    } else {
+
+        // no code match, check for default response
+        if operation.Responses.Default != nil {
+
+            // check content type has been defined in the contract
+            if mediaType, ok := operation.Responses.Default.Content[mediaTypeSting]; ok {
+
+                validationErrors = append(validationErrors,
+                    v.checkResponseSchema(request, response, contentType, mediaType)...)
+
+            } else {
+
+                // check that the operation *actually* returns a body. (i.e. a 204 response)
+                if operation.Responses.Default.Content != nil {
+
+                    // content type not found in the contract
+                    codeStr := strconv.Itoa(httpCode)
+                    validationErrors = append(validationErrors,
+                        errors.ResponseContentTypeNotFound(operation, request, response, codeStr, true))
                 }
             }
 
         } else {
-            // content type not found in the contract
-            codeStr := strconv.Itoa(httpCode)
+            // no default, no code match, nothing!
             validationErrors = append(validationErrors,
-                errors.ResponseContentTypeNotFound(operation, request, response, codeStr))
+                errors.ResponseCodeNotFound(operation, request, httpCode))
         }
-    } else {
-        // response code not found in the contract
-        validationErrors = append(validationErrors,
-            errors.ResponseCodeNotFound(operation, request, httpCode))
     }
     if len(validationErrors) > 0 {
         return false, validationErrors
     }
     return true, nil
+}
+
+func (v *responseBodyValidator) checkResponseSchema(
+    request *http.Request,
+    response *http.Response,
+    contentType string,
+    mediaType *v3.MediaType) []*errors.ValidationError {
+
+    var validationErrors []*errors.ValidationError
+
+    // currently, we can only validate JSON based responses, so check for the presence
+    // of 'json' in the content type (what ever it may be) so we can perform a schema check on it.
+    // anything other than JSON, will be ignored.
+    if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
+
+        // extract schema from media type
+        if mediaType.Schema != nil {
+            schema := mediaType.Schema.Schema()
+
+            // render the schema, to be used for validation
+            valid, vErrs := schemas.ValidateResponseSchema(request, response, schema)
+            if !valid {
+                validationErrors = append(validationErrors, vErrs...)
+            }
+        }
+    }
+    return validationErrors
 }

@@ -8,6 +8,7 @@ const (
         "values are correctly encoded, for example: '%s'"
     HowToFixParamInvalidNumber                      string = "Convert the value '%s' into a number"
     HowToFixParamInvalidBoolean                     string = "Convert the value '%s' into a true/false value"
+    HowToFixParamInvalidEnum                        string = "Instead of '%s', use one of the allowed values: '%s'"
     HowToFixParamInvalidFormEncode                  string = "Use a form style encoding for parameter values, for example: '%s'"
     HowToFixInvalidSchema                           string = "Ensure that the object being submitted, matches the schema correctly"
     HowToFixParamInvalidSpaceDelimitedObjectExplode string = "When using 'explode' with space delimited parameters, " +

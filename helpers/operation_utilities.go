@@ -6,6 +6,7 @@ package helpers
 import (
     "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
+    "strings"
 )
 
 func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
@@ -28,4 +29,29 @@ func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
         return item.Trace
     }
     return nil
+}
+
+// ExtractContentType extracts the content type from the request header. First return argument is the content type
+// of the request.The second (optional) argument is the charset of the request. The third (optional)
+// argument is the boundary of the type (only used with forms really).
+func ExtractContentType(contentType string) (string, string, string) {
+    var charset, boundary string
+    if strings.IndexRune(contentType, ';') != -1 {
+        segs := strings.Split(contentType, SemiColon)
+        contentType = strings.TrimSpace(segs[0])
+        for _, v := range segs[1:] {
+            kv := strings.Split(v, Equals)
+            if len(kv) == 2 {
+                if strings.TrimSpace(strings.ToLower(kv[0])) == Charset {
+                    charset = strings.TrimSpace(kv[1])
+                }
+                if strings.TrimSpace(strings.ToLower(kv[0])) == Boundary {
+                    boundary = strings.TrimSpace(kv[1])
+                }
+            }
+        }
+    } else {
+        contentType = strings.TrimSpace(contentType)
+    }
+    return contentType, charset, boundary
 }

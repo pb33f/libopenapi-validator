@@ -80,6 +80,24 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
                                         ValidateCookieArray(sch, p, cookie.Value)...)
                                 }
                             }
+
+                        case helpers.String:
+
+                            // check if the schema has an enum, and if so, match the value against one of
+                            // the defined enum values.
+                            if sch.Enum != nil {
+                                matchFound := false
+                                for _, enumVal := range sch.Enum {
+                                    if strings.TrimSpace(cookie.Value) == enumVal {
+                                        matchFound = true
+                                        break
+                                    }
+                                }
+                                if !matchFound {
+                                    validationErrors = append(validationErrors,
+                                        errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+                                }
+                            }
                         }
                     }
                 }

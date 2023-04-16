@@ -28,7 +28,10 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
     // extract the content type from the request
 
     if contentType = request.Header.Get(helpers.ContentTypeHeader); contentType != "" {
-        if mediaType, ok := operation.RequestBody.Content[contentType]; ok {
+
+        // extract the media type from the content type header.
+        ct, _, _ := helpers.ExtractContentType(contentType)
+        if mediaType, ok := operation.RequestBody.Content[ct]; ok {
 
             // we currently only support JSON validation for request bodies
             // this will capture *everything* that contains some form of 'json' in the content type
@@ -46,6 +49,7 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
                 }
             }
         } else {
+
             // content type not found in the contract
             validationErrors = append(validationErrors, errors.RequestContentTypeNotFound(operation, request))
         }

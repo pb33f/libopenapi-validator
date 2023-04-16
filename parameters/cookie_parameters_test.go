@@ -141,6 +141,68 @@ paths:
     assert.Len(t, errors, 0)
 }
 
+func TestNewValidator_CookieParamEnumValidString(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: PattyPreference
+          in: cookie
+          required: true
+          schema:
+            type: string
+            enum:
+              - beef
+              - chicken
+              - pea protein`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+    request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "chicken"})
+
+    valid, errors := v.ValidateCookieParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamEnumInvalidString(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: PattyPreference
+          in: cookie
+          required: true
+          schema:
+            type: string
+            enum:
+              - beef
+              - chicken
+              - pea protein`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+    request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "milk"})
+
+    valid, errors := v.ValidateCookieParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t,
+        "Instead of 'milk', use one of the allowed values: 'beef, chicken, pea protein'", errors[0].HowToFix)
+}
+
 func TestNewValidator_CookieParamBooleanInvalid(t *testing.T) {
 
     spec := `openapi: 3.1.0

@@ -42,4 +42,7 @@ const (
     JSONContentType           = "application/json"
     JSONType                  = "json"
     ContentTypeHeader         = "Content-Type"
+    DefaultContentType        = "default"
+    Charset                   = "charset"
+    Boundary                  = "boundary"
 )

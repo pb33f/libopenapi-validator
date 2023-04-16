@@ -6,6 +6,7 @@ package responses
 import (
     "bytes"
     "encoding/json"
+    "fmt"
     "github.com/pb33f/libopenapi"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/stretchr/testify/assert"
@@ -458,9 +459,8 @@ components:
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "I am a peanut", errors[0].Error())
-    assert.Equal(t, "I am a lemon", errors[0].Error())
-
+    assert.Len(t, errors[0].SchemaValidationErrors, 3)
+    assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[2].Reason)
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {
@@ -487,7 +487,6 @@ paths:
     m, _ := doc.BuildV3Model()
     v := NewResponseBodyValidator(&m.Model)
 
-    // primitves are now correct.
     body := map[string]interface{}{
         "name":       "Big Mac",
         "patties":    2,
@@ -519,4 +518,180 @@ paths:
 
     assert.True(t, valid)
     assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": false,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+
+        // inject a full content type header, including charset and boundary
+        w.Header().Set(helpers.ContentTypeHeader,
+            fmt.Sprintf("%s; charset=utf-8; boundary=---12223344", helpers.JSONContentType))
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchemaUsingDefault(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": false,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_InvalidBasicSchemaUsingDefault_MissingContentType(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewResponseBodyValidator(&m.Model)
+
+    // primitives are now correct.
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": false,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    // build a request
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+    request.Header.Set(helpers.ContentTypeHeader, "chicken/nuggets;chicken=soup")
+
+    // simulate a request/response
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, r.Header.Get(helpers.ContentTypeHeader))
+        w.WriteHeader(http.StatusOK)
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // record response
+    response := res.Result()
+
+    // validate!
+    valid, errors := v.ValidateResponseBody(request, response)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "POST / 200 operation response content type 'chicken/nuggets;chicken=soup' does not exist", errors[0].Message)
 }
