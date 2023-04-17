@@ -103,14 +103,24 @@ func HeaderParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError
     }
 }
 
-//func (v *validator) queryParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
-//    return &ValidationError{
-//        Message:  fmt.Sprintf("Query parameter '%s' is not defined", paramName),
-//        Reason:   fmt.Sprintf("The query parameter '%s' is not defined as part of the specification for the operation", paramName),
-//        SpecLine: kn.Line,
-//        SpecCol:  kn.Column,
-//    }
-//}
+func IncorrectHeaderParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+    var enums []string
+    for i := range sch.Enum {
+        enums = append(enums, fmt.Sprint(sch.Enum[i]))
+    }
+    validEnums := strings.Join(enums, ", ")
+    return &ValidationError{
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header parameter '%s' does not match allowed values", param.Name),
+        Reason: fmt.Sprintf("The header parameter '%s' is defined as being a string, and has pre-defined "+
+            "values set. The value '%s' is not one of those values.", param.Name, ef),
+        SpecLine: param.GoLow().Schema.Value.Schema().Enum.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.Value.Schema().Enum.KeyNode.Column,
+        Context:  sch,
+        HowToFix: fmt.Sprintf(HowToFixParamInvalidEnum, ef, validEnums),
+    }
+}
 
 func IncorrectQueryParamArrayBoolean(
     param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {

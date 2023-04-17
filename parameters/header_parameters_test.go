@@ -509,3 +509,115 @@ paths:
     assert.False(t, valid)
     assert.Len(t, errors, 3)
 }
+
+func TestNewValidator_HeaderParamStringValidEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [glass, china, thermos]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+    request.Header.Set("coffeecups", "glass")
+
+    valid, errors := v.ValidateHeaderParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [glass, china, thermos]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+    request.Header.Set("coffeecups", "microwave") // this is not a cup!
+
+    valid, errors := v.ValidateHeaderParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Instead of 'microwave', "+
+        "use one of the allowed values: 'glass, china, thermos'", errors[0].HowToFix)
+}
+
+func TestNewValidator_HeaderParamIntegerValidEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: integer
+            enum: [1,2,99]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+    request.Header.Set("coffeecups", "2")
+
+    valid, errors := v.ValidateHeaderParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamNumberInvalidEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: integer
+            enum: [1,2,99]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+    request.Header.Set("coffeecups", "1200") // that's a lot of cups dude, we only have one dishwasher.
+
+    valid, errors := v.ValidateHeaderParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Instead of '1200', "+
+        "use one of the allowed values: '1, 2, 99'", errors[0].HowToFix)
+}

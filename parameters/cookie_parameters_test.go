@@ -464,3 +464,58 @@ paths:
     assert.False(t, valid)
     assert.Len(t, errors, 2)
 }
+
+func TestNewValidator_CookieParamArrayValidIntegerEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: PattyPreference
+          in: cookie
+          required: true
+          schema:
+            type: integer
+            enum: [1, 2, 99]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+    request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "2"})
+
+    valid, errors := v.ValidateCookieParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamArrayInvalidIntegerEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: PattyPreference
+          in: cookie
+          required: true
+          schema:
+            type: integer
+            enum: [1, 2, 99]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+    request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "2500"}) // too many dude.
+
+    valid, errors := v.ValidateCookieParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Instead of '2500', use one of the allowed values: '1, 2, 99'", errors[0].HowToFix)
+}

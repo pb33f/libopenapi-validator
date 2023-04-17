@@ -46,6 +46,21 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
                             if _, err := strconv.ParseFloat(cookie.Value, 64); err != nil {
                                 validationErrors = append(validationErrors,
                                     errors.InvalidCookieParamNumber(p, strings.ToLower(cookie.Value), sch))
+                                break
+                            }
+                            // check if enum is in range
+                            if sch.Enum != nil {
+                                matchFound := false
+                                for _, enumVal := range sch.Enum {
+                                    if strings.TrimSpace(cookie.Value) == enumVal {
+                                        matchFound = true
+                                        break
+                                    }
+                                }
+                                if !matchFound {
+                                    validationErrors = append(validationErrors,
+                                        errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+                                }
                             }
                         case helpers.Boolean:
                             if _, err := strconv.ParseBool(cookie.Value); err != nil {
@@ -67,7 +82,6 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
                                             helpers.ParameterValidation,
                                             helpers.ParameterValidationQuery)...)
                                 }
-
                             }
                         case helpers.Array:
 

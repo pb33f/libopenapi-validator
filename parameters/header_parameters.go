@@ -49,7 +49,23 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                         if _, err := strconv.ParseFloat(param, 64); err != nil {
                             validationErrors = append(validationErrors,
                                 errors.InvalidHeaderParamNumber(p, strings.ToLower(param), sch))
+                            break
                         }
+                        // check if the param is within the enum
+                        if sch.Enum != nil {
+                            matchFound := false
+                            for _, enumVal := range sch.Enum {
+                                if strings.TrimSpace(param) == enumVal {
+                                    matchFound = true
+                                    break
+                                }
+                            }
+                            if !matchFound {
+                                validationErrors = append(validationErrors,
+                                    errors.IncorrectCookieParamEnum(p, strings.ToLower(param), sch))
+                            }
+                        }
+
                     case helpers.Boolean:
                         if _, err := strconv.ParseBool(param); err != nil {
                             validationErrors = append(validationErrors,
@@ -86,6 +102,24 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                             if sch.Items.IsA() {
                                 validationErrors = append(validationErrors,
                                     ValidateHeaderArray(sch, p, param)...)
+                            }
+                        }
+
+                    case helpers.String:
+
+                        // check if the schema has an enum, and if so, match the value against one of
+                        // the defined enum values.
+                        if sch.Enum != nil {
+                            matchFound := false
+                            for _, enumVal := range sch.Enum {
+                                if strings.TrimSpace(param) == enumVal {
+                                    matchFound = true
+                                    break
+                                }
+                            }
+                            if !matchFound {
+                                validationErrors = append(validationErrors,
+                                    errors.IncorrectHeaderParamEnum(p, strings.ToLower(param), sch))
                             }
                         }
                     }
