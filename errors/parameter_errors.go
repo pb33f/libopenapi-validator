@@ -103,6 +103,16 @@ func HeaderParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError
     }
 }
 
+func HeaderParameterCannotBeDecoded(param *v3.Parameter, val string) *ValidationError {
+    return &ValidationError{
+        Message: fmt.Sprintf("Header parameter '%s' cannot be decoded", param.Name),
+        Reason: fmt.Sprintf("The header parameter '%s' cannot be "+
+            "extracted into an object, '%s' is malformed", param.Name, val),
+        SpecLine: param.GoLow().Schema.Value.Schema().Type.KeyNode.Line,
+        SpecCol:  param.GoLow().Schema.Value.Schema().Type.KeyNode.Line,
+    }
+}
+
 func IncorrectHeaderParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
     var enums []string
     for i := range sch.Enum {

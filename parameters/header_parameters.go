@@ -74,7 +74,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                     case helpers.Object:
 
                         // check if the header is default encoded or not
-                        var encodedObj interface{}
+                        var encodedObj map[string]interface{}
                         // we have found our header, check the explode type.
                         if p.IsDefaultHeaderEncoding() {
                             encodedObj = helpers.ConstructMapFromCSV(param)
@@ -82,6 +82,12 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                             if p.IsExploded() { // only option is to be exploded for KV extraction.
                                 encodedObj = helpers.ConstructKVFromCSV(param)
                             }
+                        }
+
+                        if len(encodedObj) == 0 {
+                            validationErrors = append(validationErrors,
+                                errors.HeaderParameterCannotBeDecoded(p, strings.ToLower(param)))
+                            break
                         }
 
                         // if a schema was extracted
