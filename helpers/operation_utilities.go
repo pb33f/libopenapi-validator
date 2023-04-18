@@ -9,6 +9,8 @@ import (
     "strings"
 )
 
+// ExtractOperation extracts the operation from the path item based on the request method. If there is no
+// matching operation found, then nil is returned.
 func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
     switch request.Method {
     case http.MethodGet:

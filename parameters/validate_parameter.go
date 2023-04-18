@@ -15,6 +15,16 @@ import (
     "strings"
 )
 
+// ValidateParameterSchema will validate a parameter against a raw object, or a blob of json/yaml.
+// It will return a list of validation errors, if any.
+//   schema: the schema to validate against
+//   rawObject: the object to validate (leave empty if using a blob)
+//   rawBlob: the blob to validate (leave empty if using an object)
+//   entity: the entity being validated
+//   reasonEntity: the entity that caused the validation to be called
+//   name: the name of the parameter
+//   validationType: the type of validation being performed
+//   subValType: the type of sub-validation being performed
 func ValidateParameterSchema(
     schema *base.Schema,
     rawObject any,

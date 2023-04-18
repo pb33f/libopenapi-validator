@@ -11,12 +11,17 @@ import (
     "strings"
 )
 
+// QueryParam is a struct that holds the key, values and property name for a query parameter
+// it's used for complex query types that need to be parsed and tracked differently depending
+// on the encoding styles used.
 type QueryParam struct {
     Key      string
     Values   []string
     Property string
 }
 
+// ExtractParamsForOperation will extract the parameters for the operation based on the request method.
+// Both the path level params and the method level params will be returned.
 func ExtractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.Parameter {
     params := item.Parameters
     switch request.Method {
@@ -73,8 +78,10 @@ func cast(v string) any {
     return v
 }
 
-// deepObject encoding is a technique used to encode objects into query parameters. Kinda nuts.
+// ConstructParamMapFromDeepObjectEncoding will construct a map from the query parameters that are encoded as
+// deep objects. It's kind of a crazy way to do things, but hey, each to their own.
 func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam) map[string]interface{} {
+    // deepObject encoding is a technique used to encode objects into query parameters. Kinda nuts.
     decoded := make(map[string]interface{})
     for _, v := range values {
         if decoded[v.Key] == nil {
@@ -88,6 +95,7 @@ func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam) map[string]in
     return decoded
 }
 
+// ConstructParamMapFromQueryParamInput will construct a param map from an existing map of *QueryParam slices.
 func ConstructParamMapFromQueryParamInput(values map[string][]*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, q := range values {
@@ -98,9 +106,11 @@ func ConstructParamMapFromQueryParamInput(values map[string][]*QueryParam) map[s
     return decoded
 }
 
-// Pipes are always a good alternative to commas, personally I think they're better, if I were encoding, I would
-// use pipes instead of commas, so much can go wrong with a comma, but a pipe? hardly ever.
+// ConstructParamMapFromPipeEncoding will construct a map from the query parameters that are encoded as
+// pipe separated values. Perhaps the most sane way to delimit/encode properties.
 func ConstructParamMapFromPipeEncoding(values []*QueryParam) map[string]interface{} {
+    // Pipes are always a good alternative to commas, personally I think they're better, if I were encoding, I would
+    // use pipes instead of commas, so much can go wrong with a comma, but a pipe? hardly ever.
     decoded := make(map[string]interface{})
     for _, v := range values {
         props := make(map[string]interface{})
@@ -116,9 +126,11 @@ func ConstructParamMapFromPipeEncoding(values []*QueryParam) map[string]interfac
     return decoded
 }
 
-// Don't use spaces to delimit anything unless you really know what the hell you're doing. Perhaps the
-// easiest way to blow something up, unless you're tokenizing strings... don't do this.
+// ConstructParamMapFromSpaceEncoding will construct a map from the query parameters that are encoded as
+// space delimited values. This is perhaps the worst way to delimit anything other than a paragraph of text.
 func ConstructParamMapFromSpaceEncoding(values []*QueryParam) map[string]interface{} {
+    // Don't use spaces to delimit anything unless you really know what the hell you're doing. Perhaps the
+    // easiest way to blow something up, unless you're tokenizing strings... don't do this.
     decoded := make(map[string]interface{})
     for _, v := range values {
         props := make(map[string]interface{})
@@ -134,6 +146,7 @@ func ConstructParamMapFromSpaceEncoding(values []*QueryParam) map[string]interfa
     return decoded
 }
 
+// ConstructMapFromCSV will construct a map from a comma separated value string.
 func ConstructMapFromCSV(csv string) map[string]interface{} {
     decoded := make(map[string]interface{})
     // explode SSV into array
@@ -149,6 +162,7 @@ func ConstructMapFromCSV(csv string) map[string]interface{} {
     return decoded
 }
 
+// ConstructKVFromCSV will construct a map from a comma separated value string that denotes key value pairs.
 func ConstructKVFromCSV(values string) map[string]interface{} {
     props := make(map[string]interface{})
     exploded := strings.Split(values, Comma)
@@ -161,6 +175,7 @@ func ConstructKVFromCSV(values string) map[string]interface{} {
     return props
 }
 
+// ConstructKVFromLabelEncoding will construct a map from a comma separated value string that denotes key value pairs.
 func ConstructKVFromLabelEncoding(values string) map[string]interface{} {
     props := make(map[string]interface{})
     exploded := strings.Split(values, Period)
@@ -173,6 +188,7 @@ func ConstructKVFromLabelEncoding(values string) map[string]interface{} {
     return props
 }
 
+// ConstructKVFromMatrixCSV will construct a map from a comma separated value string that denotes key value pairs.
 func ConstructKVFromMatrixCSV(values string) map[string]interface{} {
     props := make(map[string]interface{})
     exploded := strings.Split(values, SemiColon)
@@ -185,6 +201,8 @@ func ConstructKVFromMatrixCSV(values string) map[string]interface{} {
     return props
 }
 
+// ConstructParamMapFromFormEncodingArray will construct a map from the query parameters that are encoded as
+// form encoded values.
 func ConstructParamMapFromFormEncodingArray(values []*QueryParam) map[string]interface{} {
     decoded := make(map[string]interface{})
     for _, v := range values {
@@ -201,6 +219,7 @@ func ConstructParamMapFromFormEncodingArray(values []*QueryParam) map[string]int
     return decoded
 }
 
+// DoesFormParamContainDelimiter will determine if a form parameter contains a delimiter.
 func DoesFormParamContainDelimiter(value, style string) bool {
     if strings.Contains(value, Comma) && (style == "" || style == Form) {
         return true
@@ -208,6 +227,7 @@ func DoesFormParamContainDelimiter(value, style string) bool {
     return false
 }
 
+// ExplodeQueryValue will explode a query value based on the style (space, pipe, or form/default).
 func ExplodeQueryValue(value, style string) []string {
     switch style {
     case SpaceDelimited:

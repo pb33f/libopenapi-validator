@@ -18,6 +18,11 @@ import (
     "strings"
 )
 
+// ValidateResponseSchema will validate the response body for a http.Response pointer. The request is used to
+// locate the operation in the specification, the response is used to ensure the response code, media type and the
+// schema of the response body are valid.
+//
+// This function is used by the ValidateResponseBody function, but can be used independently.
 func ValidateResponseSchema(
     request *http.Request,
     response *http.Response,

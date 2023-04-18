@@ -12,6 +12,7 @@ import (
     "strings"
 )
 
+// ValidateCookieArray will validate a cookie parameter that is an array
 func ValidateCookieArray(
     sch *base.Schema, param *v3.Parameter, value string) []*errors.ValidationError {
 
@@ -51,6 +52,7 @@ func ValidateCookieArray(
     return validationErrors
 }
 
+// ValidateHeaderArray will validate a header parameter that is an array
 func ValidateHeaderArray(
     sch *base.Schema, param *v3.Parameter, value string) []*errors.ValidationError {
 
@@ -90,6 +92,7 @@ func ValidateHeaderArray(
     return validationErrors
 }
 
+// ValidateQueryArray will validate a query parameter that is an array
 func ValidateQueryArray(
     sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool) []*errors.ValidationError {
 
@@ -179,7 +182,9 @@ func ValidateQueryArray(
     return validationErrors
 }
 
+// ValidateQueryParamStyle will validate a query parameter by style
 func ValidateQueryParamStyle(param *v3.Parameter, as []*helpers.QueryParam) []*errors.ValidationError {
+
     var validationErrors []*errors.ValidationError
 stopValidation:
     for _, qp := range as {

@@ -14,6 +14,9 @@ import (
     "strings"
 )
 
+// ValidateOpenAPIDocument will validate an OpenAPI 3+ document against the OpenAPI 3.0 schema.
+// It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
+// Swagger / OpenAPI 2.0 documents are not supported by this validator (and they won't be).
 func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*errors.ValidationError) {
 
     // first determine if this is a swagger or an openapi document

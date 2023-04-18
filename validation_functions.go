@@ -12,7 +12,6 @@ import (
 
 type Validator interface {
     ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError)
-    AllValidationErrors() []*errors.ValidationError
 }
 
 type validator struct {
@@ -38,8 +37,4 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
     //    return false, v.errors
     //}
     return false, nil
-}
-
-func (v *validator) AllValidationErrors() []*errors.ValidationError {
-    return v.errors
 }

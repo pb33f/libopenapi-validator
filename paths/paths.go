@@ -14,6 +14,11 @@ import (
     "strings"
 )
 
+// FindPath will find the path in the document that matches the request path. If a successful match was found, then
+// the first return value will be a pointer to the PathItem. The second return value will contain any validation errors
+// that were picked up when locating the path. Number/Integer validation is performed in any path parameters in the request.
+// The third return value will be the path that was found in the document, as it pertains to the contract, so all path
+// parameters will not have been replaced with their values from the request - allowing model lookups.
 func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*errors.ValidationError, string) {
 
     var validationErrors []*errors.ValidationError

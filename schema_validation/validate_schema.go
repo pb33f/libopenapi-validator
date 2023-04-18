@@ -14,14 +14,19 @@ import (
     "strings"
 )
 
+// ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 func ValidateSchemaString(schema *base.Schema, payload string) (bool, []*errors.ValidationError) {
     return validateSchema(schema, []byte(payload), nil)
 }
 
+// ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
+// This is a pre-decoded object that will skip the need to unmarshal a string of JSON/YAML.
 func ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*errors.ValidationError) {
     return validateSchema(schema, nil, payload)
 }
 
+// ValidateSchemaBytes accepts a schema object to validate against, and a byte slice containing a schema to
+// validate against.
 func ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError) {
     return validateSchema(schema, payload, nil)
 }
