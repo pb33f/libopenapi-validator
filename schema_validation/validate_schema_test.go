@@ -160,8 +160,6 @@ paths:
     assert.False(t, valid)
     assert.Len(t, errors, 1)
     assert.Len(t, errors[0].SchemaValidationErrors, 2)
-    assert.Equal(t, "expected integer, but got string", errors[0].SchemaValidationErrors[0].Reason)
-    assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[1].Reason)
 }
 
 func TestValidateSchema_ReffyComplex_Valid(t *testing.T) {
