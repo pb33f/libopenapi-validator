@@ -45,6 +45,45 @@ paths:
 
 }
 
+func TestValidateSchema_SimpleValid_String(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": true,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+    sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+
+    // validate!
+    valid, errors := ValidateSchemaString(sch.Schema(), string(bodyBytes))
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+
+}
+
 func TestValidateSchema_SimpleValid(t *testing.T) {
     spec := `openapi: 3.1.0
 paths:
@@ -77,7 +116,7 @@ paths:
     sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
-    valid, errors := ValidateSchema(sch.Schema(), bodyBytes)
+    valid, errors := ValidateSchemaBytes(sch.Schema(), bodyBytes)
 
     assert.True(t, valid)
     assert.Len(t, errors, 0)
@@ -116,7 +155,7 @@ paths:
     sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
-    valid, errors := ValidateSchema(sch.Schema(), bodyBytes)
+    valid, errors := ValidateSchemaBytes(sch.Schema(), bodyBytes)
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
@@ -207,7 +246,7 @@ paths:
     sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
-    valid, errors := ValidateSchema(sch.Schema(), bodyBytes)
+    valid, errors := ValidateSchemaBytes(sch.Schema(), bodyBytes)
 
     assert.True(t, valid)
     assert.Len(t, errors, 0)
@@ -217,7 +256,7 @@ paths:
     sch = m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
-    valid, errors = ValidateSchema(sch.Schema(), bodyBytes)
+    valid, errors = ValidateSchemaBytes(sch.Schema(), bodyBytes)
 
     assert.True(t, valid)
     assert.Len(t, errors, 0)
@@ -306,7 +345,13 @@ paths:
     sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
-    valid, errors := ValidateSchema(sch.Schema(), bodyBytes)
+    valid, errors := ValidateSchemaBytes(sch.Schema(), bodyBytes)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 3)
+
+    valid, errors = ValidateSchemaObject(sch.Schema(), cakePlease)
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
@@ -317,7 +362,13 @@ paths:
     sch = m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
-    valid, errors = ValidateSchema(sch.Schema(), bodyBytes)
+    valid, errors = ValidateSchemaBytes(sch.Schema(), bodyBytes)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Len(t, errors[0].SchemaValidationErrors, 3)
+
+    valid, errors = ValidateSchemaObject(sch.Schema(), death)
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)

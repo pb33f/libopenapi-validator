@@ -14,7 +14,19 @@ import (
     "strings"
 )
 
-func ValidateSchema(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError) {
+func ValidateSchemaString(schema *base.Schema, payload string) (bool, []*errors.ValidationError) {
+    return validateSchema(schema, []byte(payload), nil)
+}
+
+func ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*errors.ValidationError) {
+    return validateSchema(schema, nil, payload)
+}
+
+func ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError) {
+    return validateSchema(schema, payload, nil)
+}
+
+func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}) (bool, []*errors.ValidationError) {
 
     var validationErrors []*errors.ValidationError
 
@@ -22,15 +34,15 @@ func ValidateSchema(schema *base.Schema, payload []byte) (bool, []*errors.Valida
     renderedSchema, _ := schema.RenderInline()
     jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
-    var decodedObj interface{}
-    _ = json.Unmarshal(payload, &decodedObj)
-
+    if decodedObject == nil {
+        _ = json.Unmarshal(payload, &decodedObject)
+    }
     compiler := jsonschema.NewCompiler()
     _ = compiler.AddResource("schema.json", strings.NewReader(string(jsonSchema)))
     jsch, _ := compiler.Compile("schema.json")
 
     // 4. validate the object against the schema
-    scErrs := jsch.Validate(decodedObj)
+    scErrs := jsch.Validate(decodedObject)
     if scErrs != nil {
         jk := scErrs.(*jsonschema.ValidationError)
 
