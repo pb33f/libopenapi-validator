@@ -68,8 +68,7 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
                             }
                         case helpers.Object:
                             if !p.IsExploded() {
-                                var encodedObj interface{}
-                                encodedObj = helpers.ConstructMapFromCSV(cookie.Value)
+                                encodedObj := helpers.ConstructMapFromCSV(cookie.Value)
 
                                 // if a schema was extracted
                                 if sch != nil {

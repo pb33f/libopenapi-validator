@@ -98,7 +98,7 @@ func ValidateParameterSchema(
     if len(validationErrors) == 0 {
         if rawIsMap {
             decodedMap := decodedObj.(map[string]interface{})
-            if decodedMap == nil || len(decodedMap) == 0 {
+            if decodedMap == nil {
                 // add the error to the list
                 validationErrors = append(validationErrors, &errors.ValidationError{
                     ValidationType:    validationType,

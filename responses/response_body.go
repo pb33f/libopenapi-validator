@@ -23,6 +23,5 @@ func NewResponseBodyValidator(document *v3.Document) ResponseBodyValidator {
 
 type responseBodyValidator struct {
     document *v3.Document
-    request  *http.Request
     errors   []*errors.ValidationError
 }

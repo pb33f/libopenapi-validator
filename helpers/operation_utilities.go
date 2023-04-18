@@ -38,7 +38,7 @@ func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
 // argument is the boundary of the type (only used with forms really).
 func ExtractContentType(contentType string) (string, string, string) {
     var charset, boundary string
-    if strings.IndexRune(contentType, ';') != -1 {
+    if strings.ContainsRune(contentType, ';') {
         segs := strings.Split(contentType, SemiColon)
         contentType = strings.TrimSpace(segs[0])
         for _, v := range segs[1:] {
