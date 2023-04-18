@@ -10,6 +10,7 @@ import (
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "github.com/pb33f/libopenapi/datamodel/high/v3"
     "strconv"
+    "strings"
 )
 
 func ValidateCookieArray(
@@ -118,6 +119,27 @@ func ValidateQueryArray(
         }
     }
 
+    // check if the param is within an enum
+    checkEnum := func(enumCheck, item string) {
+        // check if the array param is within an enum
+        if sch.Items.IsA() {
+            itemsSch := sch.Items.A.Schema()
+            if itemsSch.Enum != nil {
+                matchFound := false
+                for _, enumVal := range itemsSch.Enum {
+                    if strings.TrimSpace(enumCheck) == enumVal {
+                        matchFound = true
+                        break
+                    }
+                }
+                if !matchFound {
+                    validationErrors = append(validationErrors,
+                        errors.IncorrectQueryParamEnumArray(param, item, sch))
+                }
+            }
+        }
+    }
+
     // now check each item in the array
     for _, item := range items {
         // for each type defined in the item's schema, check the item
@@ -127,7 +149,11 @@ func ValidateQueryArray(
                 if _, err := strconv.ParseFloat(item, 64); err != nil {
                     validationErrors = append(validationErrors,
                         errors.IncorrectQueryParamArrayNumber(param, item, sch, itemsSchema))
+                    break
                 }
+                // will it blend?
+                checkEnum(ef, item)
+
             case helpers.Boolean:
                 if _, err := strconv.ParseBool(item); err != nil {
                     validationErrors = append(validationErrors,
@@ -143,9 +169,11 @@ func ValidateQueryArray(
                         param.Name,
                         helpers.ParameterValidation,
                         helpers.ParameterValidationQuery)...)
+
             case helpers.String:
-                // do nothing for now.
-                continue
+
+                // will it float?
+                checkEnum(ef, item)
             }
         }
     }

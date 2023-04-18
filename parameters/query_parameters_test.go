@@ -446,6 +446,64 @@ paths:
     assert.Nil(t, errors)
 }
 
+func TestNewValidator_QueryParamInvalidEnumString(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [cod, halibut]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
+
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Query parameter 'fishy' does not match allowed values", errors[0].Message)
+    assert.Equal(t, "Instead of 'haddock', use one of the allowed values: 'cod, halibut'", errors[0].HowToFix)
+}
+
+func TestNewValidator_QueryParamInvalidEnumNumber(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: number
+            enum: [1, 99]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=22", nil)
+
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Query parameter 'fishy' does not match allowed values", errors[0].Message)
+    assert.Equal(t, "Instead of '22', use one of the allowed values: '1, 99'", errors[0].HowToFix)
+}
+
 func TestNewValidator_QueryParamValidTypeArrayString(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -473,8 +531,71 @@ paths:
 
     valid, errors := v.ValidateQueryParams(request)
     assert.True(t, valid)
-
     assert.Nil(t, errors)
+}
+
+func TestNewValidator_QueryParamInvalidTypeArrayStringEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [cod, halibut]
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod&fishy=haddock", nil)
+
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Instead of 'haddock', use one of the allowed values: 'cod, halibut'", errors[0].HowToFix)
+}
+
+func TestNewValidator_QueryParamInvalidTypeArrayNumberEnum(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: number
+              enum: [1, 99]
+      operationId: locateFishy
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=1&fishy=2", nil)
+
+    valid, errors := v.ValidateQueryParams(request)
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Instead of '2', use one of the allowed values: '1, 99'", errors[0].HowToFix)
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayNumber(t *testing.T) {

@@ -75,15 +75,45 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
                     // extract the schema from the parameter
                     sch := p.Schema.Schema()
 
+                    // check enum (if present)
+                    enumCheck := func(paramValue string) {
+                        matchFound := false
+                        for _, enumVal := range sch.Enum {
+                            if strings.TrimSpace(paramValue) == enumVal {
+                                matchFound = true
+                                break
+                            }
+                        }
+                        if !matchFound {
+                            validationErrors = append(validationErrors,
+                                errors.IncorrectPathParamEnum(p, strings.ToLower(paramValue), sch))
+                        }
+                    }
+
                     for typ := range sch.Type {
 
                         switch sch.Type[typ] {
+                        case helpers.String:
+
+                            // TODO: label and matrix style validation
+
+                            // check if the param is within the enum
+                            if sch.Enum != nil {
+                                enumCheck(paramValue)
+                            }
+
                         case helpers.Integer, helpers.Number:
                             // simple use case is already handled in find param.
                             if isLabel && p.Style == helpers.LabelStyle {
                                 if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
                                     validationErrors = append(validationErrors,
                                         errors.IncorrectPathParamNumber(p, paramValue[1:], sch))
+                                    break
+                                }
+                                // check if the param is within the enum
+                                if sch.Enum != nil {
+                                    enumCheck(paramValue[1:])
+                                    break
                                 }
                             }
                             if isMatrix && p.Style == helpers.MatrixStyle {
@@ -92,7 +122,18 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
                                 if _, err := strconv.ParseFloat(paramValue, 64); err != nil {
                                     validationErrors = append(validationErrors,
                                         errors.IncorrectPathParamNumber(p, paramValue[1:], sch))
+                                    break
                                 }
+                                // check if the param is within the enum
+                                if sch.Enum != nil {
+                                    enumCheck(paramValue)
+                                    break
+                                }
+                            }
+                            // check if the param is within the enum
+                            if sch.Enum != nil {
+                                enumCheck(paramValue)
+                                break
                             }
 
                         case helpers.Boolean:

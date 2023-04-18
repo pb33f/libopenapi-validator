@@ -71,6 +71,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                             validationErrors = append(validationErrors,
                                 errors.IncorrectHeaderParamBool(p, strings.ToLower(param), sch))
                         }
+                        
                     case helpers.Object:
 
                         // check if the header is default encoded or not

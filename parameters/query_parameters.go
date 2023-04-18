@@ -102,11 +102,45 @@ doneLooking:
                         }
                         for _, ty := range pType {
                             switch ty {
+
+                            case helpers.String:
+
+                                // check if the param is within an enum
+                                if sch.Enum != nil {
+                                    matchFound := false
+                                    for _, enumVal := range sch.Enum {
+                                        if strings.TrimSpace(ef) == enumVal {
+                                            matchFound = true
+                                            break
+                                        }
+                                    }
+                                    if !matchFound {
+                                        validationErrors = append(validationErrors,
+                                            errors.IncorrectQueryParamEnum(params[p], ef, sch))
+                                    }
+                                }
+
                             case helpers.Integer, helpers.Number:
                                 if _, err := strconv.ParseFloat(ef, 64); err != nil {
                                     validationErrors = append(validationErrors,
                                         errors.InvalidQueryParamNumber(params[p], ef, sch))
+                                    break
                                 }
+                                // check if the param is within an enum
+                                if sch.Enum != nil {
+                                    matchFound := false
+                                    for _, enumVal := range sch.Enum {
+                                        if strings.TrimSpace(ef) == enumVal {
+                                            matchFound = true
+                                            break
+                                        }
+                                    }
+                                    if !matchFound {
+                                        validationErrors = append(validationErrors,
+                                            errors.IncorrectQueryParamEnum(params[p], ef, sch))
+                                    }
+                                }
+
                             case helpers.Boolean:
                                 if _, err := strconv.ParseBool(ef); err != nil {
                                     validationErrors = append(validationErrors,

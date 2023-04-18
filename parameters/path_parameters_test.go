@@ -1015,3 +1015,204 @@ paths:
     assert.False(t, valid)
     assert.Len(t, errors, 1)
 }
+
+func TestNewValidator_PathParamStringEnumValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: string
+          enum: [bigMac, whopper, mcCrispy]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/bigMac/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+
+}
+
+func TestNewValidator_PathParamStringEnumInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: string
+          enum: [bigMac, whopper, mcCrispy]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/hello/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
+    assert.Equal(t, "Instead of 'hello', use one of the allowed values: 'bigMac, whopper, mcCrispy'", errors[0].HowToFix)
+
+}
+
+func TestNewValidator_PathParamIntegerEnumValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: number
+          enum: [1,2,99,100]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/2/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_PathParamIntegerEnumInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: number
+          enum: [1,2,99,100]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/3284/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
+}
+
+func TestNewValidator_PathLabelEumValid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{.burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: label
+        schema:
+          type: number
+          enum: [1,2,99,100]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/.2/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_PathLabelEumInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{.burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: label
+        schema:
+          type: number
+          enum: [1,2,99,100]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/.22334/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
+    assert.Equal(t, "Instead of '22334', use one of the allowed values: '1, 2, 99, 100'", errors[0].HowToFix)
+}
+
+func TestNewValidator_PathMatrixEumInvalid(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: number
+          enum: [1,2,99,100]
+    get:
+      operationId: locateBurgers`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=22334/locate", nil)
+    valid, errors := v.ValidatePathParams(request)
+
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
+    assert.Equal(t, "Instead of '22334', use one of the allowed values: '1, 2, 99, 100'", errors[0].HowToFix)
+}
