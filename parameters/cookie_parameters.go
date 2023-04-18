@@ -7,7 +7,6 @@ import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "net/http"
     "strconv"
@@ -75,7 +74,7 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
                                 // if a schema was extracted
                                 if sch != nil {
                                     validationErrors = append(validationErrors,
-                                        schemas.ValidateParameterSchema(sch, encodedObj, "",
+                                        ValidateParameterSchema(sch, encodedObj, "",
                                             "Cookie parameter",
                                             "The cookie parameter",
                                             p.Name,

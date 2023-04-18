@@ -7,7 +7,6 @@ import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
     "strconv"
@@ -110,7 +109,7 @@ func (v *responseBodyValidator) checkResponseSchema(
             schema := mediaType.Schema.Schema()
 
             // render the schema, to be used for validation
-            valid, vErrs := schemas.ValidateResponseSchema(request, response, schema)
+            valid, vErrs := ValidateResponseSchema(request, response, schema)
             if !valid {
                 validationErrors = append(validationErrors, vErrs...)
             }

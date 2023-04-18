@@ -6,7 +6,6 @@ package parameters
 import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "github.com/pb33f/libopenapi/datamodel/high/v3"
     "strconv"
@@ -161,7 +160,7 @@ func ValidateQueryArray(
                 }
             case helpers.Object:
                 validationErrors = append(validationErrors,
-                    schemas.ValidateParameterSchema(itemsSchema,
+                    ValidateParameterSchema(itemsSchema,
                         nil,
                         item,
                         "Query array parameter",

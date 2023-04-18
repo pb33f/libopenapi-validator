@@ -1,7 +1,7 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package schemas
+package schema_validation
 
 import (
     "github.com/pb33f/libopenapi/utils"

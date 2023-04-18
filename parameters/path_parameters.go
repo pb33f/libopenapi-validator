@@ -8,7 +8,6 @@ import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "net/http"
     "strconv"
     "strings"
@@ -187,7 +186,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
                             // if a schema was extracted
                             if sch != nil {
                                 validationErrors = append(validationErrors,
-                                    schemas.ValidateParameterSchema(sch,
+                                    ValidateParameterSchema(sch,
                                         encodedObject,
                                         "",
                                         "Path parameter",

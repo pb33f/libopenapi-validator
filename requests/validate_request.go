@@ -1,13 +1,14 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-package schemas
+package requests
 
 import (
     "encoding/json"
     "fmt"
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
+    "github.com/pb33f/libopenapi-validator/schema_validation"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "github.com/pb33f/libopenapi/utils"
     "github.com/santhosh-tekuri/jsonschema/v5"
@@ -55,7 +56,7 @@ func ValidateRequestSchema(
                 _ = yaml.Unmarshal(renderedSchema, &renderedNode)
 
                 // locate the violated property in the schema
-                located := LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+                located := schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
                 violation := &errors.SchemaValidationFailure{
                     Reason:        er.Error,
                     Location:      er.KeywordLocation,

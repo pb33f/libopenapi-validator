@@ -504,6 +504,33 @@ paths:
     assert.Equal(t, "Instead of '22', use one of the allowed values: '1, 99'", errors[0].HowToFix)
 }
 
+func TestNewValidator_QueryParamValidEnumNumber(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: number
+            enum: [1, 99]`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+
+    v := NewParameterValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=1", nil)
+
+    valid, errors := v.ValidateQueryParams(request)
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+}
+
 func TestNewValidator_QueryParamValidTypeArrayString(t *testing.T) {
 
     spec := `openapi: 3.1.0
@@ -1306,7 +1333,7 @@ func TestNewValidator_QueryParamInvalidTypeObjectPropType_Ref(t *testing.T) {
 
     spec := `openapi: 3.1.0
 components:
-  schemas:
+  schema_validation:
     chippy:
       type: object
       properties:
@@ -1324,7 +1351,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/chippy"
+            $ref: "#/components/schema_validation/chippy"
 paths:
   /a/fishy/on/a/dishy:
     get:

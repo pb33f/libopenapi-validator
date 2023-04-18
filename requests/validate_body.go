@@ -7,7 +7,6 @@ import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "net/http"
     "strings"
 )
@@ -42,7 +41,7 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
                     schema := mediaType.Schema.Schema()
 
                     // render the schema, to be used for validation
-                    valid, vErrs := schemas.ValidateRequestSchema(request, schema)
+                    valid, vErrs := ValidateRequestSchema(request, schema)
                     if !valid {
                         validationErrors = append(validationErrors, vErrs...)
                     }

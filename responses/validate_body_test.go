@@ -265,9 +265,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TestBody' 
+                $ref: '#/components/schema_validation/TestBody' 
 components:
-  schemas:
+  schema_validation:
     Uncooked:
       type: object
       required: [uncookedWeight, uncookedHeight]
@@ -302,10 +302,10 @@ components:
     TestBody:
       type: object
       oneOf:
-        - $ref: '#/components/schemas/Uncooked'
-        - $ref: '#/components/schemas/Cooked'
+        - $ref: '#/components/schema_validation/Uncooked'
+        - $ref: '#/components/schema_validation/Cooked'
       allOf:
-        - $ref: '#/components/schemas/Nutrients'
+        - $ref: '#/components/schema_validation/Nutrients'
       properties:
         name:
           type: string
@@ -368,9 +368,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TestBody' 
+                $ref: '#/components/schema_validation/TestBody' 
 components:
-  schemas:
+  schema_validation:
     Uncooked:
       type: object
       required: [uncookedWeight, uncookedHeight]
@@ -405,10 +405,10 @@ components:
     TestBody:
       type: object
       oneOf:
-        - $ref: '#/components/schemas/Uncooked'
-        - $ref: '#/components/schemas/Cooked'
+        - $ref: '#/components/schema_validation/Uncooked'
+        - $ref: '#/components/schema_validation/Cooked'
       allOf:
-        - $ref: '#/components/schemas/Nutrients'
+        - $ref: '#/components/schema_validation/Nutrients'
       properties:
         name:
           type: string

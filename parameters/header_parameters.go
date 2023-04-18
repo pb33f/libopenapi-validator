@@ -7,7 +7,6 @@ import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "net/http"
     "strconv"
@@ -71,7 +70,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                             validationErrors = append(validationErrors,
                                 errors.IncorrectHeaderParamBool(p, strings.ToLower(param), sch))
                         }
-                        
+
                     case helpers.Object:
 
                         // check if the header is default encoded or not
@@ -88,7 +87,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
                         // if a schema was extracted
                         if sch != nil {
                             validationErrors = append(validationErrors,
-                                schemas.ValidateParameterSchema(sch,
+                                ValidateParameterSchema(sch,
                                     encodedObj,
                                     "",
                                     "Header parameter",

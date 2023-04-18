@@ -8,7 +8,6 @@ import (
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/pb33f/libopenapi-validator/schemas"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "net/http"
     "regexp"
@@ -181,7 +180,7 @@ doneLooking:
 
                                 numErrors := len(validationErrors)
                                 validationErrors = append(validationErrors,
-                                    schemas.ValidateParameterSchema(sch, encodedObj[params[p].Name].(map[string]interface{}),
+                                    ValidateParameterSchema(sch, encodedObj[params[p].Name].(map[string]interface{}),
                                         ef,
                                         "Query parameter",
                                         "The query parameter",
@@ -217,7 +216,7 @@ doneLooking:
                         // validate the schema.
                         decoded := helpers.ConstructParamMapFromQueryParamInput(queryParams)
                         validationErrors = append(validationErrors,
-                            schemas.ValidateParameterSchema(sch,
+                            ValidateParameterSchema(sch,
                                 decoded,
                                 "",
                                 "Query array parameter",
