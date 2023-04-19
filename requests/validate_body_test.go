@@ -7,6 +7,7 @@ import (
     "bytes"
     "encoding/json"
     "github.com/pb33f/libopenapi"
+    "github.com/pb33f/libopenapi-validator/paths"
     "github.com/stretchr/testify/assert"
     "net/http"
     "testing"
@@ -91,13 +92,60 @@ paths:
 
     request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist",
         bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json") // wtf kinda content type is this?
+    request.Header.Set("Content-Type", "application/json")
 
     valid, errors := v.ValidateRequestBody(request)
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
     assert.Equal(t, "Path '/I do not exist' not found", errors[0].Message)
+}
+
+func TestValidateBody_SetPath(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    // mix up the primitives to fire two schema violations.
+    body := map[string]interface{}{
+        "name":       "Big Mac",
+        "patties":    2,
+        "vegetarian": true,
+    }
+
+    bodyBytes, _ := json.Marshal(body)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        bytes.NewBuffer(bodyBytes))
+    request.Header.Set("Content-Type", "application/json")
+
+    // preset the path
+    path, _, pv := paths.FindPath(request, &m.Model)
+    v.SetPathItem(path, pv)
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+
 }
 
 func TestValidateBody_InvalidBasicSchema(t *testing.T) {

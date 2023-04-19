@@ -9,6 +9,7 @@ import (
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi-validator/paths"
     "github.com/pb33f/libopenapi/datamodel/high/base"
+    "github.com/pb33f/libopenapi/datamodel/high/v3"
     "net/http"
     "regexp"
     "strconv"
@@ -19,11 +20,18 @@ import (
 // The method will locate the correct path, and operation, based on the verb. The parameters for the operation
 // will be matched and validated against what has been supplied in the http.Request query string.
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
+
     // find path
-    pathItem, errs, _ := paths.FindPath(request, v.document)
-    if pathItem == nil || errs != nil {
-        v.errors = errs
-        return false, errs
+    var pathItem *v3.PathItem
+    var errs []*errors.ValidationError
+    if v.pathItem == nil {
+        pathItem, errs, _ = paths.FindPath(request, v.document)
+        if pathItem == nil || errs != nil {
+            v.errors = errs
+            return false, errs
+        }
+    } else {
+        pathItem = v.pathItem
     }
 
     // extract params for the operation
