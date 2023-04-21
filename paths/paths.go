@@ -56,9 +56,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodPost:
@@ -76,9 +74,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodPut:
@@ -97,9 +93,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodDelete:
@@ -117,9 +111,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodOptions:
@@ -137,9 +129,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodHead:
@@ -157,9 +147,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodPatch:
@@ -177,9 +165,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		case http.MethodTrace:
@@ -197,9 +183,7 @@ pathFound:
 					validationErrors = errs
 					break pathFound
 				} else {
-					if errs != nil {
-						validationErrors = errs
-					}
+					validationErrors = errs
 				}
 			}
 		}
@@ -250,12 +234,12 @@ func comparePaths(mapped, requested []string,
 						case helpers.String, helpers.Object, helpers.Array:
 							// should not be a number.
 							if _, err := strconv.ParseFloat(s, 64); err == nil {
-								s = "&&FAIL&&"
+								s = "**&&FAIL&&**"
 							}
 						case helpers.Number, helpers.Integer:
 							// should not be a string.
 							if _, err := strconv.ParseFloat(s, 64); err != nil {
-								s = "&&FAIL&&"
+								s = "**&&FAIL&&**"
 							}
 							// TODO: check for encoded objects and arrays (yikes)
 						}

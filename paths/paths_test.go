@@ -261,3 +261,237 @@ paths:
 	assert.Equal(t, "Path '/not/here' not found", errs[0].Message)
 
 }
+
+func TestNewValidator_GetLiteralMatch(t *testing.T) {
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/store/inventory", nil)
+
+	// load a doc
+	b, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(b)
+
+	m, _ := doc.BuildV3Model()
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_PostLiteralMatch(t *testing.T) {
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/user", nil)
+
+	// load a doc
+	b, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(b)
+
+	m, _ := doc.BuildV3Model()
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_PutLiteralMatch(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/burger:
+    put:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/burger", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_PutMatch_Error(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/{cakes}:
+    put:
+      operationId: locateBurger
+      parameters:
+        - name: cakes
+          in: path
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/1234", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 1)
+}
+
+func TestNewValidator_OptionsMatch_Error(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/{cakes}:
+    options:
+      operationId: locateBurger
+      parameters:
+        - name: cakes
+          in: path
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodOptions, "https://things.com/pizza/1234", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 1)
+}
+
+func TestNewValidator_PatchLiteralMatch(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/burger:
+    patch:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/pizza/burger", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_PatchMatch_Error(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/{cakes}:
+    patch:
+      operationId: locateBurger
+      parameters:
+        - name: cakes
+          in: path
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/pizza/1234", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 1)
+}
+
+func TestNewValidator_DeleteLiteralMatch(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/burger:
+    delete:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pizza/burger", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_OptionsLiteralMatch(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/burger:
+    options:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodOptions, "https://things.com/pizza/burger", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_HeadLiteralMatch(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/burger:
+    head:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodHead, "https://things.com/pizza/burger", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_TraceLiteralMatch(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/burger:
+    trace:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/pizza/burger", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 0)
+}
+
+func TestNewValidator_TraceMatch_Error(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/{cakes}:
+    trace:
+      operationId: locateBurger
+      parameters:
+        - name: cakes
+          in: path
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/pizza/1234", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+
+	assert.Len(t, errs, 1)
+}

@@ -89,6 +89,7 @@ func (v *responseBodyValidator) ValidateResponseBody(
 			}
 
 		} else {
+			// TODO: add support for '2XX' and '3XX' responses in the contract
 			// no default, no code match, nothing!
 			validationErrors = append(validationErrors,
 				errors.ResponseCodeNotFound(operation, request, httpCode))
