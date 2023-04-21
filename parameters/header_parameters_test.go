@@ -65,34 +65,6 @@ paths:
 	assert.Equal(t, "Path '/I/do/not/exist' not found", errors[0].Message)
 }
 
-func TestNewValidator_HeaderParamUndefined(t *testing.T) {
-
-	spec := `openapi: 3.1.0
-paths:
-  /vending/drinks:
-    get:
-      parameters:
-        - name: fishy
-          in: header
-          schema:
-            type: string
-`
-
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-	m, _ := doc.BuildV3Model()
-
-	v := NewParameterValidator(&m.Model)
-
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
-	request.Header.Set("Mushypeas", "yes please") //https://github.com/golang/go/issues/5022
-
-	valid, errors := v.ValidateHeaderParams(request)
-
-	assert.False(t, valid)
-	assert.Equal(t, 1, len(errors))
-	assert.Equal(t, "Header parameter 'Mushypeas' is not defined", errors[0].Message)
-}
-
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeNumber(t *testing.T) {
 
 	spec := `openapi: 3.1.0

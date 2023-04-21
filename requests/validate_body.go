@@ -40,27 +40,28 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 
 		// extract the media type from the content type header.
 		ct, _, _ := helpers.ExtractContentType(contentType)
-		if mediaType, ok := operation.RequestBody.Content[ct]; ok {
+		if operation.RequestBody != nil {
+			if mediaType, ok := operation.RequestBody.Content[ct]; ok {
 
-			// we currently only support JSON validation for request bodies
-			// this will capture *everything* that contains some form of 'json' in the content type
-			if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
+				// we currently only support JSON validation for request bodies
+				// this will capture *everything* that contains some form of 'json' in the content type
+				if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
 
-				// extract schema from media type
-				if mediaType.Schema != nil {
-					schema := mediaType.Schema.Schema()
+					// extract schema from media type
+					if mediaType.Schema != nil {
+						schema := mediaType.Schema.Schema()
 
-					// render the schema, to be used for validation
-					valid, vErrs := ValidateRequestSchema(request, schema)
-					if !valid {
-						validationErrors = append(validationErrors, vErrs...)
+						// render the schema, to be used for validation
+						valid, vErrs := ValidateRequestSchema(request, schema)
+						if !valid {
+							validationErrors = append(validationErrors, vErrs...)
+						}
 					}
 				}
+			} else {
+				// content type not found in the contract
+				validationErrors = append(validationErrors, errors.RequestContentTypeNotFound(operation, request))
 			}
-		} else {
-
-			// content type not found in the contract
-			validationErrors = append(validationErrors, errors.RequestContentTypeNotFound(operation, request))
 		}
 	}
 	if len(validationErrors) > 0 {

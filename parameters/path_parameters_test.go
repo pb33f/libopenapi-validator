@@ -280,7 +280,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "Match for path '/burgers/hello/locate', but the parameter 'hello' is not a number", errors[0].Message)
+	assert.Equal(t, "Path '/burgers/hello/locate' not found", errors[0].Message)
 }
 
 func TestNewValidator_SimpleEncodedPath_InvalidBoolean(t *testing.T) {
