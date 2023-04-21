@@ -754,5 +754,5 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "POST / 200 operation response content type 'chicken/nuggets;chicken=soup' does not exist", errors[0].Message)
+	assert.Equal(t, "POST / 200 operation response content type 'chicken/nuggets' does not exist", errors[0].Message)
 }

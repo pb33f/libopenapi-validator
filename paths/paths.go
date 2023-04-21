@@ -38,7 +38,8 @@ pathFound:
 
 		// collect path level params
 		params := pathItem.Parameters
-
+		var errs []*errors.ValidationError
+		var ok bool
 		switch request.Method {
 		case http.MethodGet:
 			if pathItem.Get != nil {
@@ -49,11 +50,15 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodPost:
@@ -65,10 +70,15 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, _ := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
+					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodPut:
@@ -78,13 +88,18 @@ pathFound:
 				if request.URL.Path == path {
 					pItem = pathItem
 					foundPath = path
+					validationErrors = errs
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodDelete:
@@ -96,11 +111,15 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodOptions:
@@ -112,11 +131,15 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodHead:
@@ -128,11 +151,15 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodPatch:
@@ -144,11 +171,15 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		case http.MethodTrace:
@@ -160,16 +191,20 @@ pathFound:
 					foundPath = path
 					break pathFound
 				}
-				if ok, errs := comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
+				if ok, errs = comparePaths(segs, reqPathSegments, p, request.URL.Path); ok {
 					pItem = pathItem
 					foundPath = path
 					validationErrors = errs
 					break pathFound
+				} else {
+					if errs != nil {
+						validationErrors = errs
+					}
 				}
 			}
 		}
 	}
-	if pItem == nil {
+	if pItem == nil && len(validationErrors) == 0 {
 		validationErrors = append(validationErrors, &errors.ValidationError{
 			ValidationType:    helpers.ParameterValidationPath,
 			ValidationSubType: "missing",
@@ -197,9 +232,11 @@ func comparePaths(mapped, requested []string,
 	var imploded []string
 	for i, seg := range mapped {
 		s := seg
+		//sOrig := seg
 		// check for braces
 		if strings.Contains(seg, "{") {
 			s = requested[i]
+			//sOrig = s
 		}
 		// check param against type, check if it's a number or not, and if it validates.
 		for p := range params {
@@ -210,7 +247,7 @@ func comparePaths(mapped, requested []string,
 					for t := range schema.Type {
 
 						switch schema.Type[t] {
-						case helpers.String:
+						case helpers.String, helpers.Object, helpers.Array:
 							// should not be a number.
 							if _, err := strconv.ParseFloat(s, 64); err == nil {
 								s = "&&FAIL&&"
@@ -220,26 +257,8 @@ func comparePaths(mapped, requested []string,
 							if _, err := strconv.ParseFloat(s, 64); err != nil {
 								s = "&&FAIL&&"
 							}
+							// TODO: check for encoded objects and arrays (yikes)
 						}
-
-						//if schema.Type[t] == helpers.Number || schema.Type[t] == helpers.Integer {
-						//notaNumber := false
-						// will return no error on floats or int
-
-						//if notaNumber {
-						//	pathErrors = append(pathErrors, &errors.ValidationError{
-						//		ValidationType:    helpers.ParameterValidationPath,
-						//		ValidationSubType: "number",
-						//		Message: fmt.Sprintf("Match for path '%s', but the parameter "+
-						//			"'%s' is not a number", path, s),
-						//		Reason: fmt.Sprintf("The parameter '%s' is defined as a number, "+
-						//			"but the value '%s' is not a number", h, s),
-						//		SpecLine: params[p].GoLow().Schema.Value.Schema().Type.KeyNode.Line,
-						//		SpecCol:  params[p].GoLow().Schema.Value.Schema().Type.KeyNode.Column,
-						//		Context:  schema,
-						//	})
-						//}
-						//}
 					}
 				}
 			}
