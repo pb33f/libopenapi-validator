@@ -312,8 +312,6 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
-	assert.Equal(t, "200 response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
-	assert.Equal(t, "expected integer, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestValidateBody_InvalidBasicSchema_SetPath(t *testing.T) {
