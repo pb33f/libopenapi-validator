@@ -21,8 +21,16 @@ import (
 //	ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
 //	ValidateSchemaBytes accepts a schema object to validate against, and a JSON/YAML blob that is defined as a byte array.
 type SchemaValidator interface {
+
+	// ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 	ValidateSchemaString(schema *base.Schema, payload string) (bool, []*errors.ValidationError)
+
+	// ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
+	// This is a pre-decoded object that will skip the need to unmarshal a string of JSON/YAML.
 	ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*errors.ValidationError)
+
+	// ValidateSchemaBytes accepts a schema object to validate against, and a byte slice containing a schema to
+	// validate against.
 	ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError)
 }
 
@@ -33,19 +41,14 @@ func NewSchemaValidator() SchemaValidator {
 	return &schemaValidator{}
 }
 
-// ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*errors.ValidationError) {
 	return validateSchema(schema, []byte(payload), nil)
 }
 
-// ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
-// This is a pre-decoded object that will skip the need to unmarshal a string of JSON/YAML.
 func (s *schemaValidator) ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*errors.ValidationError) {
 	return validateSchema(schema, nil, payload)
 }
 
-// ValidateSchemaBytes accepts a schema object to validate against, and a byte slice containing a schema to
-// validate against.
 func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError) {
 	return validateSchema(schema, payload, nil)
 }

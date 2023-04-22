@@ -16,12 +16,32 @@ import (
 	"sync"
 )
 
+// Validator provides a coarse grained interface for validating an OpenAPI 3+ documents.
+// There are three primary use-cases for validation
+//
+// Validating *http.Request objects against and OpenAPI 3+ document
+// Validating *http.Response objects against an OpenAPI 3+ document
+// Validating an OpenAPI 3+ document against the OpenAPI 3+ specification
 type Validator interface {
+
+	// ValidateHttpRequest will validate an *http.Request object against an OpenAPI 3+ document.
+	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError)
+
+	// ValidateHttpRequestResponse will validate both the *http.Request and *http.Response objects against an OpenAPI 3+ document.
+	// The path, query, cookie and header parameters and request and response body are validated.
 	ValidateHttpRequestResponse(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
+
+	// ValidateDocument will validate an OpenAPI 3+ document against the 3.0 or 3.1 OpenAPI 3+ specification
 	ValidateDocument() (bool, []*errors.ValidationError)
+
+	// GetParameterValidator will return a parameters.ParameterValidator instance used to validate parameters
 	GetParameterValidator() parameters.ParameterValidator
+
+	// GetRequestBodyValidator will return a parameters.RequestBodyValidator instance used to validate request bodies
 	GetRequestBodyValidator() requests.RequestBodyValidator
+
+	// GetResponseBodyValidator will return a parameters.ResponseBodyValidator instance used to validate response bodies
 	GetResponseBodyValidator() responses.ResponseBodyValidator
 }
 
@@ -125,6 +145,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 	errChan := make(chan []*errors.ValidationError)
 	controlChan := make(chan bool)
 
+	// async param validation function.
 	parameterValidationFunc := func(control chan bool, errorChan chan []*errors.ValidationError) {
 		paramErrs := make(chan []*errors.ValidationError)
 		paramControlChan := make(chan bool)
@@ -138,6 +159,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 			paramValidator.ValidateQueryParams,
 		}
 
+		// listen for validation errors on parameters. everything will run async.
 		paramListener := func(control chan bool, errorChan chan []*errors.ValidationError) {
 			completedValidations := 0
 			for {
@@ -168,12 +190,13 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 		for i := range validations {
 			go validateParamFunction(paramControlChan, paramErrs, validations[i])
 		}
-		// wait for all the validations to complete
 
+		// wait for all the validations to complete
 		<-paramFunctionControlChan
 		if len(paramValidationErrors) > 0 {
 			errorChan <- paramValidationErrors
 		}
+
 		// let runValidation know we are done with this part.
 		controlChan <- true
 	}
@@ -193,28 +216,9 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 	}
 
 	var validationErrors []*errors.ValidationError
-	var validationLock sync.Mutex
-
-	runValidation := func(control chan bool, errorChan chan []*errors.ValidationError) {
-		completedValidations := 0
-		for {
-			select {
-			case vErrs := <-errorChan:
-				validationLock.Lock()
-				validationErrors = append(validationErrors, vErrs...)
-				validationLock.Unlock()
-			case <-control:
-				completedValidations++
-				if completedValidations == len(asyncFunctions) {
-					doneChan <- true
-					return
-				}
-			}
-		}
-	}
 
 	// sit and wait for everything to report back.
-	go runValidation(controlChan, errChan)
+	go runValidation(controlChan, doneChan, errChan, &validationErrors, len(asyncFunctions))
 
 	// run async functions
 	for i := range asyncFunctions {
@@ -239,6 +243,29 @@ type validator struct {
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
 	errors            []*errors.ValidationError
+}
+
+var validationLock sync.Mutex
+
+func runValidation(control, doneChan chan bool,
+	errorChan chan []*errors.ValidationError,
+	validationErrors *[]*errors.ValidationError,
+	total int) {
+	completedValidations := 0
+	for {
+		select {
+		case vErrs := <-errorChan:
+			validationLock.Lock()
+			*validationErrors = append(*validationErrors, vErrs...)
+			validationLock.Unlock()
+		case <-control:
+			completedValidations++
+			if completedValidations == total {
+				doneChan <- true
+				return
+			}
+		}
+	}
 }
 
 type validationFunction func(request *http.Request) (bool, []*errors.ValidationError)

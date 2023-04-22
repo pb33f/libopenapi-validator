@@ -14,9 +14,6 @@ import (
 	"strings"
 )
 
-// ValidateHeaderParams validates the header parameters contained within *http.Request.
-// It returns a boolean stating true if validation passed (false for failed),
-// and a slice of errors if validation failed.
 func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*errors.ValidationError) {
 
 	// find path
@@ -144,17 +141,6 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 			}
 		}
 	}
-
-	// TODO: this needs to go to the grave. this will trigger everything
-	// check for any headers that are not defined in the spec
-	//for k := range request.Header {
-	//	if _, ok := seenHeaders[strings.ToLower(k)]; !ok {
-	//		ps := pathItem.GetOperations()[strings.ToLower(request.Method)].GoLow().Parameters
-	//		if ps.KeyNode != nil {
-	//			validationErrors = append(validationErrors, errors.HeaderParameterNotDefined(k, ps.KeyNode))
-	//		}
-	//	}
-	//}
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors

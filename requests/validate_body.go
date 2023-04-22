@@ -12,9 +12,6 @@ import (
 	"strings"
 )
 
-// ValidateRequestBody will validate the request body for an operation. The first return value will be true if the
-// request body is valid, false if it is not. The second return value will be a slice of ValidationError pointers if
-// the body is not valid.
 func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
 
 	// find path

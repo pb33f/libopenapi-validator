@@ -14,7 +14,15 @@ import (
 //	ValidateRequestBody method accepts an *http.Request and returns true if validation passed,
 //	                    false if validation failed and a slice of ValidationError pointers.
 type RequestBodyValidator interface {
+
+	// ValidateRequestBody will validate the request body for an operation. The first return value will be true if the
+	// request body is valid, false if it is not. The second return value will be a slice of ValidationError pointers if
+	// the body is not valid.
 	ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError)
+
+	// SetPathItem will set the pathItem for the RequestBodyValidator, all validations will be performed
+	// against this pathItem otherwise if not set, each validation will perform a lookup for the pathItem
+	// based on the *http.Request
 	SetPathItem(path *v3.PathItem, pathValue string)
 }
 
@@ -23,9 +31,6 @@ func NewRequestBodyValidator(document *v3.Document) RequestBodyValidator {
 	return &requestBodyValidator{document: document}
 }
 
-// SetPathItem will set the pathItem for the RequestBodyValidator, all validations will be performed
-// against this pathItem otherwise if not set, each validation will perform a lookup for the pathItem
-// based on the *http.Request
 func (v *requestBodyValidator) SetPathItem(path *v3.PathItem, pathValue string) {
 	v.pathItem = path
 	v.pathValue = pathValue

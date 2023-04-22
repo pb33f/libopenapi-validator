@@ -14,8 +14,6 @@ import (
 	"strings"
 )
 
-// ValidatePathParams validates the path parameters contained within *http.Request. It returns a boolean stating true
-// if validation passed (false for failed), and a slice of errors if validation failed.
 func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError) {
 
 	// find path

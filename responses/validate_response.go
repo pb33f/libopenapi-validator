@@ -4,6 +4,7 @@
 package responses
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/pb33f/libopenapi-validator/errors"
@@ -34,6 +35,10 @@ func ValidateResponseSchema(
 	renderedSchema, _ := schema.RenderInline()
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 	responseBody, _ := io.ReadAll(response.Body)
+
+	// close the request body, so it can be re-read later by another player in the chain
+	_ = response.Body.Close()
+	response.Body = io.NopCloser(bytes.NewBuffer(responseBody))
 
 	var decodedObj interface{}
 	_ = json.Unmarshal(responseBody, &decodedObj)
