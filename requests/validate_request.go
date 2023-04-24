@@ -11,7 +11,6 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -23,13 +22,12 @@ import (
 // If validation fails, it will return a list of validation errors as the second return value.
 func ValidateRequestSchema(
 	request *http.Request,
-	schema *base.Schema) (bool, []*errors.ValidationError) {
+	schema *base.Schema,
+	renderedSchema,
+	jsonSchema []byte) (bool, []*errors.ValidationError) {
 
 	var validationErrors []*errors.ValidationError
 
-	// render the schema, to be used for validation
-	renderedSchema, _ := schema.RenderInline()
-	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 	requestBody, _ := io.ReadAll(request.Body)
 
 	// close the request body, so it can be re-read later by another player in the chain
@@ -38,6 +36,11 @@ func ValidateRequestSchema(
 
 	var decodedObj interface{}
 	_ = json.Unmarshal(requestBody, &decodedObj)
+
+	// no request body? failed to decode anything? nothing to do here.
+	if requestBody == nil || decodedObj == nil {
+		return true, nil
+	}
 
 	compiler := jsonschema.NewCompiler()
 	_ = compiler.AddResource("requestBody.json", strings.NewReader(string(jsonSchema)))
