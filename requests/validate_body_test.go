@@ -233,6 +233,9 @@ paths:
 
     valid, errors := v.ValidateRequestBody(request)
 
+    // double-tap to hit the cache
+    _, _ = v.ValidateRequestBody(request)
+
     assert.False(t, valid)
     assert.Len(t, errors, 1)
     assert.Len(t, errors[0].SchemaValidationErrors, 2)
@@ -745,4 +748,48 @@ components:
     assert.Equal(t, 2, errors[0].SchemaValidationErrors[0].Line)
     assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
     assert.Equal(t, 11, errors[0].SchemaValidationErrors[0].Column)
+}
+
+func TestValidateBody_MissingBody(t *testing.T) {
+    spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schema_validation/TestBody' 
+components:
+  schema_validation:
+    TestBody:
+      type: array
+      maxItems: 2
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          patties:
+            type: integer
+            maximum: 3
+            minimum: 1
+          vegetarian:
+            type: boolean
+        required: [name, patties, vegetarian]    `
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+
+    m, _ := doc.BuildV3Model()
+    v := NewRequestBodyValidator(&m.Model)
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+        http.NoBody)
+    request.Header.Set("Content-Type", "application/json")
+
+    valid, errors := v.ValidateRequestBody(request)
+
+    assert.True(t, valid)
+    assert.Len(t, errors, 0)
+
 }
