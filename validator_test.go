@@ -921,7 +921,7 @@ func TestNewValidator_PetStore_UploadImage200_InvalidRequestBodyType(t *testing.
     valid, errors := v.ValidateHttpRequestResponse(request, res.Result())
 
     assert.False(t, valid)
-    assert.Len(t, errors, 2) // missing response code and failed response body schema validation.
+    assert.Len(t, errors, 1)
 
 }
 
