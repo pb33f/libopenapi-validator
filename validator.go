@@ -88,10 +88,10 @@ func (v *validator) ValidateHttpRequestResponse(
 	request *http.Request,
 	response *http.Response) (bool, []*errors.ValidationError) {
 
-	// find path
 	var pathItem *v3.PathItem
 	var pathValue string
 	var errs []*errors.ValidationError
+
 	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
 	if pathItem == nil || errs != nil {
 		v.errors = errs
@@ -110,6 +110,8 @@ func (v *validator) ValidateHttpRequestResponse(
 	if len(requestErrors) > 0 || len(responseErrors) > 0 {
 		return false, append(requestErrors, responseErrors...)
 	}
+	v.foundPath = nil
+	v.foundPathValue = ""
 	return true, nil
 }
 
@@ -227,7 +229,8 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 
 	// wait for all the validations to complete
 	<-doneChan
-
+	v.foundPathValue = ""
+	v.foundPath = nil
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}

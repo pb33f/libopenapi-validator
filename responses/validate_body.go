@@ -7,7 +7,9 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/utils"
 	"net/http"
 	"strconv"
 	"strings"
@@ -113,10 +115,36 @@ func (v *responseBodyValidator) checkResponseSchema(
 
 		// extract schema from media type
 		if mediaType.Schema != nil {
-			schema := mediaType.Schema.Schema()
+
+			var schema *base.Schema
+			var renderedInline, renderedJSON []byte
+
+			// have we seen this schema before? let's hash it and check the cache.
+			hash := mediaType.GoLow().Schema.Value.Hash()
+
+			if cacheHit, ch := v.schemaCache[hash]; ch {
+
+				// got a hit, use cached values
+				schema = cacheHit.schema
+				renderedInline = cacheHit.renderedInline
+				renderedJSON = cacheHit.renderedJSON
+
+			} else {
+
+				// render the schema inline and perform the intensive work of rendering and converting
+				// this is only performed once per schema and cached in the validator.
+				schema = mediaType.Schema.Schema()
+				renderedSchema, _ := schema.RenderInline()
+				jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
+				v.schemaCache[hash] = &schemaCache{
+					schema:         schema,
+					renderedInline: renderedInline,
+					renderedJSON:   jsonSchema,
+				}
+			}
 
 			// render the schema, to be used for validation
-			valid, vErrs := ValidateResponseSchema(request, response, schema)
+			valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON)
 			if !valid {
 				validationErrors = append(validationErrors, vErrs...)
 			}

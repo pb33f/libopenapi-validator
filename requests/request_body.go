@@ -5,6 +5,7 @@ package requests
 
 import (
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 )
@@ -28,7 +29,7 @@ type RequestBodyValidator interface {
 
 // NewRequestBodyValidator will create a new RequestBodyValidator from an OpenAPI 3+ document
 func NewRequestBodyValidator(document *v3.Document) RequestBodyValidator {
-	return &requestBodyValidator{document: document}
+	return &requestBodyValidator{document: document, schemaCache: make(map[[32]byte]*schemaCache)}
 }
 
 func (v *requestBodyValidator) SetPathItem(path *v3.PathItem, pathValue string) {
@@ -36,9 +37,16 @@ func (v *requestBodyValidator) SetPathItem(path *v3.PathItem, pathValue string) 
 	v.pathValue = pathValue
 }
 
+type schemaCache struct {
+	schema         *base.Schema
+	renderedInline []byte
+	renderedJSON   []byte
+}
+
 type requestBodyValidator struct {
-	document  *v3.Document
-	pathItem  *v3.PathItem
-	pathValue string
-	errors    []*errors.ValidationError
+	document    *v3.Document
+	pathItem    *v3.PathItem
+	pathValue   string
+	errors      []*errors.ValidationError
+	schemaCache map[[32]byte]*schemaCache
 }
