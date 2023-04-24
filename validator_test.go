@@ -1023,7 +1023,7 @@ func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
         "https://hyperspace-superherbs.com/requests/d4bc1a0c-c4ee-4be5-9281-26b1a041634", nil)
     request.Header.Set("Content-Type", "application/json")
 
-    // simulate a request/response, in this case the contract returns a 200 with the pet we just created.
+    // simulate a request/response,
     res := httptest.NewRecorder()
     handler := func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set(helpers.ContentTypeHeader, "application/not-json")
@@ -1046,7 +1046,7 @@ func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
 
     // validate the response
     valid, errors := v.ValidateHttpRequestResponse(request, res.Result())
-    
+
     assert.False(t, valid)
     assert.Len(t, errors, 1)
     assert.Equal(t, "GET / 200 operation response content type 'application/not-json' does not exist",
