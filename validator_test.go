@@ -1009,3 +1009,51 @@ func TestNewValidator_PetStore_UploadImage200_InvalidAPIResponse(t *testing.T) {
     assert.Len(t, errors, 1)
     assert.Equal(t, "200 response body for '/pet/112233/uploadImage' failed to validate schema", errors[0].Message)
 }
+
+func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
+
+    careRequestBytes, _ := os.ReadFile("test_specs/care_request.yaml")
+    doc, _ := libopenapi.NewDocument(careRequestBytes)
+
+    // create a doc
+    v, _ := NewValidator(doc)
+
+    // create a new put request
+    request, _ := http.NewRequest(http.MethodGet,
+        "https://hyperspace-superherbs.com/requests/d4bc1a0c-c4ee-4be5-9281-26b1a041634", nil)
+    request.Header.Set("Content-Type", "application/json")
+
+    // simulate a request/response, in this case the contract returns a 200 with the pet we just created.
+    res := httptest.NewRecorder()
+    handler := func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set(helpers.ContentTypeHeader, "application/not-json")
+        w.WriteHeader(http.StatusOK)
+
+        // create a CareRequest
+        body := map[string]interface{}{
+            "id":     "d4bc1a0c-c4ee-4be5-9281-26b1a041634d",
+            "status": "active",
+        }
+
+        // marshal the body into bytes.
+        bodyBytes, _ := json.Marshal(body)
+
+        _, _ = w.Write(bodyBytes)
+    }
+
+    // fire the request
+    handler(res, request)
+
+    // validate the response
+    valid, errors := v.ValidateHttpRequestResponse(request, res.Result())
+    
+    assert.False(t, valid)
+    assert.Len(t, errors, 1)
+    assert.Equal(t, "GET / 200 operation response content type 'application/not-json' does not exist",
+        errors[0].Message)
+
+    assert.Equal(t, "The content type 'application/not-json' "+
+        "of the GET response received has not been defined, it's an unknown type",
+        errors[0].Reason)
+
+}
