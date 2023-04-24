@@ -5,7 +5,6 @@ import (
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi/datamodel/high/base"
     "github.com/pb33f/libopenapi/datamodel/high/v3"
-    "gopkg.in/yaml.v3"
     "net/url"
     "strings"
 )
@@ -76,40 +75,40 @@ func InvalidDeepObject(param *v3.Parameter, qp *helpers.QueryParam) *ValidationE
 
 func QueryParameterMissing(param *v3.Parameter) *ValidationError {
     return &ValidationError{
-        Message: fmt.Sprintf("Query parameter '%s' is missing", param.Name),
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationQuery,
+        Message:           fmt.Sprintf("Query parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The query parameter '%s' is defined as being required, "+
             "however it's missing from the requests", param.Name),
         SpecLine: param.GoLow().Required.KeyNode.Line,
         SpecCol:  param.GoLow().Required.KeyNode.Column,
+        HowToFix: HowToFixMissingValue,
     }
 }
 
 func HeaderParameterMissing(param *v3.Parameter) *ValidationError {
     return &ValidationError{
-        Message: fmt.Sprintf("Header parameter '%s' is missing", param.Name),
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header parameter '%s' is missing", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' is defined as being required, "+
             "however it's missing from the requests", param.Name),
         SpecLine: param.GoLow().Required.KeyNode.Line,
         SpecCol:  param.GoLow().Required.KeyNode.Column,
-    }
-}
-
-func HeaderParameterNotDefined(paramName string, kn *yaml.Node) *ValidationError {
-    return &ValidationError{
-        Message:  fmt.Sprintf("Header parameter '%s' is not defined", paramName),
-        Reason:   fmt.Sprintf("The header parameter '%s' is not defined as part of the specification for the operation", paramName),
-        SpecLine: kn.Line,
-        SpecCol:  kn.Column,
+        HowToFix: HowToFixMissingValue,
     }
 }
 
 func HeaderParameterCannotBeDecoded(param *v3.Parameter, val string) *ValidationError {
     return &ValidationError{
-        Message: fmt.Sprintf("Header parameter '%s' cannot be decoded", param.Name),
+        ValidationType:    helpers.ParameterValidation,
+        ValidationSubType: helpers.ParameterValidationHeader,
+        Message:           fmt.Sprintf("Header parameter '%s' cannot be decoded", param.Name),
         Reason: fmt.Sprintf("The header parameter '%s' cannot be "+
             "extracted into an object, '%s' is malformed", param.Name, val),
         SpecLine: param.GoLow().Schema.Value.Schema().Type.KeyNode.Line,
         SpecCol:  param.GoLow().Schema.Value.Schema().Type.KeyNode.Line,
+        HowToFix: HowToFixInvalidEncoding,
     }
 }
 
