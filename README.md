@@ -42,4 +42,4 @@ go get github.com/pb33f/libopenapi-validator
 - [Validating Schemas](https://pb33f.io/libopenapi/validation/#validating-schemas)
 
 [libopenapi](https://github.com/pb33f/libopenapi) and [libopenapi-validator](https://github.com/pb33f/libopenapi-validator) are
-products of Princess Beef Heavy Inustries, LLC
+products of Princess Beef Heavy Industries, LLC
