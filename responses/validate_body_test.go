@@ -349,13 +349,6 @@ paths:
     handler := func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
         w.WriteHeader(http.StatusOK)
-        //body := map[string]interface{}{
-        //    "name":       "Big Mac",
-        //    "patties":    false,
-        //    "vegetarian": 2,
-        //}
-
-        // bodyBytes, _ := json.Marshal(body)
         _, _ = w.Write(nil)
     }
 
