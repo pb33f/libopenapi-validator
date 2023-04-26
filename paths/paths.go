@@ -24,16 +24,19 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
 
     var validationErrors []*errors.ValidationError
 
-    reqPathSegments := strings.Split(request.URL.Path, "/")
-    if reqPathSegments[0] == "" {
-        reqPathSegments = reqPathSegments[1:]
-    }
-
     // extract base path from document to check against paths.
     basePaths := make([]string, len(document.Servers))
     for i, s := range document.Servers {
         u, _ := url.Parse(s.URL)
         basePaths[i] = u.Path
+    }
+
+    // strip any base path
+    stripped := stripBaseFromPath(request.URL.Path, basePaths)
+
+    reqPathSegments := strings.Split(stripped, "/")
+    if reqPathSegments[0] == "" {
+        reqPathSegments = reqPathSegments[1:]
     }
 
     var pItem *v3.PathItem
@@ -223,6 +226,15 @@ func checkPathAgainstBase(docPath, urlPath string, basePaths []string) bool {
         }
     }
     return false
+}
+
+func stripBaseFromPath(path string, basePaths []string) string {
+    for i := range basePaths {
+        if strings.HasPrefix(path, basePaths[i]) {
+            return path[len(basePaths[i]):]
+        }
+    }
+    return path
 }
 
 func comparePaths(mapped, requested []string,
