@@ -276,6 +276,28 @@ paths:
 
 }
 
+func TestNewValidator_FindPathWithBaseURLInServer_Args(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+servers:
+  - url: https://things.com/base3/base4/base5/base6/
+paths:
+  /user/{userId}/thing/{thingId}:
+    post:
+      operationId: addUser
+`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+
+    // check against a deeper base
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/base3/base4/base5/base6/user/1234/thing/abcd", nil)
+    pathItem, _, _ := FindPath(request, &m.Model)
+    assert.NotNil(t, pathItem)
+    assert.Equal(t, "addUser", pathItem.Post.OperationId)
+
+}
+
 func TestNewValidator_FindPathMissing(t *testing.T) {
 
     spec := `openapi: 3.1.0
