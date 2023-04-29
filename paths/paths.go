@@ -25,10 +25,12 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
     var validationErrors []*errors.ValidationError
 
     // extract base path from document to check against paths.
-    basePaths := make([]string, len(document.Servers))
+    var basePaths []string
     for i, s := range document.Servers {
         u, _ := url.Parse(s.URL)
-        basePaths[i] = u.Path
+        if u.Path != "" {
+            basePaths[i] = u.Path
+        }
     }
 
     // strip any base path
@@ -200,9 +202,9 @@ pathFound:
         validationErrors = append(validationErrors, &errors.ValidationError{
             ValidationType:    helpers.ParameterValidationPath,
             ValidationSubType: "missing",
-            Message:           fmt.Sprintf("Path '%s' not found", request.URL.Path),
-            Reason: fmt.Sprintf("The request contains a path of '%s' "+
-                "however that path does not exist in the specification", request.URL.Path),
+            Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+            Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+                "however that path does not exist in the specification", request.Method, request.URL.Path),
             SpecLine: -1,
             SpecCol:  -1,
         })
