@@ -8,38 +8,22 @@ import (
     "github.com/pb33f/libopenapi"
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
-    "github.com/pb33f/libopenapi-validator/schema_validation/openapi_schemas"
-    "github.com/pb33f/libopenapi/utils"
     "github.com/santhosh-tekuri/jsonschema/v5"
+    _ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
     "strings"
 )
 
-// ValidateOpenAPIDocument will validate an OpenAPI 3+ document against the OpenAPI 3.0 schema.
+// ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
-// Swagger / OpenAPI 2.0 documents are not supported by this validator (and they won't be).
 func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*errors.ValidationError) {
 
-    // first determine if this is a swagger or an openapi document
     info := doc.GetSpecInfo()
-    if info.SpecType == utils.OpenApi2 {
-        return false, []*errors.ValidationError{{Message: "Swagger / OpenAPI 2.0 is not supported by the validator"}}
-    }
-    var loadedSchema string
-
-    // check version of openapi and load schema
-    switch info.Version {
-    case "3.1.0", "3.1":
-        loadedSchema = openapi_schemas.LoadSchema3_1(info.APISchema)
-    default:
-        loadedSchema = openapi_schemas.LoadSchema3_0(info.APISchema)
-    }
-
+    loadedSchema := info.APISchema
     var validationErrors []*errors.ValidationError
-
     decodedDocument := *info.SpecJSON
 
     compiler := jsonschema.NewCompiler()
-    _ = compiler.AddResource("schema.json", strings.NewReader(string(loadedSchema)))
+    _ = compiler.AddResource("schema.json", strings.NewReader(loadedSchema))
     jsch, _ := compiler.Compile("schema.json")
 
     scErrs := jsch.Validate(decodedDocument)
