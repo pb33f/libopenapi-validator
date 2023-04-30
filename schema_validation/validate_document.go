@@ -42,6 +42,7 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*errors.Validatio
             if er.Error != "" {
 
                 // locate the violated property in the schema
+
                 located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.KeywordLocation)
                 if located == nil {
                     // try again with the instance location
