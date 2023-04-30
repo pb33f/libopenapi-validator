@@ -14,7 +14,7 @@ import (
 func LocateSchemaPropertyNodeByJSONPath(doc *yaml.Node, JSONPath string) *yaml.Node {
     // first convert the path to something we can use as a lookup, remove the leading slash
     _, path := utils.ConvertComponentIdIntoFriendlyPathSearch(JSONPath)
-    if path != "" {
+    if path == "" {
         return nil
     }
     yamlPath, _ := yamlpath.NewPath(path)

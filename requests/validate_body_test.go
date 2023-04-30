@@ -98,7 +98,7 @@ paths:
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "Path '/I do not exist' not found", errors[0].Message)
+    assert.Equal(t, "POST Path '/I do not exist' not found", errors[0].Message)
 }
 
 func TestValidateBody_SetPath(t *testing.T) {

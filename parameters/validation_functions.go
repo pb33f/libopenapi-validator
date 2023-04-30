@@ -4,6 +4,7 @@
 package parameters
 
 import (
+    "fmt"
     "github.com/pb33f/libopenapi-validator/errors"
     "github.com/pb33f/libopenapi-validator/helpers"
     "github.com/pb33f/libopenapi/datamodel/high/base"
@@ -129,7 +130,7 @@ func ValidateQueryArray(
             if itemsSch.Enum != nil {
                 matchFound := false
                 for _, enumVal := range itemsSch.Enum {
-                    if strings.TrimSpace(enumCheck) == enumVal {
+                    if strings.TrimSpace(enumCheck) == fmt.Sprint(enumVal) {
                         matchFound = true
                         break
                     }

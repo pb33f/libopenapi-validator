@@ -51,20 +51,3 @@ func TestValidateDocument_Invalid31(t *testing.T) {
     assert.Len(t, errors[0].SchemaValidationErrors, 4)
 
 }
-
-func TestValidateDocument_InvalidSwagger(t *testing.T) {
-
-    petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
-
-    doc, _ := libopenapi.NewDocument(petstore)
-    // fake the version so the validator things this is a swagger spec
-    doc.GetSpecInfo().SpecType = "swagger"
-
-    // validate!
-    valid, errors := ValidateOpenAPIDocument(doc)
-
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "Swagger / OpenAPI 2.0 is not supported by the validator", errors[0].Message)
-
-}

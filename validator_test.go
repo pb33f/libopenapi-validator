@@ -102,7 +102,7 @@ paths:
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "Path '/I am a potato man' not found", errors[0].Message)
+    assert.Equal(t, "POST Path '/I am a potato man' not found", errors[0].Message)
 
 }
 
@@ -764,7 +764,7 @@ func TestNewValidator_PetStore_PetGet200_PathNotFound(t *testing.T) {
 
     assert.False(t, valid)
     assert.Len(t, errors, 1)
-    assert.Equal(t, "Path '/pet/IamNotANumber' not found", errors[0].Message)
+    assert.Equal(t, "GET Path '/pet/IamNotANumber' not found", errors[0].Message)
 }
 
 func TestNewValidator_PetStore_PetGet200(t *testing.T) {

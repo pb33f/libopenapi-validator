@@ -23,9 +23,9 @@ func TestNewValidator_BadParam(t *testing.T) {
 
     _, errs, _ := FindPath(request, &m.Model)
 
-    assert.Equal(t, "Path '/pet/doggy' not found",
+    assert.Equal(t, "GET Path '/pet/doggy' not found",
         errs[0].Message)
-    assert.Equal(t, "The request contains a path of '/pet/doggy' however that path does not exist in the specification",
+    assert.Equal(t, "The GET request contains a path of '/pet/doggy' however that path does not exist in the specification",
         errs[0].Reason)
 }
 
@@ -316,7 +316,7 @@ paths:
     pathItem, errs, _ := FindPath(request, &m.Model)
     assert.Nil(t, pathItem)
     assert.NotNil(t, errs)
-    assert.Equal(t, "Path '/not/here' not found", errs[0].Message)
+    assert.Equal(t, "HEAD Path '/not/here' not found", errs[0].Message)
 
 }
 
@@ -548,6 +548,30 @@ paths:
     m, _ := doc.BuildV3Model()
 
     request, _ := http.NewRequest(http.MethodTrace, "https://things.com/pizza/1234", nil)
+
+    _, errs, _ := FindPath(request, &m.Model)
+
+    assert.Len(t, errs, 1)
+}
+
+func TestNewValidator_DeleteMatch_Error(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /pizza/{cakes}:
+    delete:
+      operationId: locateBurger
+      parameters:
+        - name: cakes
+          in: path
+          required: true
+          schema:
+            type: string`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+
+    request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pizza/1234", nil)
 
     _, errs, _ := FindPath(request, &m.Model)
 

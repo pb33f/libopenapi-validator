@@ -26,10 +26,10 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
 
     // extract base path from document to check against paths.
     var basePaths []string
-    for i, s := range document.Servers {
+    for _, s := range document.Servers {
         u, _ := url.Parse(s.URL)
         if u.Path != "" {
-            basePaths[i] = u.Path
+            basePaths = append(basePaths, u.Path)
         }
     }
 
