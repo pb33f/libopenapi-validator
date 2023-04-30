@@ -51,6 +51,8 @@ github.com/pb33f/libopenapi v0.7.0 h1:2mQgDa0UQs8/5Hd2z+KbgWvoGx0++N3ihMKihcAS5M
 github.com/pb33f/libopenapi v0.7.0/go.mod h1:lvUmCtjgHUGVj6WzN3I5/CS9wkXtyN3Ykjh6ZZP5lrI=
 github.com/pb33f/libopenapi v0.8.0 h1:zfXNu7/Hk9sgMV3UC2hnSB4CGlgQkMaWWwPn0Id+eLI=
 github.com/pb33f/libopenapi v0.8.0/go.mod h1:lvUmCtjgHUGVj6WzN3I5/CS9wkXtyN3Ykjh6ZZP5lrI=
+github.com/pb33f/libopenapi v0.8.1 h1:kudGljKp7cErupRr8ND5oIaTsfjOfQYAxSd3Z2dxt6k=
+github.com/pb33f/libopenapi v0.8.1/go.mod h1:lvUmCtjgHUGVj6WzN3I5/CS9wkXtyN3Ykjh6ZZP5lrI=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/santhosh-tekuri/jsonschema/v5 v5.2.0 h1:WCcC4vZDS1tYNxjWlwRJZQy28r8CMoggKnxNzxsVDMQ=
