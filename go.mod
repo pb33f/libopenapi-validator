@@ -1,6 +1,6 @@
 module github.com/pb33f/libopenapi-validator
 
-go 1.19
+go 1.20
 
 require (
 	github.com/pb33f/libopenapi v0.8.1
