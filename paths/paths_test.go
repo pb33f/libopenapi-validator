@@ -577,3 +577,27 @@ paths:
 
     assert.Len(t, errs, 1)
 }
+
+func TestNewValidator_PostMatch_Error(t *testing.T) {
+
+    spec := `openapi: 3.1.0
+paths:
+  /pizza/{cakes}:
+    post:
+      operationId: locateBurger
+      parameters:
+        - name: cakes
+          in: path
+          required: true
+          schema:
+            type: string`
+
+    doc, _ := libopenapi.NewDocument([]byte(spec))
+    m, _ := doc.BuildV3Model()
+
+    request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
+
+    _, errs, _ := FindPath(request, &m.Model)
+
+    assert.Len(t, errs, 1)
+}

@@ -12,15 +12,26 @@ import (
 // LocateSchemaPropertyNodeByJSONPath will locate a schema property node by a JSONPath. It converts something like
 // #/components/schemas/MySchema/properties/MyProperty to something like $.components.schemas.MySchema.properties.MyProperty
 func LocateSchemaPropertyNodeByJSONPath(doc *yaml.Node, JSONPath string) *yaml.Node {
-    // first convert the path to something we can use as a lookup, remove the leading slash
-    _, path := utils.ConvertComponentIdIntoFriendlyPathSearch(JSONPath)
-    if path == "" {
-        return nil
-    }
-    yamlPath, _ := yamlpath.NewPath(path)
-    locatedNodes, _ := yamlPath.Find(doc)
-    if len(locatedNodes) > 0 {
-        return locatedNodes[0]
-    }
-    return nil
+    var locatedNode *yaml.Node
+    doneChan := make(chan bool)
+    go func() {
+        defer func() {
+            if err := recover(); err != nil {
+                // can't search path, too crazy.
+                doneChan <- true
+            }
+        }()
+        _, path := utils.ConvertComponentIdIntoFriendlyPathSearch(JSONPath)
+        if path == "" {
+            doneChan <- true
+        }
+        yamlPath, _ := yamlpath.NewPath(path)
+        locatedNodes, _ := yamlPath.Find(doc)
+        if len(locatedNodes) > 0 {
+            locatedNode = locatedNodes[0]
+        }
+        doneChan <- true
+    }()
+    <-doneChan
+    return locatedNode
 }
