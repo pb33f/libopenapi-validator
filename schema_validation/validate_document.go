@@ -28,38 +28,42 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*errors.Validatio
 
     scErrs := jsch.Validate(decodedDocument)
 
+    var schemaValidationErrors []*errors.SchemaValidationFailure
+
     if scErrs != nil {
-        jk := scErrs.(*jsonschema.ValidationError)
 
-        // flatten the validationErrors
-        schFlatErrs := jk.BasicOutput().Errors
-        var schemaValidationErrors []*errors.SchemaValidationFailure
-        for q := range schFlatErrs {
-            er := schFlatErrs[q]
-            if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
-                continue // ignore this error, it's useless tbh, utter noise.
-            }
-            if er.Error != "" {
+        if jk, ok := scErrs.(*jsonschema.ValidationError); ok {
 
-                // locate the violated property in the schema
+            // flatten the validationErrors
+            schFlatErrs := jk.BasicOutput().Errors
 
-                located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.KeywordLocation)
-                if located == nil {
-                    // try again with the instance location
-                    located = LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
+            for q := range schFlatErrs {
+                er := schFlatErrs[q]
+                if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+                    continue // ignore this error, it's useless tbh, utter noise.
                 }
-                violation := &errors.SchemaValidationFailure{
-                    Reason:        er.Error,
-                    Location:      er.KeywordLocation,
-                    OriginalError: jk,
+                if er.Error != "" {
+
+                    // locate the violated property in the schema
+
+                    located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.KeywordLocation)
+                    if located == nil {
+                        // try again with the instance location
+                        located = LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
+                    }
+                    violation := &errors.SchemaValidationFailure{
+                        Reason:        er.Error,
+                        Location:      er.KeywordLocation,
+                        OriginalError: jk,
+                    }
+                    // if we have a location within the schema, add it to the error
+                    if located != nil {
+                        // location of the violation within the rendered schema.
+                        violation.Line = located.Line
+                        violation.Column = located.Column
+                    }
+                    schemaValidationErrors = append(schemaValidationErrors, violation)
                 }
-                // if we have a location within the schema, add it to the error
-                if located != nil {
-                    // location of the violation within the rendered schema.
-                    violation.Line = located.Line
-                    violation.Column = located.Column
-                }
-                schemaValidationErrors = append(schemaValidationErrors, violation)
             }
         }
 
