@@ -427,3 +427,15 @@ paths:
 	assert.Len(t, errors[0].SchemaValidationErrors, 3)
 
 }
+
+func TestValidateSchema_EmptySchema(t *testing.T) {
+
+	// create a schema validator
+	v := NewSchemaValidator()
+
+	// validate!
+	valid, errors := v.ValidateSchemaObject(nil, nil)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 0)
+}
