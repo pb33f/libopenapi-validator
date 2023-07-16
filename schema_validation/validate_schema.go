@@ -11,6 +11,7 @@ import (
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	_ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 	"strings"
 )
@@ -35,28 +36,36 @@ type SchemaValidator interface {
 	ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError)
 }
 
-type schemaValidator struct{}
+type schemaValidator struct {
+	logger *zap.SugaredLogger
+}
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
 func NewSchemaValidator() SchemaValidator {
-	return &schemaValidator{}
+	logger, _ := zap.NewProduction()
+	return &schemaValidator{logger: logger.Sugar()}
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*errors.ValidationError) {
-	return validateSchema(schema, []byte(payload), nil)
+	return validateSchema(schema, []byte(payload), nil, s.logger)
 }
 
 func (s *schemaValidator) ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*errors.ValidationError) {
-	return validateSchema(schema, nil, payload)
+	return validateSchema(schema, nil, payload, s.logger)
 }
 
 func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError) {
-	return validateSchema(schema, payload, nil)
+	return validateSchema(schema, payload, nil, s.logger)
 }
 
-func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}) (bool, []*errors.ValidationError) {
+func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *zap.SugaredLogger) (bool, []*errors.ValidationError) {
 
 	var validationErrors []*errors.ValidationError
+
+	if schema == nil {
+		log.Infoln("schema is empty and cannot be validated. This generally means the schema is missing from the spec, or could not be read.")
+		return false, validationErrors
+	}
 
 	// render the schema, to be used for validation
 	renderedSchema, _ := schema.RenderInline()
@@ -102,9 +111,11 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 					// locate the violated property in the schema
 					located := LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
 					violation := &errors.SchemaValidationFailure{
-						Reason:        er.Error,
-						Location:      er.KeywordLocation,
-						OriginalError: jk,
+						Reason:           er.Error,
+						Location:         er.InstanceLocation,
+						DeepLocation:     er.KeywordLocation,
+						AbsoluteLocation: er.AbsoluteKeywordLocation,
+						OriginalError:    jk,
 					}
 					// if we have a location within the schema, add it to the error
 					if located != nil {
