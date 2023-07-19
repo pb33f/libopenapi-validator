@@ -15,8 +15,13 @@ import (
 	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
+	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 )
+
+var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // ValidateResponseSchema will validate the response body for a http.Response pointer. The request is used to
 // locate the operation in the specification, the response is used to ensure the response code, media type and the
@@ -74,10 +79,29 @@ func ValidateResponseSchema(
 
 				// locate the violated property in the schema
 				located := schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+
+				// extract the element specified by the instance
+				val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
+				var referenceObject string
+
+				if len(val) > 0 {
+					referenceIndex, _ := strconv.Atoi(val[1])
+					if reflect.ValueOf(decodedObj).Type().Kind() == reflect.Slice {
+						found := decodedObj.([]any)[referenceIndex]
+						recoded, _ := json.MarshalIndent(found, "", "  ")
+						referenceObject = string(recoded)
+					}
+				}
+				if referenceObject == "" {
+					referenceObject = string(responseBody)
+				}
+
 				violation := &errors.SchemaValidationFailure{
-					Reason:        er.Error,
-					Location:      er.KeywordLocation,
-					OriginalError: jk,
+					Reason:          er.Error,
+					Location:        er.KeywordLocation,
+					ReferenceSchema: string(renderedSchema),
+					ReferenceObject: referenceObject,
+					OriginalError:   jk,
 				}
 				// if we have a location within the schema, add it to the error
 				if located != nil {
