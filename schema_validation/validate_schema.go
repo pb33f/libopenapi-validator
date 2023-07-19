@@ -13,6 +13,9 @@ import (
 	_ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -35,6 +38,8 @@ type SchemaValidator interface {
 	// validate against.
 	ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*errors.ValidationError)
 }
+
+var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 type schemaValidator struct {
 	logger *zap.SugaredLogger
@@ -110,11 +115,30 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 
 					// locate the violated property in the schema
 					located := LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+
+					// extract the element specified by the instance
+					val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
+					var referenceObject string
+
+					if len(val) > 0 {
+						referenceIndex, _ := strconv.Atoi(val[1])
+						if reflect.ValueOf(decodedObject).Type().Kind() == reflect.Slice {
+							found := decodedObject.([]any)[referenceIndex]
+							recoded, _ := json.MarshalIndent(found, "", "  ")
+							referenceObject = string(recoded)
+						}
+					}
+					if referenceObject == "" {
+						referenceObject = string(payload)
+					}
+
 					violation := &errors.SchemaValidationFailure{
 						Reason:           er.Error,
 						Location:         er.InstanceLocation,
 						DeepLocation:     er.KeywordLocation,
 						AbsoluteLocation: er.AbsoluteKeywordLocation,
+						ReferenceSchema:  string(renderedSchema),
+						ReferenceObject:  referenceObject,
 						OriginalError:    jk,
 					}
 					// if we have a location within the schema, add it to the error
