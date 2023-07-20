@@ -872,3 +872,76 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST / 200 operation response content type 'chicken/nuggets' does not exist", errors[0].Message)
 }
+
+func TestValidateBody_InvalidSchemaMultiple(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                    patties:
+                      type: integer
+                    vegetarian:
+                      type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	var items []map[string]interface{}
+	items = append(items, map[string]interface{}{
+		"patties":    1,
+		"vegetarian": true,
+	})
+	items = append(items, map[string]interface{}{
+		"name":       "Quarter Pounder",
+		"patties":    true,
+		"vegetarian": false,
+	})
+	items = append(items, map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": false,
+	})
+
+	bodyBytes, _ := json.Marshal(items)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bodyBytes)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "200 response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
+}
