@@ -4,17 +4,17 @@
 package requests
 
 import (
-    "bytes"
-    "encoding/json"
-    "github.com/pb33f/libopenapi"
-    "github.com/pb33f/libopenapi-validator/paths"
-    "github.com/stretchr/testify/assert"
-    "net/http"
-    "testing"
+	"bytes"
+	"encoding/json"
+	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/stretchr/testify/assert"
+	"net/http"
+	"testing"
 )
 
 func TestValidateBody_MissingContentType(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -31,35 +31,35 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    // mix up the primitives to fire two schema violations.
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    false,
-        "vegetarian": 2,
-    }
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "thomas/tank-engine") // wtf kinda content type is this?
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "thomas/tank-engine") // wtf kinda content type is this?
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "POST operation request content type 'thomas/tank-engine' does not exist", errors[0].Message)
-    assert.Equal(t, "The content type is invalid, Use one of the 1 "+
-        "supported types for this operation: application/json", errors[0].HowToFix)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST operation request content type 'thomas/tank-engine' does not exist", errors[0].Message)
+	assert.Equal(t, "The content type is invalid, Use one of the 1 "+
+		"supported types for this operation: application/json", errors[0].HowToFix)
 }
 
 func TestValidateBody_PathNotFound(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -76,33 +76,33 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    // mix up the primitives to fire two schema violations.
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    false,
-        "vegetarian": 2,
-    }
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Equal(t, "POST Path '/I do not exist' not found", errors[0].Message)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST Path '/I do not exist' not found", errors[0].Message)
 }
 
 func TestValidateBody_SetPath(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -119,37 +119,37 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    // mix up the primitives to fire two schema violations.
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-    }
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    // preset the path
-    path, _, pv := paths.FindPath(request, &m.Model)
-    v.SetPathItem(path, pv)
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+	v.SetPathItem(path, pv)
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.True(t, valid)
-    assert.Len(t, errors, 0)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 
 }
 
 func TestValidateBody_ContentTypeNotFound(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -166,37 +166,37 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    // mix up the primitives to fire two schema violations.
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-    }
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("content-type", "application/not-json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("content-type", "application/not-json")
 
-    // preset the path
-    path, _, pv := paths.FindPath(request, &m.Model)
-    v.SetPathItem(path, pv)
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+	v.SetPathItem(path, pv)
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
 
 }
 
 func TestValidateBody_InvalidBasicSchema(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -213,38 +213,38 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    // mix up the primitives to fire two schema violations.
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    false,
-        "vegetarian": 2,
-    }
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    // double-tap to hit the cache
-    _, _ = v.ValidateRequestBody(request)
+	// double-tap to hit the cache
+	_, _ = v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Len(t, errors[0].SchemaValidationErrors, 2)
-    assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
 
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -261,32 +261,32 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-    }
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.True(t, valid)
-    assert.Len(t, errors, 0)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 
 }
 
 func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -303,32 +303,32 @@ paths:
                 vegetarian:
                   type: boolean`
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-    }
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json; charset=utf-8; boundary=12345")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json; charset=utf-8; boundary=12345")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.True(t, valid)
-    assert.Len(t, errors, 0)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 
 }
 
 func TestValidateBody_ValidSchemaUsingAllOf(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -367,34 +367,34 @@ components:
           type: boolean
       required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-        "fat":        10.0,
-        "salt":       0.5,
-        "meat":       "beef",
-    }
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+		"fat":        10.0,
+		"salt":       0.5,
+		"meat":       "beef",
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.True(t, valid)
-    assert.Len(t, errors, 0)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_InvalidSchemaUsingAllOf(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -433,35 +433,35 @@ components:
           type: boolean
       required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-        "fat":        10.0,
-        "salt":       false,    // invalid
-        "meat":       "turkey", // invalid
-    }
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+		"fat":        10.0,
+		"salt":       false,    // invalid
+		"meat":       "turkey", // invalid
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Len(t, errors[0].SchemaValidationErrors, 3) // throws 'allOf failure' in addition
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 3) // throws 'allOf failure' in addition
 }
 
 func TestValidateBody_ValidSchemaUsingAllOfAnyOf(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -519,36 +519,36 @@ components:
           type: boolean
       required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":          "Big Mac",
-        "patties":       2,
-        "vegetarian":    true,
-        "fat":           10.0,
-        "salt":          0.5,
-        "meat":          "beef",
-        "usedOil":       true,
-        "usedAnimalFat": false,
-    }
+	body := map[string]interface{}{
+		"name":          "Big Mac",
+		"patties":       2,
+		"vegetarian":    true,
+		"fat":           10.0,
+		"salt":          0.5,
+		"meat":          "beef",
+		"usedOil":       true,
+		"usedAnimalFat": false,
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.True(t, valid)
-    assert.Len(t, errors, 0)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_InvalidSchemaUsingOneOf(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -606,39 +606,39 @@ components:
           type: boolean
       required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-        "fat":        10.0,
-        "salt":       0.5,
-        "meat":       "beef",
-    }
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+		"fat":        10.0,
+		"salt":       0.5,
+		"meat":       "beef",
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Len(t, errors[0].SchemaValidationErrors, 3)
-    assert.Equal(t, "oneOf failed", errors[0].SchemaValidationErrors[0].Reason)
-    assert.Equal(t, "missing properties: 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[1].Reason)
-    assert.Equal(t, "missing properties: 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[2].Reason)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 3)
+	assert.Equal(t, "oneOf failed", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "missing properties: 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[1].Reason)
+	assert.Equal(t, "missing properties: 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[2].Reason)
 
 }
 
 func TestValidateBody_InvalidSchemaMinMax(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -662,37 +662,37 @@ components:
           type: boolean
       required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    5,
-        "vegetarian": true,
-        "fat":        10.0,
-        "salt":       0.5,
-        "meat":       "beef",
-    }
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    5,
+		"vegetarian": true,
+		"fat":        10.0,
+		"salt":       0.5,
+		"meat":       "beef",
+	}
 
-    bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := json.Marshal(body)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Len(t, errors[0].SchemaValidationErrors, 1)
-    assert.Equal(t, "must be <= 3 but found 5", errors[0].SchemaValidationErrors[0].Reason)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "must be <= 3 but found 5", errors[0].SchemaValidationErrors[0].Reason)
 
 }
 
 func TestValidateBody_InvalidSchemaMaxItems(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -719,39 +719,39 @@ components:
             type: boolean
         required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    body := map[string]interface{}{
-        "name":       "Big Mac",
-        "patties":    2,
-        "vegetarian": true,
-        "fat":        10.0,
-        "salt":       0.5,
-        "meat":       "beef",
-    }
-    bodyArray := []interface{}{body, body, body, body} // two too many!
-    bodyBytes, _ := json.Marshal(bodyArray)
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+		"fat":        10.0,
+		"salt":       0.5,
+		"meat":       "beef",
+	}
+	bodyArray := []interface{}{body, body, body, body} // two too many!
+	bodyBytes, _ := json.Marshal(bodyArray)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        bytes.NewBuffer(bodyBytes))
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.False(t, valid)
-    assert.Len(t, errors, 1)
-    assert.Len(t, errors[0].SchemaValidationErrors, 1)
-    assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
-    assert.Equal(t, 2, errors[0].SchemaValidationErrors[0].Line)
-    assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
-    assert.Equal(t, 11, errors[0].SchemaValidationErrors[0].Column)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, 2, errors[0].SchemaValidationErrors[0].Line)
+	assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, 11, errors[0].SchemaValidationErrors[0].Column)
 }
 
 func TestValidateBody_MissingBody(t *testing.T) {
-    spec := `openapi: 3.1.0
+	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -778,18 +778,79 @@ components:
             type: boolean
         required: [name, patties, vegetarian]    `
 
-    doc, _ := libopenapi.NewDocument([]byte(spec))
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-    m, _ := doc.BuildV3Model()
-    v := NewRequestBodyValidator(&m.Model)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
 
-    request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
-        http.NoBody)
-    request.Header.Set("Content-Type", "application/json")
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		http.NoBody)
+	request.Header.Set("Content-Type", "application/json")
 
-    valid, errors := v.ValidateRequestBody(request)
+	valid, errors := v.ValidateRequestBody(request)
 
-    assert.True(t, valid)
-    assert.Len(t, errors, 0)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+
+}
+
+func TestValidateBody_InvalidSchemaMultipleItems(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	var items []map[string]interface{}
+	items = append(items, map[string]interface{}{
+		"patties":    1,
+		"vegetarian": true,
+	})
+	items = append(items, map[string]interface{}{
+		"name":       "Quarter Pounder",
+		"patties":    true,
+		"vegetarian": false,
+	})
+	items = append(items, map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": false,
+	})
+
+	bodyBytes, _ := json.Marshal(items)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	// double-tap to hit the cache
+	_, _ = v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
 
 }
