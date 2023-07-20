@@ -98,8 +98,18 @@ func ValidateRequestSchema(
 				}
 				// if we have a location within the schema, add it to the error
 				if located != nil {
+
+					line := located.Line
+					// if the located node is a map or an array, then the actual human interpretable
+					// line on which the violation occurred is the line of the key, not the value.
+					if located.Kind == yaml.MappingNode || located.Kind == yaml.SequenceNode {
+						if line > 0 {
+							line--
+						}
+					}
+
 					// location of the violation within the rendered schema.
-					violation.Line = located.Line
+					violation.Line = line
 					violation.Column = located.Column
 				}
 				schemaValidationErrors = append(schemaValidationErrors, violation)
