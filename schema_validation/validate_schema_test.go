@@ -486,7 +486,7 @@ paths:
 
     // create a schema validator
     v := NewSchemaValidator()
-	
+
     sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
 
     // validate!
