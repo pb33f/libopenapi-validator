@@ -945,3 +945,46 @@ paths:
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "200 response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
 }
+
+func TestValidateBody_EmptyContentType_Valid(t *testing.T) {
+	spec := `openapi: "3.0.0"
+info:
+  title: Healthcheck
+  version: '0.1.0'
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          description: pet response
+          content: {}`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/health", nil)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(nil)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+
+}
