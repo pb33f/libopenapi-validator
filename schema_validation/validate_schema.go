@@ -84,94 +84,96 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 	jsch, _ := compiler.Compile("schema.json")
 
 	// 4. validate the object against the schema
-	scErrs := jsch.Validate(decodedObject)
-	if scErrs != nil {
-		var schemaValidationErrors []*errors.SchemaValidationFailure
+	if decodedObject != nil {
+		scErrs := jsch.Validate(decodedObject)
+		if scErrs != nil {
+			var schemaValidationErrors []*errors.SchemaValidationFailure
 
-		// check for invalid JSON type errors.
-		if _, ok := scErrs.(jsonschema.InvalidJSONTypeError); ok {
-			violation := &errors.SchemaValidationFailure{
-				Reason:   scErrs.Error(),
-				Location: "unavailable", // we don't have a location for this error, so we'll just say it's unavailable.
-			}
-			schemaValidationErrors = append(schemaValidationErrors, violation)
-		}
-
-		if jk, ok := scErrs.(*jsonschema.ValidationError); ok {
-
-			// flatten the validationErrors
-			schFlatErrs := jk.BasicOutput().Errors
-
-			for q := range schFlatErrs {
-				er := schFlatErrs[q]
-				if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
-					continue // ignore this error, it's useless tbh, utter noise.
+			// check for invalid JSON type errors.
+			if _, ok := scErrs.(jsonschema.InvalidJSONTypeError); ok {
+				violation := &errors.SchemaValidationFailure{
+					Reason:   scErrs.Error(),
+					Location: "unavailable", // we don't have a location for this error, so we'll just say it's unavailable.
 				}
-				if er.Error != "" {
+				schemaValidationErrors = append(schemaValidationErrors, violation)
+			}
 
-					// re-encode the schema.
-					var renderedNode yaml.Node
-					_ = yaml.Unmarshal(renderedSchema, &renderedNode)
+			if jk, ok := scErrs.(*jsonschema.ValidationError); ok {
 
-					// locate the violated property in the schema
-					located := LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+				// flatten the validationErrors
+				schFlatErrs := jk.BasicOutput().Errors
 
-					// extract the element specified by the instance
-					val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
-					var referenceObject string
-
-					if len(val) > 0 {
-						referenceIndex, _ := strconv.Atoi(val[1])
-						if reflect.ValueOf(decodedObject).Type().Kind() == reflect.Slice {
-							found := decodedObject.([]any)[referenceIndex]
-							recoded, _ := json.MarshalIndent(found, "", "  ")
-							referenceObject = string(recoded)
-						}
+				for q := range schFlatErrs {
+					er := schFlatErrs[q]
+					if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+						continue // ignore this error, it's useless tbh, utter noise.
 					}
-					if referenceObject == "" {
-						referenceObject = string(payload)
-					}
+					if er.Error != "" {
 
-					violation := &errors.SchemaValidationFailure{
-						Reason:           er.Error,
-						Location:         er.InstanceLocation,
-						DeepLocation:     er.KeywordLocation,
-						AbsoluteLocation: er.AbsoluteKeywordLocation,
-						ReferenceSchema:  string(renderedSchema),
-						ReferenceObject:  referenceObject,
-						OriginalError:    jk,
-					}
-					// if we have a location within the schema, add it to the error
-					if located != nil {
-						line := located.Line
-						// if the located node is a map or an array, then the actual human interpretable
-						// line on which the violation occurred is the line of the key, not the value.
-						if located.Kind == yaml.MappingNode || located.Kind == yaml.SequenceNode {
-							if line > 0 {
-								line--
+						// re-encode the schema.
+						var renderedNode yaml.Node
+						_ = yaml.Unmarshal(renderedSchema, &renderedNode)
+
+						// locate the violated property in the schema
+						located := LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+
+						// extract the element specified by the instance
+						val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
+						var referenceObject string
+
+						if len(val) > 0 {
+							referenceIndex, _ := strconv.Atoi(val[1])
+							if reflect.ValueOf(decodedObject).Type().Kind() == reflect.Slice {
+								found := decodedObject.([]any)[referenceIndex]
+								recoded, _ := json.MarshalIndent(found, "", "  ")
+								referenceObject = string(recoded)
 							}
 						}
+						if referenceObject == "" {
+							referenceObject = string(payload)
+						}
 
-						// location of the violation within the rendered schema.
-						violation.Line = line
-						violation.Column = located.Column
+						violation := &errors.SchemaValidationFailure{
+							Reason:           er.Error,
+							Location:         er.InstanceLocation,
+							DeepLocation:     er.KeywordLocation,
+							AbsoluteLocation: er.AbsoluteKeywordLocation,
+							ReferenceSchema:  string(renderedSchema),
+							ReferenceObject:  referenceObject,
+							OriginalError:    jk,
+						}
+						// if we have a location within the schema, add it to the error
+						if located != nil {
+							line := located.Line
+							// if the located node is a map or an array, then the actual human interpretable
+							// line on which the violation occurred is the line of the key, not the value.
+							if located.Kind == yaml.MappingNode || located.Kind == yaml.SequenceNode {
+								if line > 0 {
+									line--
+								}
+							}
+
+							// location of the violation within the rendered schema.
+							violation.Line = line
+							violation.Column = located.Column
+						}
+						schemaValidationErrors = append(schemaValidationErrors, violation)
 					}
-					schemaValidationErrors = append(schemaValidationErrors, violation)
 				}
 			}
-		}
 
-		// add the error to the list
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:         helpers.Schema,
-			Message:                "schema does not pass validation",
-			Reason:                 "Schema failed to validate against the contract requirements",
-			SpecLine:               schema.GoLow().Type.KeyNode.Line,
-			SpecCol:                schema.GoLow().Type.KeyNode.Column,
-			SchemaValidationErrors: schemaValidationErrors,
-			HowToFix:               errors.HowToFixInvalidSchema,
-			Context:                string(renderedSchema), // attach the rendered schema to the error
-		})
+			// add the error to the list
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:         helpers.Schema,
+				Message:                "schema does not pass validation",
+				Reason:                 "Schema failed to validate against the contract requirements",
+				SpecLine:               schema.GoLow().Type.KeyNode.Line,
+				SpecCol:                schema.GoLow().Type.KeyNode.Column,
+				SchemaValidationErrors: schemaValidationErrors,
+				HowToFix:               errors.HowToFixInvalidSchema,
+				Context:                string(renderedSchema), // attach the rendered schema to the error
+			})
+		}
 	}
 	if len(validationErrors) > 0 {
 		return false, validationErrors
