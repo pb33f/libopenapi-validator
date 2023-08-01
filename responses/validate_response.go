@@ -123,6 +123,14 @@ func ValidateResponseSchema(
             }
         }
 
+        line := 0
+        col := 0
+        if schema.GoLow().Type.KeyNode != nil {
+            line = schema.GoLow().Type.KeyNode.Line
+            col = schema.GoLow().Type.KeyNode.Column
+        }
+
+
         // add the error to the list
         validationErrors = append(validationErrors, &errors.ValidationError{
             ValidationType:    helpers.ResponseBodyValidation,
@@ -131,8 +139,8 @@ func ValidateResponseSchema(
                 response.StatusCode, request.URL.Path),
             Reason: fmt.Sprintf("The response body for status code '%d' is defined as an object. "+
                 "However, it does not meet the schema requirements of the specification", response.StatusCode),
-            SpecLine:               schema.GoLow().Type.KeyNode.Line,
-            SpecCol:                schema.GoLow().Type.KeyNode.Column,
+            SpecLine:               line,
+            SpecCol:                col,
             SchemaValidationErrors: schemaValidationErrors,
             HowToFix:               errors.HowToFixInvalidSchema,
             Context:                string(renderedSchema), // attach the rendered schema to the error
