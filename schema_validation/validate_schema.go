@@ -161,14 +161,21 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 					}
 				}
 			}
+			line := 1
+			col := 0
+			if schema.GoLow().Type.KeyNode != nil {
+				line = schema.GoLow().Type.KeyNode.Line
+				col = schema.GoLow().Type.KeyNode.Column
+			}
+
 
 			// add the error to the list
 			validationErrors = append(validationErrors, &errors.ValidationError{
 				ValidationType:         helpers.Schema,
 				Message:                "schema does not pass validation",
 				Reason:                 "Schema failed to validate against the contract requirements",
-				SpecLine:               schema.GoLow().Type.KeyNode.Line,
-				SpecCol:                schema.GoLow().Type.KeyNode.Column,
+				SpecLine:               line,
+				SpecCol:                col,
 				SchemaValidationErrors: schemaValidationErrors,
 				HowToFix:               errors.HowToFixInvalidSchema,
 				Context:                string(renderedSchema), // attach the rendered schema to the error
