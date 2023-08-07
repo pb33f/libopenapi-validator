@@ -988,3 +988,57 @@ paths:
 	assert.Len(t, errors, 0)
 
 }
+
+func TestValidateBody_InvalidBodyJSON(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	badJson := []byte("{\"bad\": \"json\",}")
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(badJson))
+	request.Header.Set(helpers.ContentTypeHeader, "application/json")
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, r.Header.Get(helpers.ContentTypeHeader))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(badJson)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
+	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
+
+}

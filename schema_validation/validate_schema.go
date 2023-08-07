@@ -5,6 +5,7 @@ package schema_validation
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -76,8 +77,31 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 	renderedSchema, _ := schema.RenderInline()
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
-	if decodedObject == nil {
-		_ = json.Unmarshal(payload, &decodedObject)
+	if decodedObject == nil && len(payload) > 0 {
+		err := json.Unmarshal(payload, &decodedObject)
+
+		if err != nil {
+			// cannot decode the request body, so it's not valid
+			violation := &errors.SchemaValidationFailure{
+				Reason:          err.Error(),
+				Location:        "unavailable",
+				ReferenceSchema: string(renderedSchema),
+				ReferenceObject: string(payload),
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:         helpers.RequestBodyValidation,
+				ValidationSubType:      helpers.Schema,
+				Message:                "schema does not pass validation",
+				Reason:                 fmt.Sprintf("The schema cannot be decoded: %s", err.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               errors.HowToFixInvalidSchema,
+				Context:                string(renderedSchema), // attach the rendered schema to the error
+			})
+			return false, validationErrors
+		}
+
 	}
 	compiler := jsonschema.NewCompiler()
 	_ = compiler.AddResource("schema.json", strings.NewReader(string(jsonSchema)))
@@ -167,7 +191,6 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 				line = schema.GoLow().Type.KeyNode.Line
 				col = schema.GoLow().Type.KeyNode.Column
 			}
-
 
 			// add the error to the list
 			validationErrors = append(validationErrors, &errors.ValidationError{

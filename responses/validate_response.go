@@ -44,7 +44,33 @@ func ValidateResponseSchema(
 	response.Body = io.NopCloser(bytes.NewBuffer(responseBody))
 
 	var decodedObj interface{}
-	_ = json.Unmarshal(responseBody, &decodedObj)
+
+	if len(responseBody) > 0 {
+		err := json.Unmarshal(responseBody, &decodedObj)
+
+		if err != nil {
+			// cannot decode the response body, so it's not valid
+			violation := &errors.SchemaValidationFailure{
+				Reason:          err.Error(),
+				Location:        "unavailable",
+				ReferenceSchema: string(renderedSchema),
+				ReferenceObject: string(responseBody),
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.ResponseBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%s response body for '%s' failed to validate schema",
+					request.Method, request.URL.Path),
+				Reason:                 fmt.Sprintf("The response body cannot be decoded: %s", err.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               errors.HowToFixInvalidSchema,
+				Context:                string(renderedSchema), // attach the rendered schema to the error
+			})
+			return false, validationErrors
+		}
+	}
 
 	// no response body? failed to decode anything? nothing to do here.
 	if responseBody == nil || decodedObj == nil {
