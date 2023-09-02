@@ -534,3 +534,48 @@ paths:
 	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
 
 }
+
+//func TestValidateSchema_NullableEnum(t *testing.T) {
+//	spec := `openapi: 3.0.0
+//paths:
+//  /burgers/createBurger:
+//    post:
+//      requestBody:
+//        content:
+//          application/json:
+//            schema:
+//              type: object
+//              required: [name]
+//              properties:
+//                name:
+//                  type: string
+//                  enum: [mcbird, mcbeef, veggie, null]
+//                  nullable: true
+//                patties:
+//                  type: integer
+//                vegetarian:
+//                  type: boolean`
+//
+//	doc, _ := libopenapi.NewDocument([]byte(spec))
+//
+//	m, _ := doc.BuildV3Model()
+//
+//	body := map[string]interface{}{
+//		"name":       nil,
+//		"patties":    2,
+//		"vegetarian": true,
+//	}
+//
+//	bodyBytes, _ := json.Marshal(body)
+//	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+//
+//	// create a schema validator
+//	v := NewSchemaValidator()
+//
+//	// validate!
+//	valid, errors := v.ValidateSchemaString(sch.Schema(), string(bodyBytes))
+//
+//	assert.True(t, valid)
+//	assert.Len(t, errors, 0)
+//
+//}

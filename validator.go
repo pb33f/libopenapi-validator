@@ -28,6 +28,10 @@ type Validator interface {
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError)
 
+	// ValidateHttpResponse will an *http.Response object against an OpenAPI 3+ document.
+	// The response body is validated. The request is only used to extract the correct reponse from the spec.
+	ValidateHttpResponse(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
+
 	// ValidateHttpRequestResponse will validate both the *http.Request and *http.Response objects against an OpenAPI 3+ document.
 	// The path, query, cookie and header parameters and request and response body are validated.
 	ValidateHttpRequestResponse(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
@@ -51,23 +55,28 @@ func NewValidator(document libopenapi.Document) (Validator, []error) {
 	if errs != nil {
 		return nil, errs
 	}
+	v := NewValidatorFromV3Model(&m.Model)
+	v.(*validator).document = document
+	return v, nil
+}
 
+// NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
+func NewValidatorFromV3Model(m *v3.Document) Validator {
 	// create a new parameter validator
-	paramValidator := parameters.NewParameterValidator(&m.Model)
+	paramValidator := parameters.NewParameterValidator(m)
 
 	// create a new request body validator
-	reqBodyValidator := requests.NewRequestBodyValidator(&m.Model)
+	reqBodyValidator := requests.NewRequestBodyValidator(m)
 
 	// create a response body validator
-	respBodyValidator := responses.NewResponseBodyValidator(&m.Model)
+	respBodyValidator := responses.NewResponseBodyValidator(m)
 
 	return &validator{
-		v3Model:           &m.Model,
-		document:          document,
+		v3Model:           m,
 		requestValidator:  reqBodyValidator,
 		responseValidator: respBodyValidator,
 		paramValidator:    paramValidator,
-	}, nil
+	}
 }
 
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
@@ -82,6 +91,36 @@ func (v *validator) GetResponseBodyValidator() responses.ResponseBodyValidator {
 
 func (v *validator) ValidateDocument() (bool, []*errors.ValidationError) {
 	return schema_validation.ValidateOpenAPIDocument(v.document)
+}
+
+func (v *validator) ValidateHttpResponse(
+	request *http.Request,
+	response *http.Response) (bool, []*errors.ValidationError) {
+
+	var pathItem *v3.PathItem
+	var pathValue string
+	var errs []*errors.ValidationError
+
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
+	if pathItem == nil || errs != nil {
+		v.errors = errs
+		return false, errs
+	}
+	v.foundPath = pathItem
+	v.foundPathValue = pathValue
+
+	responseBodyValidator := v.responseValidator
+	responseBodyValidator.SetPathItem(pathItem, pathValue)
+
+	// validate response
+	_, responseErrors := responseBodyValidator.ValidateResponseBody(request, response)
+
+	if len(responseErrors) > 0 {
+		return false, responseErrors
+	}
+	v.foundPath = nil
+	v.foundPathValue = ""
+	return true, nil
 }
 
 func (v *validator) ValidateHttpRequestResponse(
