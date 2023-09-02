@@ -1057,3 +1057,80 @@ func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
 		errors[0].Reason)
 
 }
+
+func TestNewValidator_PetStore_InvalidPath_Response(t *testing.T) {
+
+	// create a new document from the petstore spec
+	doc, _ := libopenapi.NewDocument(petstoreBytes)
+
+	// create a doc
+	v, _ := NewValidator(doc)
+
+	// create a new put request
+	request, _ := http.NewRequest(http.MethodPost,
+		"https://hyperspace-superherbs.com/missing", nil)
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response, in this case the contract returns a 200 with the pet we just created.
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// validate the response
+	valid, errors := v.ValidateHttpResponse(request, res.Result())
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST Path '/missing' not found", errors[0].Message)
+}
+
+func TestNewValidator_PetStore_PetFindByStatusGet200_Valid_responseOnly(t *testing.T) {
+
+	// create a new document from the petstore spec
+	doc, _ := libopenapi.NewDocument(petstoreBytes)
+
+	// create a doc
+	v, _ := NewValidator(doc)
+
+	// create a pet
+	body := map[string]interface{}{
+		"id":   123,
+		"name": "cotton",
+		"category": map[string]interface{}{
+			"id":   123,
+			"name": "dogs",
+		},
+		"photoUrls": []string{"https://example.com"},
+	}
+
+	// marshal the body into bytes.
+	bodyBytes, _ := json.Marshal([]interface{}{body}) // operation returns an array of pets
+
+	// create a new put request
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://hyperspace-superherbs.com/pet/findByStatus?status=sold", nil)
+	request.Header.Set("Content-Type", "application/json")
+
+	// simulate a request/response, in this case the contract returns a 200 with the pet we just created.
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bodyBytes)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// validate the response (should be clean)
+	valid, errors := v.ValidateHttpResponse(request, res.Result())
+
+	// should all be perfectly valid.
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}

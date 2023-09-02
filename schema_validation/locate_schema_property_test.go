@@ -4,12 +4,12 @@
 package schema_validation
 
 import (
-    "github.com/stretchr/testify/assert"
-    "testing"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestLocateSchemaPropertyNodeByJSONPath_BadNode(t *testing.T) {
 
-    assert.Nil(t, LocateSchemaPropertyNodeByJSONPath(nil, ""))
+	assert.Nil(t, LocateSchemaPropertyNodeByJSONPath(nil, ""))
 
 }
