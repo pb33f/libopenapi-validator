@@ -3,7 +3,7 @@ module github.com/pb33f/libopenapi-validator
 go 1.19
 
 require (
-	github.com/pb33f/libopenapi v0.9.7
+	github.com/pb33f/libopenapi v0.10.4
 	github.com/santhosh-tekuri/jsonschema/v5 v5.2.0
 	github.com/stretchr/testify v1.8.0
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
@@ -17,5 +17,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb // indirect
 	golang.org/x/sync v0.1.0 // indirect
 )
