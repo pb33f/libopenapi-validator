@@ -40,17 +40,19 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*errors.Validatio
 
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
-				if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+				if er.KeywordLocation == "" ||
+					strings.HasPrefix(er.Error, "oneOf failed") ||
+					strings.HasPrefix(er.Error, "allOf failed") ||
+					strings.HasPrefix(er.Error, "anyOf failed") ||
+					strings.HasPrefix(er.Error, "if failed") ||
+					strings.HasPrefix(er.Error, "else failed") ||
+					strings.HasPrefix(er.Error, "doesn't validate with") {
 					continue // ignore this error, it's useless tbh, utter noise.
 				}
 				if er.Error != "" {
 
 					// locate the violated property in the schema
-					located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.KeywordLocation)
-					if located == nil {
-						// try again with the instance location
-						located = LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
-					}
+					located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
 					violation := &errors.SchemaValidationFailure{
 						Reason:           er.Error,
 						Location:         er.InstanceLocation,
