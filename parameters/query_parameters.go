@@ -217,7 +217,7 @@ doneLooking:
 				if params[p].Schema != nil {
 					sch := params[p].Schema.Schema()
 
-					if sch.Type[0] == helpers.Object && params[p].IsDefaultFormEncoding() {
+					if len(sch.Type) > 0 && sch.Type[0] == helpers.Object && params[p].IsDefaultFormEncoding() {
 						// if the param is an object, and we're using default encoding, then we need to
 						// validate the schema.
 						decoded := helpers.ConstructParamMapFromQueryParamInput(queryParams)
