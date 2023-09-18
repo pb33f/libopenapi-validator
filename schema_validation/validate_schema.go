@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // SchemaValidator is an interface that defines the methods for validating a *base.Schema (V3+ Only) object.
@@ -64,6 +65,8 @@ func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byt
 	return validateSchema(schema, payload, nil, s.logger)
 }
 
+var renderLock = &sync.Mutex{}
+
 func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *zap.SugaredLogger) (bool, []*errors.ValidationError) {
 
 	var validationErrors []*errors.ValidationError
@@ -73,8 +76,12 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 		return false, validationErrors
 	}
 
-	// render the schema, to be used for validation
+	// render the schema, to be used for validation, stop this from running concurrently, mutations are made to state
+	// and, it will cause async issues.
+	renderLock.Lock()
 	renderedSchema, _ := schema.RenderInline()
+	renderLock.Unlock()
+
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
 	if decodedObject == nil && len(payload) > 0 {
