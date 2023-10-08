@@ -535,43 +535,43 @@ paths:
 
 }
 
-// https://github.com/pb33f/libopenapi-validator/issues/26
-func TestValidateSchema_v3_0_BooleanExclusiveMinimum(t *testing.T) {
-
-	spec := `openapi: 3.0.0
-paths:
-  /burgers/createBurger:
-    post:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                amount:
-                  type: number
-                  minimum: 0
-                  exclusiveMinimum: true`
-
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-
-	body := map[string]interface{}{"amount": 3}
-
-	bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
-
-	// create a schema validator
-	v := NewSchemaValidator()
-
-	// validate!
-	valid, errors := v.ValidateSchemaString(sch.Schema(), string(bodyBytes))
-
-	assert.True(t, valid)
-	assert.Empty(t, errors)
-
-}
+//// https://github.com/pb33f/libopenapi-validator/issues/26
+//func TestValidateSchema_v3_0_BooleanExclusiveMinimum(t *testing.T) {
+//
+//	spec := `openapi: 3.0.0
+//paths:
+//  /burgers/createBurger:
+//    post:
+//      requestBody:
+//        content:
+//          application/json:
+//            schema:
+//              type: object
+//              properties:
+//                amount:
+//                  type: number
+//                  minimum: 0
+//                  exclusiveMinimum: true`
+//
+//	doc, _ := libopenapi.NewDocument([]byte(spec))
+//
+//	m, _ := doc.BuildV3Model()
+//
+//	body := map[string]interface{}{"amount": 3}
+//
+//	bodyBytes, _ := json.Marshal(body)
+//	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+//
+//	// create a schema validator
+//	v := NewSchemaValidator()
+//
+//	// validate!
+//	valid, errors := v.ValidateSchemaString(sch.Schema(), string(bodyBytes))
+//
+//	assert.True(t, valid)
+//	assert.Empty(t, errors)
+//
+//}
 
 // https://github.com/pb33f/libopenapi-validator/issues/26
 func TestValidateSchema_v3_0_NumericExclusiveMinimum(t *testing.T) {

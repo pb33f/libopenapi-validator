@@ -85,11 +85,13 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 	// render the schema, to be used for validation, stop this from running concurrently, mutations are made to state
 	// and, it will cause async issues.
 	renderLock.Lock()
-	version := float32(0.0)
+
+	//version := float32(0.0)
 	if schemaIndex != nil {
-		version = schemaIndex.GetConfig().SpecInfo.VersionNumeric
-		renderedSchema, _ = schema.RenderInline()
+		//version = schemaIndex.GetConfig().SpecInfo.VersionNumeric
+
 	}
+	renderedSchema, _ = schema.RenderInline()
 	renderLock.Unlock()
 
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
@@ -121,11 +123,15 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 
 	}
 	compiler := jsonschema.NewCompiler()
-	if version >= 3.1 {
-		compiler.Draft = jsonschema.Draft2020
-	} else {
-		compiler.Draft = jsonschema.Draft4
-	}
+
+	// setting this will break existing vacuum OWASP rules, that assume a 2020 validator for if/else/then schema
+	// validations.
+	//switch version {
+	//case 3.0, 2.0:
+	//	compiler.Draft = jsonschema.Draft4
+	//default:
+	//	compiler.Draft = jsonschema.Draft2020
+	//}
 
 	_ = compiler.AddResource("schema.json", strings.NewReader(string(jsonSchema)))
 	jsch, err := compiler.Compile("schema.json")
