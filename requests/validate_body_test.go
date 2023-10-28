@@ -6,11 +6,12 @@ package requests
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"testing"
+
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func TestValidateBody_MissingContentType(t *testing.T) {
@@ -56,6 +57,47 @@ paths:
 	assert.Equal(t, "POST operation request content type 'thomas/tank-engine' does not exist", errors[0].Message)
 	assert.Equal(t, "The content type is invalid, Use one of the 1 "+
 		"supported types for this operation: application/json", errors[0].HowToFix)
+}
+
+func TestValidateBody_SkipValidationForNonJSON(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/yaml:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/yaml")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_PathNotFound(t *testing.T) {
@@ -183,6 +225,51 @@ paths:
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("content-type", "application/not-json")
+
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+	v.SetPathItem(path, pv)
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+
+}
+
+func TestValidateBody_ContentTypeNotSet(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
 
 	// preset the path
 	path, _, pv := paths.FindPath(request, &m.Model)
@@ -748,6 +835,53 @@ components:
 	assert.Equal(t, 2, errors[0].SchemaValidationErrors[0].Line)
 	assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, 11, errors[0].SchemaValidationErrors[0].Column)
+}
+
+func TestValidateBody_SchemaHasNoRequestBody(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		http.NoBody)
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+
+}
+
+func TestValidateBody_MediaTypeHasNullSchema(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		http.NoBody)
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+
 }
 
 func TestValidateBody_MissingBody(t *testing.T) {
