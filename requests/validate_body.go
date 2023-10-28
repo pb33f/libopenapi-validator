@@ -30,15 +30,13 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 
 	operation := helpers.ExtractOperation(request, pathItem)
 	if operation.RequestBody == nil {
-		// TODO: check if requestBody is marked as required
 		return true, nil
 	}
 
 	// extract the content type from the request
 	contentType := request.Header.Get(helpers.ContentTypeHeader)
 	if contentType == "" {
-		//TODO: should this ever return errors?
-		return true, nil
+		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request)}
 	}
 
 	// extract the media type from the content type header.
