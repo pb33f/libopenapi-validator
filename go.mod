@@ -1,11 +1,11 @@
 module github.com/pb33f/libopenapi-validator
 
-go 1.19
+go 1.21
 
 require (
-	github.com/pb33f/libopenapi v0.12.1
-	github.com/santhosh-tekuri/jsonschema/v5 v5.2.0
-	github.com/stretchr/testify v1.8.0
+	github.com/pb33f/libopenapi v0.13.1
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
+	github.com/stretchr/testify v1.8.4
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
 	go.uber.org/zap v1.24.0
 	gopkg.in/yaml.v3 v3.0.1
