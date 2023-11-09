@@ -22,6 +22,7 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.Valida
 	info := doc.GetSpecInfo()
 	loadedSchema := info.APISchema
 	var validationErrors []*liberrors.ValidationError
+	<-info.JsonParsingChannel
 	decodedDocument := *info.SpecJSON
 
 	compiler := jsonschema.NewCompiler()
