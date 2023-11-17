@@ -14,8 +14,9 @@ import (
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	_ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
-	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+	"log/slog"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -46,13 +47,20 @@ type SchemaValidator interface {
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 type schemaValidator struct {
-	logger *zap.SugaredLogger
+	logger *slog.Logger
+}
+
+// NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
+func NewSchemaValidatorWithLogger(logger *slog.Logger) SchemaValidator {
+	return &schemaValidator{logger: logger}
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
 func NewSchemaValidator() SchemaValidator {
-	logger, _ := zap.NewProduction()
-	return &schemaValidator{logger: logger.Sugar()}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelError,
+	}))
+	return NewSchemaValidatorWithLogger(logger)
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError) {
@@ -69,12 +77,12 @@ func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byt
 
 var renderLock = &sync.Mutex{}
 
-func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *zap.SugaredLogger) (bool, []*liberrors.ValidationError) {
+func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *slog.Logger) (bool, []*liberrors.ValidationError) {
 
 	var validationErrors []*liberrors.ValidationError
 
 	if schema == nil {
-		log.Infoln("schema is empty and cannot be validated. This generally means the schema is missing from the spec, or could not be read.")
+		log.Info("schema is empty and cannot be validated. This generally means the schema is missing from the spec, or could not be read.")
 		return false, validationErrors
 	}
 
@@ -123,15 +131,6 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 
 	}
 	compiler := jsonschema.NewCompiler()
-
-	// setting this will break existing vacuum OWASP rules, that assume a 2020 validator for if/else/then schema
-	// validations.
-	//switch version {
-	//case 3.0, 2.0:
-	//	compiler.Draft = jsonschema.Draft4
-	//default:
-	//	compiler.Draft = jsonschema.Draft2020
-	//}
 
 	_ = compiler.AddResource("schema.json", strings.NewReader(string(jsonSchema)))
 	jsch, err := compiler.Compile("schema.json")
