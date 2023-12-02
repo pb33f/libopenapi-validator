@@ -923,6 +923,28 @@ components:
 
 	valid, errors := v.ValidateRequestBody(request)
 
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+
+}
+
+func TestValidateBody_NoBodyNoNothing(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		http.NoBody)
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 

@@ -702,6 +702,7 @@ func TestNewValidator_PetStore_PetGet200_Valid(t *testing.T) {
 	request, _ := http.NewRequest(http.MethodGet,
 		"https://hyperspace-superherbs.com/pet/12345", nil)
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("api_key", "12345")
 
 	// simulate a request/response, in this case the contract returns a 200 with the pet we just created.
 	res := httptest.NewRecorder()
@@ -779,6 +780,7 @@ func TestNewValidator_PetStore_PetGet200(t *testing.T) {
 	request, _ := http.NewRequest(http.MethodGet,
 		"https://hyperspace-superherbs.com/pet/112233", nil)
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("api_key", "12345")
 
 	// simulate a request/response, in this case the contract returns a 200 with the pet we just created.
 	res := httptest.NewRecorder()
@@ -825,6 +827,7 @@ func TestNewValidator_PetStore_PetGet200_ServerBadMediaType(t *testing.T) {
 	request, _ := http.NewRequest(http.MethodGet,
 		"https://hyperspace-superherbs.com/pet/112233", nil)
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("api_key", "12345")
 
 	// simulate a request/response, in this case the contract returns a 200 with the pet we just created.
 	res := httptest.NewRecorder()

@@ -5,6 +5,7 @@ package helpers
 
 import (
 	"fmt"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"strconv"
@@ -59,6 +60,46 @@ func ExtractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.P
 		}
 	}
 	return params
+}
+
+// ExtractSecurityForOperation will extract the security requirements for the operation based on the request method.
+func ExtractSecurityForOperation(request *http.Request, item *v3.PathItem) []*base.SecurityRequirement {
+	var schemes []*base.SecurityRequirement
+	switch request.Method {
+	case http.MethodGet:
+		if item.Get != nil {
+			schemes = append(schemes, item.Get.Security...)
+		}
+	case http.MethodPost:
+		if item.Post != nil {
+			schemes = append(schemes, item.Post.Security...)
+		}
+	case http.MethodPut:
+		if item.Put != nil {
+			schemes = append(schemes, item.Put.Security...)
+		}
+	case http.MethodDelete:
+		if item.Delete != nil {
+			schemes = append(schemes, item.Delete.Security...)
+		}
+	case http.MethodOptions:
+		if item.Options != nil {
+			schemes = append(schemes, item.Options.Security...)
+		}
+	case http.MethodHead:
+		if item.Head != nil {
+			schemes = append(schemes, item.Head.Security...)
+		}
+	case http.MethodPatch:
+		if item.Patch != nil {
+			schemes = append(schemes, item.Patch.Security...)
+		}
+	case http.MethodTrace:
+		if item.Trace != nil {
+			schemes = append(schemes, item.Trace.Security...)
+		}
+	}
+	return schemes
 }
 
 func cast(v string) any {
