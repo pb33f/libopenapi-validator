@@ -68,9 +68,27 @@ func ValidateRequestSchema(
 		}
 	}
 
-	// no request body? failed to decode anything? nothing to do here.
-	if requestBody == nil || decodedObj == nil {
-		return true, nil
+	// no request body? but we do have a schema?
+	if len(requestBody) <= 0 && len(jsonSchema) > 0 {
+		// cannot decode the request body, so it's not valid
+		violation := &errors.SchemaValidationFailure{
+			Reason:          "request body is empty, but there is a schema defined",
+			ReferenceSchema: string(renderedSchema),
+			ReferenceObject: string(requestBody),
+		}
+		validationErrors = append(validationErrors, &errors.ValidationError{
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message: fmt.Sprintf("%s request body is empty for '%s'",
+				request.Method, request.URL.Path),
+			Reason:                 "The request body is empty but there is a schema defined",
+			SpecLine:               schema.GoLow().Type.KeyNode.Line,
+			SpecCol:                schema.GoLow().Type.KeyNode.Line,
+			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+			HowToFix:               errors.HowToFixInvalidSchema,
+			Context:                string(renderedSchema), // attach the rendered schema to the error
+		})
+		return false, validationErrors
 	}
 
 	compiler := jsonschema.NewCompiler()

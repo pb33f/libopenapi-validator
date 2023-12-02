@@ -198,6 +198,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 			paramValidator.ValidateCookieParams,
 			paramValidator.ValidateHeaderParams,
 			paramValidator.ValidateQueryParams,
+			paramValidator.ValidateSecurity,
 		}
 
 		// listen for validation errors on parameters. everything will run async.

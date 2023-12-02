@@ -41,6 +41,10 @@ type ParameterValidator interface {
 	// ValidatePathParams validates the path parameters contained within *http.Request. It returns a boolean stating true
 	// if validation passed (false for failed), and a slice of errors if validation failed.
 	ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError)
+
+	// ValidateSecurity validates the security requirements for the operation. It returns a boolean stating true
+	// if validation passed (false for failed), and a slice of errors if validation failed.
+	ValidateSecurity(request *http.Request) (bool, []*errors.ValidationError)
 }
 
 func (v *paramValidator) SetPathItem(path *v3.PathItem, pathValue string) {
