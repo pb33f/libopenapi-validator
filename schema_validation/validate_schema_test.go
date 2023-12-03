@@ -5,14 +5,14 @@ package schema_validation
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
-	"testing"
 )
 
 func TestLocateSchemaPropertyNodeByJSONPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -42,7 +42,6 @@ paths:
 		"/i/do/not/exist")
 
 	assert.Nil(t, foundNode)
-
 }
 
 func TestValidateSchema_SimpleValid_String(t *testing.T) {
@@ -74,7 +73,7 @@ paths:
 	}
 
 	bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// create a schema validator
 	v := NewSchemaValidator()
@@ -84,7 +83,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateSchema_SimpleValid(t *testing.T) {
@@ -119,14 +117,13 @@ paths:
 	v := NewSchemaValidator()
 
 	bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// validate!
 	valid, errors := v.ValidateSchemaBytes(sch.Schema(), bodyBytes)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateSchema_SimpleInValid(t *testing.T) {
@@ -161,7 +158,7 @@ paths:
 	v := NewSchemaValidator()
 
 	bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// validate!
 	valid, errors := v.ValidateSchemaBytes(sch.Schema(), bodyBytes)
@@ -198,8 +195,8 @@ paths:
 	// create a schema validator
 	v := NewSchemaValidator()
 
-	//bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	// bodyBytes, _ := json.Marshal(body)
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// validate!
 	valid, errors := v.ValidateSchemaObject(sch.Schema(), body)
@@ -289,7 +286,7 @@ paths:
 
 	// cake? (https://www.youtube.com/watch?v=PVH0gZO5lq0)
 	bodyBytes, _ := json.Marshal(cakePlease)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// create a schema validator
 	v := NewSchemaValidator()
@@ -302,14 +299,13 @@ paths:
 
 	// or death!
 	bodyBytes, _ = json.Marshal(death)
-	sch = m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch = m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// validate!
 	valid, errors = v.ValidateSchemaBytes(sch.Schema(), bodyBytes)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateSchema_ReffyComplex_Invalid(t *testing.T) {
@@ -391,7 +387,7 @@ paths:
 
 	// cake? (https://www.youtube.com/watch?v=PVH0gZO5lq0)
 	bodyBytes, _ := json.Marshal(cakePlease)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// create a schema validator
 	v := NewSchemaValidator()
@@ -411,7 +407,7 @@ paths:
 
 	// or death!
 	bodyBytes, _ = json.Marshal(death)
-	sch = m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch = m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// validate!
 	valid, errors = v.ValidateSchemaBytes(sch.Schema(), bodyBytes)
@@ -425,11 +421,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 3)
-
 }
 
 func TestValidateSchema_EmptySchema(t *testing.T) {
-
 	// create a schema validator
 	v := NewSchemaValidator()
 
@@ -487,7 +481,7 @@ paths:
 	// create a schema validator
 	v := NewSchemaValidator()
 
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// validate!
 	valid, errors := v.ValidateSchemaBytes(sch.Schema(), bodyBytes)
@@ -520,7 +514,7 @@ paths:
 	m, _ := doc.BuildV3Model()
 
 	bodyBytes := []byte("{\"bad\": \"json\",}")
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// create a schema validator
 	v := NewSchemaValidator()
@@ -532,7 +526,6 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "schema does not pass validation", errors[0].Message)
 	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 //// https://github.com/pb33f/libopenapi-validator/issues/26
@@ -560,7 +553,7 @@ paths:
 //	body := map[string]interface{}{"amount": 3}
 //
 //	bodyBytes, _ := json.Marshal(body)
-//	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+//	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger"].Post.RequestBody.Content.GetOrZero("application/json"].Schema
 //
 //	// create a schema validator
 //	v := NewSchemaValidator()
@@ -575,7 +568,6 @@ paths:
 
 // https://github.com/pb33f/libopenapi-validator/issues/26
 func TestValidateSchema_v3_0_NumericExclusiveMinimum(t *testing.T) {
-
 	spec := `openapi: 3.0.0
 paths:
   /burgers/createBurger:
@@ -597,7 +589,7 @@ paths:
 	body := map[string]interface{}{"amount": 3}
 
 	bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// create a schema validator
 	v := NewSchemaValidator()
@@ -607,12 +599,10 @@ paths:
 
 	assert.False(t, valid)
 	assert.NotEmpty(t, errors)
-
 }
 
 // https://github.com/pb33f/libopenapi-validator/issues/26
 func TestValidateSchema_v3_1_NumericExclusiveMinimum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -634,7 +624,7 @@ paths:
 	body := map[string]interface{}{"amount": 3}
 
 	bodyBytes, _ := json.Marshal(body)
-	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
 
 	// create a schema validator
 	v := NewSchemaValidator()
@@ -644,7 +634,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Empty(t, errors)
-
 }
 
 //func TestValidateSchema_NullableEnum(t *testing.T) {
@@ -679,7 +668,7 @@ paths:
 //	}
 //
 //	bodyBytes, _ := json.Marshal(body)
-//	sch := m.Model.Paths.PathItems["/burgers/createBurger"].Post.RequestBody.Content["application/json"].Schema
+//	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger"].Post.RequestBody.Content.GetOrZero("application/json"].Schema
 //
 //	// create a schema validator
 //	v := NewSchemaValidator()

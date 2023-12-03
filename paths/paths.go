@@ -5,14 +5,16 @@ package paths
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
@@ -21,7 +23,6 @@ import (
 // The third return value will be the path that was found in the document, as it pertains to the contract, so all path
 // parameters will not have been replaced with their values from the request - allowing model lookups.
 func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*errors.ValidationError, string) {
-
 	var validationErrors []*errors.ValidationError
 
 	// extract base path from document to check against paths.
@@ -44,7 +45,9 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
 	var pItem *v3.PathItem
 	var foundPath string
 pathFound:
-	for path, pathItem := range document.Paths.PathItems {
+	for pair := orderedmap.First(document.Paths.PathItems); pair != nil; pair = pair.Next() {
+		path := pair.Key()
+		pathItem := pair.Value()
 		segs := strings.Split(path, "/")
 		if segs[0] == "" {
 			segs = segs[1:]
@@ -242,8 +245,8 @@ func stripBaseFromPath(path string, basePaths []string) string {
 }
 
 func comparePaths(mapped, requested []string,
-	params []*v3.Parameter, basePaths []string) (bool, []*errors.ValidationError) {
-
+	params []*v3.Parameter, basePaths []string,
+) (bool, []*errors.ValidationError) {
 	// check lengths first
 	var pathErrors []*errors.ValidationError
 
@@ -253,11 +256,11 @@ func comparePaths(mapped, requested []string,
 	var imploded []string
 	for i, seg := range mapped {
 		s := seg
-		//sOrig := seg
+		// sOrig := seg
 		// check for braces
 		if strings.Contains(seg, "{") {
 			s = requested[i]
-			//sOrig = s
+			// sOrig = s
 		}
 		// check param against type, check if it's a number or not, and if it validates.
 		for p := range params {
@@ -266,7 +269,6 @@ func comparePaths(mapped, requested []string,
 				if params[p].Name == h {
 					schema := params[p].Schema.Schema()
 					for t := range schema.Type {
-
 						switch schema.Type[t] {
 						case helpers.String, helpers.Object, helpers.Array:
 							// should not be a number.
