@@ -4,15 +4,15 @@
 package parameters
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func TestNewValidator_QueryParamMissing(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -41,7 +41,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamNotMissing(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -70,7 +69,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamPost(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -99,7 +97,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamPut(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -128,7 +125,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamDelete(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -157,7 +153,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamOptions(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -186,7 +181,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamHead(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -215,7 +209,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamPatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -244,7 +237,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamTrace(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -273,7 +265,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamBadPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -301,7 +292,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamWrongTypeNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -331,7 +321,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidTypeNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -360,7 +349,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidTypeFloat(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -389,7 +377,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamWrongTypeBool(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -419,7 +406,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidTypeBool(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -448,7 +434,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidEnumString(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -477,7 +462,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidEnumNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -506,7 +490,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidEnumNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -533,7 +516,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidTypeArrayString(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -563,7 +545,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayStringEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -595,7 +576,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayNumberEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -627,7 +607,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -664,7 +643,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidExplodedType(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -696,7 +674,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidExplodedArray(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -725,7 +702,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidExplodedArrayAndInvalidType(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -756,7 +732,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidExploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -787,7 +762,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayBool(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -823,7 +797,6 @@ operationId: locateFishy`
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayFloat(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -851,7 +824,6 @@ operationId: locateFishy`
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayFloatPipeDelimited(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -880,7 +852,6 @@ operationId: locateFishy`
 }
 
 func TestNewValidator_QueryParamInvalidTypeArrayObjectPipeDelimited(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -913,7 +884,6 @@ operationId: locateFishy`
 }
 
 func TestNewValidator_QueryParamValidTypeObject(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -956,7 +926,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_Invalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -990,11 +959,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
-
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropTypeFloat(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1027,11 +994,9 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_QueryParamInvalidTypeObjectArrayPropType_Ref(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1078,7 +1043,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidTypeObjectArrayPropType_Ref(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1121,11 +1085,9 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_Ref(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1160,11 +1122,9 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_RefInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1200,11 +1160,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "expected number, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_RefViaContentWrapped(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1243,11 +1201,9 @@ paths:
 	assert.True(t, valid)
 
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_RefViaContentWrappedInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1285,11 +1241,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "expected number, but got string", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_JSONInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   parameters:
@@ -1327,11 +1281,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Query parameter 'fishy' is not valid JSON", errors[0].Message)
-
 }
 
 func TestNewValidator_QueryParamInvalidTypeObjectPropType_Ref(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 components:
   schema_validation:
@@ -1370,11 +1322,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
-
 }
 
 func TestNewValidator_QueryParamValidateStyle_AllowReserved(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -1408,7 +1358,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_ValidObjectArrayNoExplode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -1439,7 +1388,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_InValidObjectArrayNoExplode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -1473,7 +1421,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedIncorrectlyExploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -1506,7 +1453,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectValidExplode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -1534,11 +1480,9 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidExplode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
  /a/fishy/on/a/dishy:
@@ -1566,11 +1510,9 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectValid(t *testing.T) {
-
 	spec := `
 openapi: 3.1.0
 paths:
@@ -1611,7 +1553,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectDecode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1657,7 +1598,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectDecodeInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1704,7 +1644,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedObjectDecode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1750,7 +1689,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedObjectDecodeInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1795,7 +1733,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidMultiple(t *testing.T) {
-
 	spec := `
 openapi: 3.1.0
 paths:
@@ -1834,7 +1771,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesNoSchema(t *testing.T) {
-
 	spec := `---
 openapi: 3.1.0
 paths:
@@ -1865,7 +1801,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesInvalid(t *testing.T) {
-
 	spec := `---
 openapi: 3.1.0
 paths:
@@ -1898,7 +1833,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_FormEncoding(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1943,7 +1877,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_FormEncodingInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -1987,11 +1920,9 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[1].Reason)
-
 }
 
 func TestNewValidator_QueryParamValidateStyle_FormEncodingArray(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2030,7 +1961,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_FormEncodingArrayExplode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2071,7 +2001,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_FormEncodingArrayExplodeInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2113,7 +2042,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2152,7 +2080,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2191,7 +2118,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedInvalidSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2231,7 +2157,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesFailedSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2268,7 +2193,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamSetPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2309,7 +2233,6 @@ paths:
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesFailedMultipleSchemas(t *testing.T) {
-
 	spec := `---
 openapi: 3.1.0
 paths:
@@ -2381,7 +2304,6 @@ paths:
 }
 
 func TestNewValidator_ValidateEncodedObjectIsCorrect(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -2404,7 +2326,7 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	sch := m.Model.Paths.PathItems["/a/fishy/on/a/dishy"].Get.Parameters[0].Schema
+	sch := m.Model.Paths.PathItems.GetOrZero("/a/fishy/on/a/dishy").Get.Parameters[0].Schema
 
 	s := sch.Schema()
 
@@ -2419,5 +2341,4 @@ paths:
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "lemons 'pizza' is defined as an object, "+
 		"however it failed to be decoded as an object", errs[0].Reason)
-
 }

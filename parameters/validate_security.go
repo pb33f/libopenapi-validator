@@ -5,16 +5,17 @@ package parameters
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"net/http"
-	"strings"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*errors.ValidationError) {
-
 	// find path
 	var pathItem *v3.PathItem
 	var errs []*errors.ValidationError
@@ -36,12 +37,12 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 	}
 
 	for _, sec := range security {
-		for secName, _ := range sec.Requirements {
+		for pair := orderedmap.First(sec.Requirements); pair != nil; pair = pair.Next() {
+			secName := pair.Key()
 
 			// look up security from components
-			secScheme := v.document.Components.SecuritySchemes[secName]
+			secScheme := v.document.Components.SecuritySchemes.GetOrZero(secName)
 			if secScheme != nil {
-
 				switch strings.ToLower(secScheme.Type) {
 				case "http":
 					switch strings.ToLower(secScheme.Scheme) {

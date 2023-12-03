@@ -5,18 +5,18 @@ package parameters
 
 import (
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
-	"net/http"
-	"strconv"
-	"strings"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*errors.ValidationError) {
-
 	// find path
 	var pathItem *v3.PathItem
 	var errs []*errors.ValidationError
@@ -31,10 +31,10 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 	}
 
 	// extract params for the operation
-	var params = helpers.ExtractParamsForOperation(request, pathItem)
+	params := helpers.ExtractParamsForOperation(request, pathItem)
 
 	var validationErrors []*errors.ValidationError
-	var seenHeaders = make(map[string]bool)
+	seenHeaders := make(map[string]bool)
 	for _, p := range params {
 		if p.In == helpers.Header {
 
@@ -136,7 +136,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 					}
 				}
 			} else {
-				if p.Required {
+				if p.Required != nil && *p.Required {
 					validationErrors = append(validationErrors, errors.HeaderParameterMissing(p))
 				}
 			}

@@ -5,34 +5,37 @@ package errors
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"strings"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 func ResponseContentTypeNotFound(op *v3.Operation,
 	request *http.Request,
 	response *http.Response,
 	code string,
-	isDefault bool) *ValidationError {
+	isDefault bool,
+) *ValidationError {
 	ct := response.Header.Get(helpers.ContentTypeHeader)
 	mediaTypeString, _, _ := helpers.ExtractContentType(ct)
 	var ctypes []string
 	var specLine, specCol int
-	var contentMap map[string]*v3.MediaType
+	var contentMap *orderedmap.Map[string, *v3.MediaType]
 
 	// check for a default type (applies to all codes without a match)
 	if !isDefault {
-		for k := range op.Responses.Codes[code].Content {
-			ctypes = append(ctypes, k)
+		for pair := orderedmap.First(op.Responses.Codes.GetOrZero(code).Content); pair != nil; pair = pair.Next() {
+			ctypes = append(ctypes, pair.Key())
 		}
-		specLine = op.Responses.Codes[code].GoLow().Content.KeyNode.Line
-		specCol = op.Responses.Codes[code].GoLow().Content.KeyNode.Column
-		contentMap = op.Responses.Codes[code].Content
+		specLine = op.Responses.Codes.GetOrZero(code).GoLow().Content.KeyNode.Line
+		specCol = op.Responses.Codes.GetOrZero(code).GoLow().Content.KeyNode.Column
+		contentMap = op.Responses.Codes.GetOrZero(code).Content
 	} else {
-		for k := range op.Responses.Default.Content {
-			ctypes = append(ctypes, k)
+		for pair := orderedmap.First(op.Responses.Default.Content); pair != nil; pair = pair.Next() {
+			ctypes = append(ctypes, pair.Key())
 		}
 		specLine = op.Responses.Default.GoLow().Content.KeyNode.Line
 		specCol = op.Responses.Default.GoLow().Content.KeyNode.Column
@@ -49,7 +52,7 @@ func ResponseContentTypeNotFound(op *v3.Operation,
 		SpecCol:  specCol,
 		Context:  op,
 		HowToFix: fmt.Sprintf(HowToFixInvalidContentType,
-			len(contentMap), strings.Join(ctypes, ", ")),
+			orderedmap.Len(contentMap), strings.Join(ctypes, ", ")),
 	}
 }
 

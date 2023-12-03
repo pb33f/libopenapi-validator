@@ -16,7 +16,6 @@ import (
 )
 
 func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
-
 	// find path
 	var pathItem *v3.PathItem = v.pathItem
 	if v.pathItem == nil {
@@ -41,7 +40,7 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 
 	// extract the media type from the content type header.
 	ct, _, _ := helpers.ExtractContentType(contentType)
-	mediaType, ok := operation.RequestBody.Content[ct]
+	mediaType, ok := operation.RequestBody.Content.Get(ct)
 	if !ok {
 		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request)}
 	}
@@ -85,6 +84,6 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 		}
 	}
 
-	//render the schema, to be used for validation
+	// render the schema, to be used for validation
 	return ValidateRequestSchema(request, schema, renderedInline, renderedJSON)
 }

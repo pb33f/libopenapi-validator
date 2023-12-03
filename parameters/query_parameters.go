@@ -6,19 +6,20 @@ package parameters
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
-
 	// find path
 	var pathItem *v3.PathItem
 	var errs []*errors.ValidationError
@@ -33,7 +34,7 @@ func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*er
 	}
 
 	// extract params for the operation
-	var params = helpers.ExtractParamsForOperation(request, pathItem)
+	params := helpers.ExtractParamsForOperation(request, pathItem)
 	queryParams := make(map[string][]*helpers.QueryParam)
 	var validationErrors []*errors.ValidationError
 
@@ -79,13 +80,11 @@ doneLooking:
 						sch = params[p].Schema.Schema()
 					} else {
 						// ok, no schema, check for a content type
-						if params[p].Content != nil {
-							for k, ct := range params[p].Content {
-								sch = ct.Schema.Schema()
-								contentWrapped = true
-								contentType = k
-								break
-							}
+						for pair := orderedmap.First(params[p].Content); pair != nil; pair = pair.Next() {
+							sch = pair.Value().Schema.Schema()
+							contentWrapped = true
+							contentType = pair.Key()
+							break
 						}
 					}
 					pType := sch.Type
@@ -210,7 +209,6 @@ doneLooking:
 						}
 					}
 				}
-
 			} else {
 				// if the param is not in the requests, so let's check if this param is an
 				// object, and if we should use default encoding and explode values.
@@ -234,7 +232,7 @@ doneLooking:
 					}
 				}
 				// if there is no match, check if the param is required or not.
-				if params[p].Required {
+				if params[p].Required != nil && *params[p].Required {
 					validationErrors = append(validationErrors, errors.QueryParameterMissing(params[p]))
 				}
 			}
