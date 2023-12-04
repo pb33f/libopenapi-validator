@@ -22,4 +22,5 @@ require (
 	golang.org/x/sync v0.1.0 // indirect
 )
 
-replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi v0.0.0-20231203222815-69ba5b875a1d
+// replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi ordered-libopenapi
+replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi v0.0.0-20231204101531-2ff7c595854b
