@@ -33,12 +33,16 @@ func ValidateRequestSchema(
 
 	var validationErrors []*errors.ValidationError
 
-	requestBody, _ := io.ReadAll(request.Body)
+	var requestBody []byte
+	if request != nil && request.Body != nil {
+		requestBody, _ = io.ReadAll(request.Body)
 
-	// close the request body, so it can be re-read later by another player in the chain
-	_ = request.Body.Close()
-	request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+		// close the request body, so it can be re-read later by another player in the chain
+		_ = request.Body.Close()
+		request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 
+	}
+	
 	var decodedObj interface{}
 
 	if len(requestBody) > 0 {
