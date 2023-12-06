@@ -23,4 +23,4 @@ require (
 )
 
 // replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi ordered-libopenapi
-replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi v0.0.0-20231204223826-c2b4b662babb
+replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi v0.0.0-20231206083555-8b6a5ef486dc
