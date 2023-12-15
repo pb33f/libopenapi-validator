@@ -3,7 +3,7 @@ module github.com/pb33f/libopenapi-validator
 go 1.21
 
 require (
-	github.com/pb33f/libopenapi v0.13.17
+	github.com/pb33f/libopenapi v0.14.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/stretchr/testify v1.8.4
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
@@ -21,6 +21,3 @@ require (
 	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb // indirect
 	golang.org/x/sync v0.1.0 // indirect
 )
-
-// replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi ordered-libopenapi
-replace github.com/pb33f/libopenapi => github.com/speakeasy-api/libopenapi v0.0.0-20231206083555-8b6a5ef486dc
