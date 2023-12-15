@@ -113,7 +113,7 @@ doneLooking:
 								if sch.Enum != nil {
 									matchFound := false
 									for _, enumVal := range sch.Enum {
-										if strings.TrimSpace(ef) == fmt.Sprint(enumVal) {
+										if strings.TrimSpace(ef) == fmt.Sprint(enumVal.Value) {
 											matchFound = true
 											break
 										}
@@ -134,7 +134,7 @@ doneLooking:
 								if sch.Enum != nil {
 									matchFound := false
 									for _, enumVal := range sch.Enum {
-										if strings.TrimSpace(ef) == fmt.Sprint(enumVal) {
+										if strings.TrimSpace(ef) == fmt.Sprint(enumVal.Value) {
 											matchFound = true
 											break
 										}

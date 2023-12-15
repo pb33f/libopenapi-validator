@@ -130,7 +130,7 @@ func ValidateQueryArray(
 			if itemsSch.Enum != nil {
 				matchFound := false
 				for _, enumVal := range itemsSch.Enum {
-					if strings.TrimSpace(enumCheck) == fmt.Sprint(enumVal) {
+					if strings.TrimSpace(enumCheck) == fmt.Sprint(enumVal.Value) {
 						matchFound = true
 						break
 					}

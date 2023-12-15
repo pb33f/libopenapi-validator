@@ -59,7 +59,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 						if sch.Enum != nil {
 							matchFound := false
 							for _, enumVal := range sch.Enum {
-								if strings.TrimSpace(param) == fmt.Sprint(enumVal) {
+								if strings.TrimSpace(param) == fmt.Sprint(enumVal.Value) {
 									matchFound = true
 									break
 								}
@@ -123,7 +123,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 						if sch.Enum != nil {
 							matchFound := false
 							for _, enumVal := range sch.Enum {
-								if strings.TrimSpace(param) == fmt.Sprint(enumVal) {
+								if strings.TrimSpace(param) == fmt.Sprint(enumVal.Value) {
 									matchFound = true
 									break
 								}
