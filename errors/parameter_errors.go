@@ -115,7 +115,7 @@ func HeaderParameterCannotBeDecoded(param *v3.Parameter, val string) *Validation
 func IncorrectHeaderParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
 	var enums []string
 	for i := range sch.Enum {
-		enums = append(enums, fmt.Sprint(sch.Enum[i]))
+		enums = append(enums, fmt.Sprint(sch.Enum[i].Value))
 	}
 	validEnums := strings.Join(enums, ", ")
 	return &ValidationError{
@@ -236,7 +236,7 @@ func InvalidQueryParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *
 func IncorrectQueryParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
 	var enums []string
 	for i := range sch.Enum {
-		enums = append(enums, fmt.Sprint(sch.Enum[i]))
+		enums = append(enums, fmt.Sprint(sch.Enum[i].Value))
 	}
 	validEnums := strings.Join(enums, ", ")
 	return &ValidationError{
@@ -257,7 +257,7 @@ func IncorrectQueryParamEnumArray(param *v3.Parameter, ef string, sch *base.Sche
 	// look at that model fly!
 	for i := range param.GoLow().Schema.Value.Schema().Items.Value.A.Schema().Enum.Value {
 		enums = append(enums,
-			fmt.Sprint(param.GoLow().Schema.Value.Schema().Items.Value.A.Schema().Enum.Value[i].Value))
+			fmt.Sprint(param.GoLow().Schema.Value.Schema().Items.Value.A.Schema().Enum.Value[i].Value.Value))
 	}
 	validEnums := strings.Join(enums, ", ")
 	return &ValidationError{
@@ -346,7 +346,7 @@ func IncorrectCookieParamBool(param *v3.Parameter, ef string, sch *base.Schema) 
 func IncorrectCookieParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
 	var enums []string
 	for i := range sch.Enum {
-		enums = append(enums, fmt.Sprint(sch.Enum[i]))
+		enums = append(enums, fmt.Sprint(sch.Enum[i].Value))
 	}
 	validEnums := strings.Join(enums, ", ")
 	return &ValidationError{
@@ -409,7 +409,7 @@ func IncorrectPathParamBool(param *v3.Parameter, item string, sch *base.Schema) 
 func IncorrectPathParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
 	var enums []string
 	for i := range sch.Enum {
-		enums = append(enums, fmt.Sprint(sch.Enum[i]))
+		enums = append(enums, fmt.Sprint(sch.Enum[i].Value))
 	}
 	validEnums := strings.Join(enums, ", ")
 	return &ValidationError{

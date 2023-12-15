@@ -56,7 +56,7 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
 							if sch.Enum != nil {
 								matchFound := false
 								for _, enumVal := range sch.Enum {
-									if strings.TrimSpace(cookie.Value) == fmt.Sprint(enumVal) {
+									if strings.TrimSpace(cookie.Value) == fmt.Sprint(enumVal.Value) {
 										matchFound = true
 										break
 									}
@@ -105,7 +105,7 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
 							if sch.Enum != nil {
 								matchFound := false
 								for _, enumVal := range sch.Enum {
-									if strings.TrimSpace(cookie.Value) == fmt.Sprint(enumVal) {
+									if strings.TrimSpace(cookie.Value) == fmt.Sprint(enumVal.Value) {
 										matchFound = true
 										break
 									}

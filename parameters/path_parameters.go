@@ -85,7 +85,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 					enumCheck := func(paramValue string) {
 						matchFound := false
 						for _, enumVal := range sch.Enum {
-							if strings.TrimSpace(paramValue) == fmt.Sprint(enumVal) {
+							if strings.TrimSpace(paramValue) == fmt.Sprint(enumVal.Value) {
 								matchFound = true
 								break
 							}
