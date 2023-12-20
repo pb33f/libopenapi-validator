@@ -48,11 +48,12 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 type schemaValidator struct {
 	logger *slog.Logger
+	lock   sync.Mutex
 }
 
 // NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
 func NewSchemaValidatorWithLogger(logger *slog.Logger) SchemaValidator {
-	return &schemaValidator{logger: logger}
+	return &schemaValidator{logger: logger, lock: sync.Mutex{}}
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
@@ -64,20 +65,18 @@ func NewSchemaValidator() SchemaValidator {
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError) {
-	return validateSchema(schema, []byte(payload), nil, s.logger)
+	return s.validateSchema(schema, []byte(payload), nil, s.logger)
 }
 
 func (s *schemaValidator) ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*liberrors.ValidationError) {
-	return validateSchema(schema, nil, payload, s.logger)
+	return s.validateSchema(schema, nil, payload, s.logger)
 }
 
 func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*liberrors.ValidationError) {
-	return validateSchema(schema, payload, nil, s.logger)
+	return s.validateSchema(schema, payload, nil, s.logger)
 }
 
-var renderLock = &sync.Mutex{}
-
-func validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *slog.Logger) (bool, []*liberrors.ValidationError) {
+func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *slog.Logger) (bool, []*liberrors.ValidationError) {
 
 	var validationErrors []*liberrors.ValidationError
 
@@ -87,20 +86,14 @@ func validateSchema(schema *base.Schema, payload []byte, decodedObject interface
 	}
 
 	// extract index of schema, and check the version
-	schemaIndex := schema.GoLow().Index
+	//schemaIndex := schema.GoLow().Index
 	var renderedSchema []byte
 
 	// render the schema, to be used for validation, stop this from running concurrently, mutations are made to state
 	// and, it will cause async issues.
-	renderLock.Lock()
-
-	//version := float32(0.0)
-	if schemaIndex != nil {
-		//version = schemaIndex.GetConfig().SpecInfo.VersionNumeric
-
-	}
+	s.lock.Lock()
 	renderedSchema, _ = schema.RenderInline()
-	renderLock.Unlock()
+	s.lock.Unlock()
 
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
