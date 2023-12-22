@@ -64,11 +64,11 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 	hash := mediaType.GoLow().Schema.Value.Hash()
 
 	// perform work only once and cache the result in the validator.
-	if cacheHit, ch := v.schemaCache[hash]; ch {
+	if cacheHit, ch := v.schemaCache.Load(hash); ch {
 		// got a hit, use cached values
-		schema = cacheHit.schema
-		renderedInline = cacheHit.renderedInline
-		renderedJSON = cacheHit.renderedJSON
+		schema = cacheHit.(*schemaCache).schema
+		renderedInline = cacheHit.(*schemaCache).renderedInline
+		renderedJSON = cacheHit.(*schemaCache).renderedJSON
 
 	} else {
 
@@ -77,11 +77,11 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 		schema = mediaType.Schema.Schema()
 		renderedInline, _ = schema.RenderInline()
 		renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-		v.schemaCache[hash] = &schemaCache{
+		v.schemaCache.Store(hash, &schemaCache{
 			schema:         schema,
 			renderedInline: renderedInline,
 			renderedJSON:   renderedJSON,
-		}
+		})
 	}
 
 	// render the schema, to be used for validation
