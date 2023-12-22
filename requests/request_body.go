@@ -8,6 +8,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
+	"sync"
 )
 
 // RequestBodyValidator is an interface that defines the methods for validating request bodies for Operations.
@@ -29,7 +30,7 @@ type RequestBodyValidator interface {
 
 // NewRequestBodyValidator will create a new RequestBodyValidator from an OpenAPI 3+ document
 func NewRequestBodyValidator(document *v3.Document) RequestBodyValidator {
-	return &requestBodyValidator{document: document, schemaCache: make(map[[32]byte]*schemaCache)}
+	return &requestBodyValidator{document: document, schemaCache: &sync.Map{}}
 }
 
 func (v *requestBodyValidator) SetPathItem(path *v3.PathItem, pathValue string) {
@@ -48,5 +49,5 @@ type requestBodyValidator struct {
 	pathItem    *v3.PathItem
 	pathValue   string
 	errors      []*errors.ValidationError
-	schemaCache map[[32]byte]*schemaCache
+	schemaCache *sync.Map
 }
