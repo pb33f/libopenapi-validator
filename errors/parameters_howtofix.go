@@ -25,4 +25,5 @@ const (
 	HowToFixInvalidEncoding            = "Ensure the correct encoding has been used on the object"
 	HowToFixMissingValue               = "Ensure the value has been set"
 	HowToFixPath                       = "Check the path is correct, and check that the correct HTTP method has been used (e.g. GET, POST, PUT, DELETE)"
+	HowToFixPathMethod                 = "Add the missing operation to the contract for the path"
 )

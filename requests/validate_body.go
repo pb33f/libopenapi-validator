@@ -28,6 +28,9 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 	}
 
 	operation := helpers.ExtractOperation(request, pathItem)
+	if operation == nil {
+		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method)}
+	}
 	if operation.RequestBody == nil {
 		return true, nil
 	}
