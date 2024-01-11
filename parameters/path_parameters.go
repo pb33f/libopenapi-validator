@@ -75,8 +75,17 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 						continue
 					}
 
+					paramValue := ""
+
 					// extract the parameter value from the path.
-					paramValue := submittedSegments[x]
+					if len(submittedSegments) < x {
+						paramValue = submittedSegments[x]
+					}
+
+					if paramValue == "" {
+						// TODO: check path match issue.
+						continue
+					}
 
 					// extract the schema from the parameter
 					sch := p.Schema.Schema()

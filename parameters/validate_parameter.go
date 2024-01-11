@@ -72,7 +72,17 @@ func ValidateParameterSchema(
 	// 4. validate the object against the schema
 	var scErrs error
 	if validEncoding {
-		scErrs = jsch.Validate(decodedObj)
+		p := decodedObj
+		if rawIsMap {
+			if g, ko := rawObject.(map[string]interface{}); ko {
+				if len(g) == 0 {
+					p = nil
+				}
+			}
+		}
+		if p != nil {
+			scErrs = jsch.Validate(p)
+		}
 	}
 	if scErrs != nil {
 		jk := scErrs.(*jsonschema.ValidationError)

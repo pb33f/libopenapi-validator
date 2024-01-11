@@ -267,20 +267,23 @@ func comparePaths(mapped, requested []string,
 			if params[p].In == helpers.Path {
 				h := seg[1 : len(seg)-1]
 				if params[p].Name == h {
-					schema := params[p].Schema.Schema()
-					for t := range schema.Type {
-						switch schema.Type[t] {
-						case helpers.String, helpers.Object, helpers.Array:
-							// should not be a number.
-							if _, err := strconv.ParseFloat(s, 64); err == nil {
-								s = helpers.FailSegment
+					if params[p].Schema != nil {
+						// check if the param is a number or not
+						schema := params[p].Schema.Schema()
+						for t := range schema.Type {
+							switch schema.Type[t] {
+							case helpers.String, helpers.Object, helpers.Array:
+								// should not be a number.
+								if _, err := strconv.ParseFloat(s, 64); err == nil {
+									s = helpers.FailSegment
+								}
+							case helpers.Number, helpers.Integer:
+								// should not be a string.
+								if _, err := strconv.ParseFloat(s, 64); err != nil {
+									s = helpers.FailSegment
+								}
+								// TODO: check for encoded objects and arrays (yikes)
 							}
-						case helpers.Number, helpers.Integer:
-							// should not be a string.
-							if _, err := strconv.ParseFloat(s, 64); err != nil {
-								s = helpers.FailSegment
-							}
-							// TODO: check for encoded objects and arrays (yikes)
 						}
 					}
 				}

@@ -32,3 +32,17 @@ func RequestContentTypeNotFound(op *v3.Operation, request *http.Request) *Valida
 		HowToFix: fmt.Sprintf(HowToFixInvalidContentType, orderedmap.Len(op.RequestBody.Content), strings.Join(ctypes, ", ")),
 	}
 }
+
+func OperationNotFound(pathItem *v3.PathItem, request *http.Request, method string) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.RequestValidation,
+		ValidationSubType: helpers.RequestMissingOperation,
+		Message: fmt.Sprintf("%s operation request content type '%s' does not exist",
+			request.Method, method),
+		Reason:   fmt.Sprintf("The path was found, but there was no '%s' method found in the spec", request.Method),
+		SpecLine: pathItem.GoLow().KeyNode.Line,
+		SpecCol:  pathItem.GoLow().KeyNode.Column,
+		Context:  pathItem,
+		HowToFix: HowToFixPathMethod,
+	}
+}

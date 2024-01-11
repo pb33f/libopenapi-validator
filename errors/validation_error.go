@@ -39,6 +39,9 @@ type SchemaValidationFailure struct {
 	// ReferenceObject is the object that was referenced in the validation failure.
 	ReferenceObject string `json:"referenceObject,omitempty" yaml:"referenceObject,omitempty"`
 
+	// ReferenceExample is an example object generated from the schema that was referenced in the validation failure.
+	ReferenceExample string `json:"referenceExample,omitempty" yaml:"referenceExample,omitempty"`
+
 	// The original error object, which is a jsonschema.ValidationError object.
 	OriginalError *jsonschema.ValidationError `json:"-" yaml:"-"`
 }
