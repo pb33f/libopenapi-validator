@@ -46,7 +46,7 @@ func (v *responseBodyValidator) ValidateResponseBody(
 
 	// check if the response code is in the contract
 	foundResponse := operation.Responses.FindResponseByCode(httpCode)
-	if foundResponse != nil {
+	if foundResponse != nil && foundResponse.Content != nil {
 		// check content type has been defined in the contract
 		if mediaType, ok := foundResponse.Content.Get(mediaTypeSting); ok {
 			validationErrors = append(validationErrors,
@@ -64,7 +64,7 @@ func (v *responseBodyValidator) ValidateResponseBody(
 		}
 	} else {
 		// no code match, check for default response
-		if operation.Responses.Default != nil {
+		if operation.Responses.Default != nil && operation.Responses.Default.Content != nil {
 			// check content type has been defined in the contract
 			if mediaType, ok := operation.Responses.Default.Content.Get(mediaTypeSting); ok {
 				validationErrors = append(validationErrors,
