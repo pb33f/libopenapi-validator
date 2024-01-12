@@ -78,7 +78,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 					paramValue := ""
 
 					// extract the parameter value from the path.
-					if len(submittedSegments) < x {
+					if x < len(submittedSegments) {
 						paramValue = submittedSegments[x]
 					}
 
