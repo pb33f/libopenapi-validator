@@ -37,7 +37,51 @@ func ValidateResponseSchema(
 
 	var validationErrors []*errors.ValidationError
 
-	responseBody, _ := io.ReadAll(response.Body)
+	if response == nil {
+		// cannot decode the response body, so it's not valid
+		violation := &errors.SchemaValidationFailure{
+			Reason:          "response is empty",
+			Location:        "unavailable",
+			ReferenceSchema: string(renderedSchema),
+		}
+		validationErrors = append(validationErrors, &errors.ValidationError{
+			ValidationType:    "response",
+			ValidationSubType: "object",
+			Message: fmt.Sprintf("%s response object is missing for '%s'",
+				request.Method, request.URL.Path),
+			Reason:                 fmt.Sprintf("The response object is completely missing"),
+			SpecLine:               1,
+			SpecCol:                0,
+			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+			HowToFix:               "ensure response object has been set",
+			Context:                string(renderedSchema), // attach the rendered schema to the error
+		})
+		return false, validationErrors
+	}
+
+	responseBody, ioErr := io.ReadAll(response.Body)
+	if ioErr != nil {
+		// cannot decode the response body, so it's not valid
+		violation := &errors.SchemaValidationFailure{
+			Reason:          ioErr.Error(),
+			Location:        "unavailable",
+			ReferenceSchema: string(renderedSchema),
+			ReferenceObject: string(responseBody),
+		}
+		validationErrors = append(validationErrors, &errors.ValidationError{
+			ValidationType:    helpers.ResponseBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message: fmt.Sprintf("%s response body for '%s' cannot be read, it's empty or malformed",
+				request.Method, request.URL.Path),
+			Reason:                 fmt.Sprintf("The response body cannot be decoded: %s", ioErr.Error()),
+			SpecLine:               1,
+			SpecCol:                0,
+			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+			HowToFix:               "ensure body is not empty",
+			Context:                string(renderedSchema), // attach the rendered schema to the error
+		})
+		return false, validationErrors
+	}
 
 	// close the request body, so it can be re-read later by another player in the chain
 	_ = response.Body.Close()
