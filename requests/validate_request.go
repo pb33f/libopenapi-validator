@@ -42,7 +42,7 @@ func ValidateRequestSchema(
 		request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 
 	}
-	
+
 	var decodedObj interface{}
 
 	if len(requestBody) > 0 {
