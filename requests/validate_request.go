@@ -23,7 +23,7 @@ import (
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
-// ValidateRequestSchema will validate an http.Request pointer against a schema.
+// ValidateRequestSchema will validate a http.Request pointer against a schema.
 // If validation fails, it will return a list of validation errors as the second return value.
 func ValidateRequestSchema(
 	request *http.Request,
