@@ -44,6 +44,7 @@ const (
 	JSONContentType           = "application/json"
 	JSONType                  = "json"
 	ContentTypeHeader         = "Content-Type"
+	AuthorizationHeader       = "Authorization"
 	Charset                   = "charset"
 	Boundary                  = "boundary"
 	Preferred                 = "preferred"
