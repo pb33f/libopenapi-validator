@@ -601,3 +601,33 @@ paths:
 
 	assert.Len(t, errs, 1)
 }
+
+func TestNewValidator_FindPathWithFragment(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /hashy#one:
+    post:
+      operationId: one
+  /hashy#two:
+    post:
+      operationId: two
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/hashy#one", nil)
+
+	pathItem, errs, _ := FindPath(request, &m.Model)
+	assert.Len(t, errs, 0)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Post.OperationId)
+
+	request, _ = http.NewRequest(http.MethodPost, "https://things.com/hashy#two", nil)
+	pathItem, errs, _ = FindPath(request, &m.Model)
+	assert.Len(t, errs, 0)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "two", pathItem.Post.OperationId)
+
+}

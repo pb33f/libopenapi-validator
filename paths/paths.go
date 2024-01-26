@@ -36,6 +36,9 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
 
 	// strip any base path
 	stripped := stripBaseFromPath(request.URL.Path, basePaths)
+	if request.URL.Fragment != "" {
+		stripped = fmt.Sprintf("%s#%s", stripped, request.URL.Fragment)
+	}
 
 	reqPathSegments := strings.Split(stripped, "/")
 	if reqPathSegments[0] == "" {
@@ -48,6 +51,15 @@ pathFound:
 	for pair := orderedmap.First(document.Paths.PathItems); pair != nil; pair = pair.Next() {
 		path := pair.Key()
 		pathItem := pair.Value()
+
+		// if the stripped path has a fragment, then use that as part of the lookup
+		// if not, then strip off any fragments from the pathItem
+		if !strings.Contains(stripped, "#") {
+			if strings.Contains(path, "#") {
+				path = strings.Split(path, "#")[0]
+			}
+		}
+
 		segs := strings.Split(path, "/")
 		if segs[0] == "" {
 			segs = segs[1:]
@@ -256,11 +268,8 @@ func comparePaths(mapped, requested []string,
 	var imploded []string
 	for i, seg := range mapped {
 		s := seg
-		// sOrig := seg
-		// check for braces
 		if strings.Contains(seg, "{") {
 			s = requested[i]
-			// sOrig = s
 		}
 		// check param against type, check if it's a number or not, and if it validates.
 		for p := range params {
