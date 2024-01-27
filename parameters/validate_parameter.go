@@ -81,7 +81,31 @@ func ValidateParameterSchema(
 			}
 		}
 		if p != nil {
-			scErrs = jsch.Validate(p)
+
+			// check if any of the items have an empty key
+			skip := false
+			if rawIsMap {
+				for k := range p.(map[string]interface{}) {
+					if k == "" {
+						validationErrors = append(validationErrors, &errors.ValidationError{
+							ValidationType:    validationType,
+							ValidationSubType: subValType,
+							Message:           fmt.Sprintf("%s '%s' failed to validate", entity, name),
+							Reason: fmt.Sprintf("%s '%s' is defined as an object, "+
+								"however it failed to pass a schema validation", reasonEntity, name),
+							SpecLine:               schema.GoLow().Type.KeyNode.Line,
+							SpecCol:                schema.GoLow().Type.KeyNode.Column,
+							SchemaValidationErrors: nil,
+							HowToFix:               errors.HowToFixInvalidSchema,
+						})
+						skip = true
+						break
+					}
+				}
+			}
+			if !skip {
+				scErrs = jsch.Validate(p)
+			}
 		}
 	}
 	if scErrs != nil {
