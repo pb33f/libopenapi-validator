@@ -46,20 +46,22 @@ func (v *responseBodyValidator) ValidateResponseBody(
 
 	// check if the response code is in the contract
 	foundResponse := operation.Responses.FindResponseByCode(httpCode)
-	if foundResponse != nil && foundResponse.Content != nil {
-		// check content type has been defined in the contract
-		if mediaType, ok := foundResponse.Content.Get(mediaTypeSting); ok {
-			validationErrors = append(validationErrors,
-				v.checkResponseSchema(request, response, mediaTypeSting, mediaType)...)
-		} else {
-			// check that the operation *actually* returns a body. (i.e. a 204 response)
-			if foundResponse.Content != nil && orderedmap.Len(foundResponse.Content) > 0 {
-
-				// content type not found in the contract
-				codeStr := strconv.Itoa(httpCode)
+	if foundResponse != nil {
+		if foundResponse.Content != nil { // only validate if we have content types.
+			// check content type has been defined in the contract
+			if mediaType, ok := foundResponse.Content.Get(mediaTypeSting); ok {
 				validationErrors = append(validationErrors,
-					errors.ResponseContentTypeNotFound(operation, request, response, codeStr, false))
+					v.checkResponseSchema(request, response, mediaTypeSting, mediaType)...)
+			} else {
+				// check that the operation *actually* returns a body. (i.e. a 204 response)
+				if foundResponse.Content != nil && orderedmap.Len(foundResponse.Content) > 0 {
 
+					// content type not found in the contract
+					codeStr := strconv.Itoa(httpCode)
+					validationErrors = append(validationErrors,
+						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, false))
+
+				}
 			}
 		}
 	} else {
