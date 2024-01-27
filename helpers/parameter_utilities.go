@@ -8,6 +8,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -121,16 +122,55 @@ func cast(v string) any {
 
 // ConstructParamMapFromDeepObjectEncoding will construct a map from the query parameters that are encoded as
 // deep objects. It's kind of a crazy way to do things, but hey, each to their own.
-func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam) map[string]interface{} {
+func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam, sch *base.Schema) map[string]interface{} {
 	// deepObject encoding is a technique used to encode objects into query parameters. Kinda nuts.
 	decoded := make(map[string]interface{})
 	for _, v := range values {
 		if decoded[v.Key] == nil {
+
 			props := make(map[string]interface{})
-			props[v.Property] = cast(v.Values[0])
+			rawValues := make([]interface{}, len(v.Values))
+			for i := range v.Values {
+				rawValues[i] = cast(v.Values[i])
+			}
+			// check if the schema for the param is an array
+			if sch != nil && slices.Contains(sch.Type, Array) {
+				props[v.Property] = rawValues
+			}
+			// check if schema has additional properties defined as an array
+			if sch != nil && sch.AdditionalProperties != nil &&
+				sch.AdditionalProperties.IsA() &&
+				slices.Contains(sch.AdditionalProperties.A.Schema().Type, Array) {
+				props[v.Property] = rawValues
+			}
+
+			if len(props) == 0 {
+				props[v.Property] = cast(v.Values[0])
+			}
 			decoded[v.Key] = props
 		} else {
-			decoded[v.Key].(map[string]interface{})[v.Property] = cast(v.Values[0])
+
+			added := false
+			rawValues := make([]interface{}, len(v.Values))
+			for i := range v.Values {
+				rawValues[i] = cast(v.Values[i])
+			}
+			// check if the schema for the param is an array
+			if sch != nil && slices.Contains(sch.Type, Array) {
+				decoded[v.Key].(map[string]interface{})[v.Property] = rawValues
+				added = true
+			}
+			// check if schema has additional properties defined as an array
+			if sch != nil && sch.AdditionalProperties != nil &&
+				sch.AdditionalProperties.IsA() &&
+				slices.Contains(sch.AdditionalProperties.A.Schema().Type, Array) {
+				decoded[v.Key].(map[string]interface{})[v.Property] = rawValues
+				added = true
+			}
+			if !added {
+				decoded[v.Key].(map[string]interface{})[v.Property] = cast(v.Values[0])
+			}
+
 		}
 	}
 	return decoded

@@ -9,6 +9,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -192,6 +193,22 @@ stopValidation:
 		for i := range qp.Values {
 			switch param.Style {
 			case helpers.DeepObject:
+				// check if the object has additional properties defined that treat this as an array
+				if param.Schema != nil {
+					pSchema := param.Schema.Schema()
+					if slices.Contains(pSchema.Type, helpers.Array) {
+						continue
+					}
+					if pSchema.AdditionalProperties != nil && pSchema.AdditionalProperties.IsA() {
+						addPropSchema := pSchema.AdditionalProperties.A.Schema()
+						if addPropSchema.Type != nil && len(addPropSchema.Type) > 0 {
+							if slices.Contains(addPropSchema.Type, helpers.Array) {
+								// an array can have more than one value.
+								continue
+							}
+						}
+					}
+				}
 				if len(qp.Values) > 1 {
 					validationErrors = append(validationErrors, errors.InvalidDeepObject(param, qp))
 					break stopValidation
