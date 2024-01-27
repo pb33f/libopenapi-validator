@@ -158,7 +158,7 @@ doneLooking:
 
 								switch params[p].Style {
 								case helpers.DeepObject:
-									encodedObj = helpers.ConstructParamMapFromDeepObjectEncoding(jk)
+									encodedObj = helpers.ConstructParamMapFromDeepObjectEncoding(jk, sch)
 								case helpers.PipeDelimited:
 									encodedObj = helpers.ConstructParamMapFromPipeEncoding(jk)
 								case helpers.SpaceDelimited:

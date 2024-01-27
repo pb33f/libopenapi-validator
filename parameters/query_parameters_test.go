@@ -2342,3 +2342,112 @@ paths:
 	assert.Equal(t, "lemons 'pizza' is defined as an object, "+
 		"however it failed to be decoded as an object", errs[0].Reason)
 }
+
+// https://github.com/pb33f/wiretap/issues/82
+func TestNewValidator_QueryParamValidateStyle_DeepObjectAdditionalPropertiesArray(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /anything/queryParams/deepObject/map:
+    get:
+      operationId: deepObjectQueryParamsMap
+      parameters:
+        - name: mapArrParam
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+            example: { "test": ["test", "test2"], "test2": ["test3", "test4"] }
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/anything/queryParams/deepObject/map?mapArrParam[test2]=test3&mapArrParam[test2]=test4&mapArrParam[test]=test&mapArrParam[test]=test2", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+
+	assert.Len(t, errors, 0)
+}
+
+// https://github.com/pb33f/wiretap/issues/82
+func TestNewValidator_QueryParamValidateStyle_DeepObjectAdditionalPropertiesArrayTop(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /anything/queryParams/deepObject/map:
+    get:
+      operationId: deepObjectQueryParamsMap
+      parameters:
+        - name: mapArrParam
+          in: query
+          style: deepObject
+          schema:
+            type: array
+            items:
+              type: string
+            example: { "test": ["test", "test2"], "test2": ["test3", "test4"] }
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/anything/queryParams/deepObject/map?mapArrParam[test2]=test3&mapArrParam[test2]=test4&mapArrParam[test]=test&mapArrParam[test]=test2", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+
+	assert.Len(t, errors, 0)
+}
+
+// https://github.com/pb33f/wiretap/issues/82
+func TestNewValidator_QueryParamValidateStyle_DeepObjectAdditionalPropertiesArray_Fail(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /anything/queryParams/deepObject/map:
+    get:
+      operationId: deepObjectQueryParamsMap
+      parameters:
+        - name: mapArrParam
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: string
+            example: { "test": ["test", "test2"], "test2": ["test3", "test4"] }
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/anything/queryParams/deepObject/map?mapArrParam[test2]=23&mapArrParam[test2]=test4&mapArrParam[test]=test&mapArrParam[test]=test2", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "expected string, but got number", errors[0].SchemaValidationErrors[0].Reason)
+}
