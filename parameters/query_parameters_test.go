@@ -1827,7 +1827,7 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.False(t, valid)
 
-	assert.Len(t, errors, 1)
+	assert.Len(t, errors, 2)
 	assert.Equal(t, "The query parameter 'fishy' has the 'deepObject' style defined, "+
 		"There are multiple values (2) supplied, instead of a single value", errors[0].Reason)
 }
@@ -2450,4 +2450,99 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "expected string, but got number", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+// https://github.com/pb33f/wiretap/issues/83
+func TestNewValidator_QueryParamValidateStyle_BadSchemaDeepObject(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 0.1.0
+security:
+  - apiKeyAuth: []
+paths:
+  /anything/queryParams/deepObject/obj:
+    get:
+      operationId: deepObjectQueryParamsObject
+      parameters:
+        - name: objParam
+          in: query
+          style: deepObject
+          schema:
+            $ref: "components.yaml#/components/schemas/simpleObject"
+          required: true
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Authenticate using an API Key generated via our platform.`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, err := doc.BuildV3Model()
+	assert.Len(t, err, 1) // path build will fail because of missing schema.
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"http://localhost:9090/anything/queryParams/deepObject/obj?objParam=blahdedahdedah", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+// https://github.com/pb33f/wiretap/issues/83
+func TestNewValidator_QueryParamValidateStyle_BadSchemaDeepObject_Inline(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 0.1.0
+security:
+  - apiKeyAuth: []
+paths:
+  /anything/queryParams/deepObject/obj:
+    get:
+      operationId: deepObjectQueryParamsObject
+      parameters:
+        - name: objParam
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              cake:
+                type: string
+          required: true
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Authenticate using an API Key generated via our platform.`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, err := doc.BuildV3Model()
+	assert.Len(t, err, 0) //no patch build here
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"http://localhost:9090/anything/queryParams/deepObject/obj?objParam=blahdedahdedah", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "The query parameter 'objParam' is defined as an object,"+
+		" however it failed to pass a schema validation", errors[0].Reason)
 }
