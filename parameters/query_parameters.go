@@ -108,43 +108,15 @@ doneLooking:
 							switch ty {
 
 							case helpers.String:
-
-								// check if the param is within an enum
-								if sch.Enum != nil {
-									matchFound := false
-									for _, enumVal := range sch.Enum {
-										if strings.TrimSpace(ef) == fmt.Sprint(enumVal.Value) {
-											matchFound = true
-											break
-										}
-									}
-									if !matchFound {
-										validationErrors = append(validationErrors,
-											errors.IncorrectQueryParamEnum(params[p], ef, sch))
-									}
-								}
-
+								validationErrors = v.validateSimpleParam(sch, ef, ef, params[p])
 							case helpers.Integer, helpers.Number:
-								if _, err := strconv.ParseFloat(ef, 64); err != nil {
+								efF, err := strconv.ParseFloat(ef, 64)
+								if err != nil {
 									validationErrors = append(validationErrors,
 										errors.InvalidQueryParamNumber(params[p], ef, sch))
 									break
 								}
-								// check if the param is within an enum
-								if sch.Enum != nil {
-									matchFound := false
-									for _, enumVal := range sch.Enum {
-										if strings.TrimSpace(ef) == fmt.Sprint(enumVal.Value) {
-											matchFound = true
-											break
-										}
-									}
-									if !matchFound {
-										validationErrors = append(validationErrors,
-											errors.IncorrectQueryParamEnum(params[p], ef, sch))
-									}
-								}
-
+								validationErrors = v.validateSimpleParam(sch, ef, efF, params[p])
 							case helpers.Boolean:
 								if _, err := strconv.ParseBool(ef); err != nil {
 									validationErrors = append(validationErrors,
@@ -244,4 +216,30 @@ doneLooking:
 		return false, validationErrors
 	}
 	return true, nil
+}
+
+func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, parsedParam any, parameter *v3.Parameter) (validationErrors []*errors.ValidationError) {
+	// check if the param is within an enum
+	if sch.Enum != nil {
+		matchFound := false
+		for _, enumVal := range sch.Enum {
+			if strings.TrimSpace(rawParam) == fmt.Sprint(enumVal.Value) {
+				matchFound = true
+				break
+			}
+		}
+		if !matchFound {
+			return []*errors.ValidationError{errors.IncorrectQueryParamEnum(parameter, rawParam, sch)}
+		}
+	}
+
+	return ValidateSingleParameterSchema(
+		sch,
+		parsedParam,
+		"Query parameter",
+		"The query parameter",
+		parameter.Name,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationQuery,
+	)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewValidator_QueryParamMissing(t *testing.T) {
@@ -66,6 +67,36 @@ paths:
 	assert.True(t, valid)
 
 	assert.Nil(t, errors)
+}
+
+func TestNewValidator_QueryParamMinimum(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 4
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.Len(t, errs, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+	assert.Equal(t, "Query parameter 'fishy' failed to validate", errors[0].Message)
 }
 
 func TestNewValidator_QueryParamPost(t *testing.T) {
@@ -346,6 +377,36 @@ paths:
 	assert.True(t, valid)
 
 	assert.Nil(t, errors)
+}
+
+func TestNewValidator_QueryParamMinimumNumber(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: 200
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.Len(t, errs, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=123", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+	assert.Equal(t, "Query parameter 'fishy' failed to validate", errors[0].Message)
 }
 
 func TestNewValidator_QueryParamValidTypeFloat(t *testing.T) {
@@ -2533,7 +2594,7 @@ components:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 0) //no patch build here
+	assert.Len(t, err, 0) // no patch build here
 
 	v := NewParameterValidator(&m.Model)
 
