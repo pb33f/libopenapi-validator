@@ -6,11 +6,12 @@ package validator
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"net/http"
 	"net/http/httptest"
 	"os"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func ExampleNewValidator_validateDocument() {
@@ -83,7 +84,8 @@ func ExampleNewValidator_validateHttpRequest() {
 			fmt.Printf("Type: %s, Failure: %s\n", e.ValidationType, e.Message)
 		}
 	}
-	// Output: Type: path, Failure: GET Path '/pet/NotAValidPetId' not found
+	// Output: Type: security, Failure: API Key api_key not found in header
+	// Type: parameter, Failure: Path parameter 'petId' is not a valid number
 }
 
 func ExampleNewValidator_validateHttpRequestResponse() {

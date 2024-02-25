@@ -6,13 +6,14 @@ package validator
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewValidator(t *testing.T) {
@@ -764,8 +765,9 @@ func TestNewValidator_PetStore_PetGet200_PathNotFound(t *testing.T) {
 	valid, errors := v.ValidateHttpRequestResponse(request, res.Result())
 
 	assert.False(t, valid)
-	assert.Len(t, errors, 1)
-	assert.Equal(t, "GET Path '/pet/IamNotANumber' not found", errors[0].Message)
+	assert.Len(t, errors, 2)
+	assert.Equal(t, "API Key api_key not found in header", errors[0].Message)
+	assert.Equal(t, "Path parameter 'petId' is not a valid number", errors[1].Message)
 }
 
 func TestNewValidator_PetStore_PetGet200(t *testing.T) {
@@ -1023,7 +1025,7 @@ func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
 
 	// create a new put request
 	request, _ := http.NewRequest(http.MethodGet,
-		"https://hyperspace-superherbs.com/requests/d4bc1a0c-c4ee-4be5-9281-26b1a041634", nil)
+		"https://hyperspace-superherbs.com/requests/d4bc1a0c-c4ee-4be5-9281-26b1a041634d", nil)
 	request.Header.Set("Content-Type", "application/json")
 
 	// simulate a request/response,
