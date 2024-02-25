@@ -4,11 +4,13 @@
 package parameters
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewValidator_SimpleArrayEncodedPath(t *testing.T) {
@@ -280,7 +282,64 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "GET Path '/burgers/hello/locate' not found", errors[0].Message)
+	assert.Equal(t, "Path parameter 'burgerId' is not a valid number", errors[0].Message)
+}
+
+func TestNewValidator_SimpleEncodedPath_IntegerViolation(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: integer
+          minimum: 10
+    get:
+      operationId: locateBurgers`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/1/locate", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "Reason: must be >= 10 but found 1, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+}
+
+func TestNewValidator_SimpleEncodedPath_Integer(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: integer
+          minimum: 10
+    get:
+      operationId: locateBurgers`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/14/locate", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.True(t, valid)
+	assert.Nil(t, errors)
 }
 
 func TestNewValidator_SimpleEncodedPath_InvalidBoolean(t *testing.T) {
@@ -336,6 +395,37 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' is not a valid number", errors[0].Message)
+}
+
+func TestNewValidator_LabelEncodedPath_IntegerViolation(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{.burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: label
+        schema:
+          type: integer
+          minimum: 10
+    get:
+      operationId: locateBurgers`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/.3/locate", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "Reason: must be >= 10 but found 3, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidBoolean(t *testing.T) {
@@ -682,6 +772,37 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' is not a valid number", errors[0].Message)
+}
+
+func TestNewValidator_MatrixEncodedPath_PrimitiveNumberViolation(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: integer
+          minimum: 5
+    get:
+      operationId: locateBurgers`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=3/locate", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "Reason: must be >= 5 but found 3, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidPrimitiveBoolean(t *testing.T) {
@@ -1073,6 +1194,36 @@ paths:
 	assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
 	assert.Equal(t, "Instead of 'hello', use one of the allowed values: 'bigMac, whopper, mcCrispy'", errors[0].HowToFix)
 
+}
+
+func TestNewValidator_PathParamStringViolation(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        schema:
+          type: string
+          minLength: 4
+    get:
+      operationId: locateBurgers`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/big/locate", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "Reason: length must be >= 4, but got 3, Location: /minLength", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_PathParamIntegerEnumValid(t *testing.T) {

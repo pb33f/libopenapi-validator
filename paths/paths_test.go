@@ -4,11 +4,12 @@
 package paths
 
 import (
-	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewValidator_BadParam(t *testing.T) {
@@ -21,12 +22,8 @@ func TestNewValidator_BadParam(t *testing.T) {
 
 	m, _ := doc.BuildV3Model()
 
-	_, errs, _ := FindPath(request, &m.Model)
-
-	assert.Equal(t, "GET Path '/pet/doggy' not found",
-		errs[0].Message)
-	assert.Equal(t, "The GET request contains a path of '/pet/doggy' however that path, or the GET method for that path does not exist in the specification",
-		errs[0].Reason)
+	pathItem, _, _ := FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
 }
 
 func TestNewValidator_GoodParamFloat(t *testing.T) {
@@ -385,11 +382,12 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/1234", nil)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
 	_, errs, _ := FindPath(request, &m.Model)
 
 	assert.Len(t, errs, 1)
+	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
 }
 
 func TestNewValidator_OptionsMatch_Error(t *testing.T) {
@@ -409,11 +407,12 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodOptions, "https://things.com/pizza/1234", nil)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
 	_, errs, _ := FindPath(request, &m.Model)
 
 	assert.Len(t, errs, 1)
+	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
 }
 
 func TestNewValidator_PatchLiteralMatch(t *testing.T) {
@@ -451,11 +450,12 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/pizza/1234", nil)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
 	_, errs, _ := FindPath(request, &m.Model)
 
 	assert.Len(t, errs, 1)
+	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
 }
 
 func TestNewValidator_DeleteLiteralMatch(t *testing.T) {
@@ -547,11 +547,12 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/pizza/1234", nil)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
 	_, errs, _ := FindPath(request, &m.Model)
 
 	assert.Len(t, errs, 1)
+	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
 }
 
 func TestNewValidator_DeleteMatch_Error(t *testing.T) {
@@ -571,11 +572,12 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pizza/1234", nil)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
 	_, errs, _ := FindPath(request, &m.Model)
 
 	assert.Len(t, errs, 1)
+	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
 }
 
 func TestNewValidator_PostMatch_Error(t *testing.T) {
@@ -595,11 +597,12 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
+	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/1234", nil)
 
 	_, errs, _ := FindPath(request, &m.Model)
 
 	assert.Len(t, errs, 1)
+	assert.Equal(t, "PUT Path '/pizza/1234' not found", errs[0].Message)
 }
 
 func TestNewValidator_FindPathWithFragment(t *testing.T) {

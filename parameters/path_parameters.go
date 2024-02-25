@@ -5,13 +5,15 @@ package parameters
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -41,7 +43,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 			submittedSegments := strings.Split(request.URL.Path, helpers.Slash)
 			pathSegments := strings.Split(foundPath, helpers.Slash)
 
-			//var paramTemplate string
+			// var paramTemplate string
 			for x := range pathSegments {
 				if pathSegments[x] == "" { // skip empty segments
 					continue
@@ -50,13 +52,13 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 				if i > -1 {
 					isMatrix := false
 					isLabel := false
-					//isExplode := false
+					// isExplode := false
 					isSimple := true
 					paramTemplate := pathSegments[x][i+1 : len(pathSegments[x])-1]
 					paramName := paramTemplate
 					// check for an asterisk on the end of the parameter (explode)
 					if strings.HasSuffix(paramTemplate, helpers.Asterisk) {
-						//isExplode = true
+						// isExplode = true
 						paramName = paramTemplate[:len(paramTemplate)-1]
 					}
 					if strings.HasPrefix(paramTemplate, helpers.Period) {
@@ -116,41 +118,40 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 							// check if the param is within the enum
 							if sch.Enum != nil {
 								enumCheck(paramValue)
+								break
 							}
+							validationErrors = append(validationErrors,
+								ValidateSingleParameterSchema(
+									sch,
+									paramValue,
+									"Path parameter",
+									"The path parameter",
+									p.Name,
+									helpers.ParameterValidation,
+									helpers.ParameterValidationPath,
+								)...)
 
 						case helpers.Integer, helpers.Number:
 							// simple use case is already handled in find param.
-							if isLabel && p.Style == helpers.LabelStyle {
-								if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
-									validationErrors = append(validationErrors,
-										errors.IncorrectPathParamNumber(p, paramValue[1:], sch))
-									break
-								}
-								// check if the param is within the enum
-								if sch.Enum != nil {
-									enumCheck(paramValue[1:])
-									break
-								}
-							}
-							if isMatrix && p.Style == helpers.MatrixStyle {
-								// strip off the colon and the parameter name
-								paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-								if _, err := strconv.ParseFloat(paramValue, 64); err != nil {
-									validationErrors = append(validationErrors,
-										errors.IncorrectPathParamNumber(p, paramValue[1:], sch))
-									break
-								}
-								// check if the param is within the enum
-								if sch.Enum != nil {
-									enumCheck(paramValue)
-									break
-								}
+							rawParamValue, paramValueParsed, err := v.resolveNumber(sch, p, isLabel, isMatrix, paramValue)
+							if err != nil {
+								validationErrors = append(validationErrors, err...)
+								break
 							}
 							// check if the param is within the enum
 							if sch.Enum != nil {
-								enumCheck(paramValue)
+								enumCheck(rawParamValue)
 								break
 							}
+							validationErrors = append(validationErrors, ValidateSingleParameterSchema(
+								sch,
+								paramValueParsed,
+								"Path parameter",
+								"The path parameter",
+								p.Name,
+								helpers.ParameterValidation,
+								helpers.ParameterValidationPath,
+							)...)
 
 						case helpers.Boolean:
 							if isLabel && p.Style == helpers.LabelStyle {
@@ -279,4 +280,28 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 		return false, validationErrors
 	}
 	return true, nil
+}
+
+func (v *paramValidator) resolveNumber(sch *base.Schema, p *v3.Parameter, isLabel bool, isMatrix bool, paramValue string) (string, float64, []*errors.ValidationError) {
+	if isLabel && p.Style == helpers.LabelStyle {
+		paramValueParsed, err := strconv.ParseFloat(paramValue[1:], 64)
+		if err != nil {
+			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue[1:], sch)}
+		}
+		return paramValue[1:], paramValueParsed, nil
+	}
+	if isMatrix && p.Style == helpers.MatrixStyle {
+		// strip off the colon and the parameter name
+		paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+		paramValueParsed, err := strconv.ParseFloat(paramValue, 64)
+		if err != nil {
+			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue[1:], sch)}
+		}
+		return paramValue, paramValueParsed, nil
+	}
+	paramValueParsed, err := strconv.ParseFloat(paramValue, 64)
+	if err != nil {
+		return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue[1:], sch)}
+	}
+	return paramValue, paramValueParsed, nil
 }
