@@ -69,7 +69,7 @@ paths:
 	assert.Nil(t, errors)
 }
 
-func TestNewValidator_QueryParamMinimum(t *testing.T) {
+func TestNewValidator_QueryParamMinimum_violation(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -97,6 +97,36 @@ paths:
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
 	assert.Equal(t, "Query parameter 'fishy' failed to validate", errors[0].Message)
+}
+
+func TestNewValidator_QueryParamMinimum(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 4
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.Len(t, errs, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=salmon", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+
+	assert.Nil(t, errors)
 }
 
 func TestNewValidator_QueryParamPost(t *testing.T) {
@@ -380,6 +410,36 @@ paths:
 }
 
 func TestNewValidator_QueryParamMinimumNumber(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: number
+            minimum: 200
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.Len(t, errs, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=300", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+
+	assert.Nil(t, errors)
+}
+
+func TestNewValidator_QueryParamMinimumNumber_violation(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
