@@ -1416,12 +1416,8 @@ paths:
       - name: burger
         in: path
         schema:
-          type: object
-          properties:
-            id:
-               type: integer
-            vegetarian:
-               type: boolean
+          type: string
+          format: uuid
     get:
       operationId: locateBurger`
 
@@ -1431,7 +1427,7 @@ paths:
 
 	v := NewParameterValidator(&m.Model)
 
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/lorem/ipsum/burgers/id,1234,vegetarian,true/locate", nil)
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/lorem/ipsum/burgers/d6d8d513-686c-466f-9f5a-1c051b6b4f3f/locate", nil)
 	valid, errors := v.ValidatePathParams(request)
 
 	assert.True(t, valid)
