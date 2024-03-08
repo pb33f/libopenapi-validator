@@ -33,15 +33,15 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 		foundPath = v.pathValue
 	}
 
+	// split the path into segments
+	submittedSegments := strings.Split(paths.StripRequestPath(request, v.document), helpers.Slash)
+	pathSegments := strings.Split(foundPath, helpers.Slash)
+
 	// extract params for the operation
 	var params = helpers.ExtractParamsForOperation(request, pathItem)
 	var validationErrors []*errors.ValidationError
 	for _, p := range params {
 		if p.In == helpers.Path {
-
-			// split the path into segments
-			submittedSegments := strings.Split(request.URL.Path, helpers.Slash)
-			pathSegments := strings.Split(foundPath, helpers.Slash)
 
 			// var paramTemplate string
 			for x := range pathSegments {

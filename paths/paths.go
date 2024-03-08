@@ -24,20 +24,8 @@ import (
 func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*errors.ValidationError, string) {
 	var validationErrors []*errors.ValidationError
 
-	// extract base path from document to check against paths.
-	var basePaths []string
-	for _, s := range document.Servers {
-		u, _ := url.Parse(s.URL)
-		if u != nil && u.Path != "" {
-			basePaths = append(basePaths, u.Path)
-		}
-	}
-
-	// strip any base path
-	stripped := stripBaseFromPath(request.URL.Path, basePaths)
-	if request.URL.Fragment != "" {
-		stripped = fmt.Sprintf("%s#%s", stripped, request.URL.Fragment)
-	}
+	basePaths := getBasePaths(request, document)
+	stripped := StripRequestPath(request, document)
 
 	reqPathSegments := strings.Split(stripped, "/")
 	if reqPathSegments[0] == "" {
@@ -203,6 +191,32 @@ pathFound:
 	} else {
 		return pItem, validationErrors, foundPath
 	}
+}
+
+func getBasePaths(request *http.Request, document *v3.Document) []string {
+	// extract base path from document to check against paths.
+	var basePaths []string
+	for _, s := range document.Servers {
+		u, _ := url.Parse(s.URL)
+		if u != nil && u.Path != "" {
+			basePaths = append(basePaths, u.Path)
+		}
+	}
+
+	return basePaths
+}
+
+// StripRequestPath strips the base path from the request path, based on the server paths provided in the specification
+func StripRequestPath(request *http.Request, document *v3.Document) string {
+
+	basePaths := getBasePaths(request, document)
+
+	// strip any base path
+	stripped := stripBaseFromPath(request.URL.Path, basePaths)
+	if request.URL.Fragment != "" {
+		stripped = fmt.Sprintf("%s#%s", stripped, request.URL.Fragment)
+	}
+	return stripped
 }
 
 func checkPathAgainstBase(docPath, urlPath string, basePaths []string) bool {
