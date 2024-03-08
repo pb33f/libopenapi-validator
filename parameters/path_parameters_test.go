@@ -1403,3 +1403,37 @@ paths:
 	assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
 	assert.Equal(t, "Instead of '22334', use one of the allowed values: '1, 2, 99, 100'", errors[0].HowToFix)
 }
+
+func TestNewValidator_FillInThis(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+servers:
+  - url: https://api.pb33f.io/lorem/ipsum
+    description: Live production endpoint for general use.
+paths:
+  /burgers/{burger}/locate:
+    parameters:
+      - name: burger
+        in: path
+        schema:
+          type: object
+          properties:
+            id:
+               type: integer
+            vegetarian:
+               type: boolean
+    get:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/lorem/ipsum/burgers/id,1234,vegetarian,true/locate", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
