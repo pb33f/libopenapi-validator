@@ -24,7 +24,7 @@ import (
 func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*errors.ValidationError, string) {
 	var validationErrors []*errors.ValidationError
 
-	basePaths := getBasePaths(request, document)
+	basePaths := getBasePaths(document)
 	stripped := StripRequestPath(request, document)
 
 	reqPathSegments := strings.Split(stripped, "/")
@@ -193,7 +193,7 @@ pathFound:
 	}
 }
 
-func getBasePaths(request *http.Request, document *v3.Document) []string {
+func getBasePaths(document *v3.Document) []string {
 	// extract base path from document to check against paths.
 	var basePaths []string
 	for _, s := range document.Servers {
@@ -209,7 +209,7 @@ func getBasePaths(request *http.Request, document *v3.Document) []string {
 // StripRequestPath strips the base path from the request path, based on the server paths provided in the specification
 func StripRequestPath(request *http.Request, document *v3.Document) string {
 
-	basePaths := getBasePaths(request, document)
+	basePaths := getBasePaths(document)
 
 	// strip any base path
 	stripped := stripBaseFromPath(request.URL.Path, basePaths)
