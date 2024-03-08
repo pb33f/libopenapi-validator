@@ -1404,7 +1404,7 @@ paths:
 	assert.Equal(t, "Instead of '22334', use one of the allowed values: '1, 2, 99, 100'", errors[0].HowToFix)
 }
 
-func TestNewValidator_FillInThis(t *testing.T) {
+func TestNewValidator_ServerPathPrefixInRequestPath(t *testing.T) {
 
 	spec := `openapi: 3.1.0
 servers:
