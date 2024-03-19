@@ -634,3 +634,28 @@ paths:
 	assert.Equal(t, "two", pathItem.Post.OperationId)
 
 }
+
+func TestNewValidator_FindPathMissingWithBaseURLInServer(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+servers:
+  - url: 'https://things.com/'
+paths:
+  /dishy:
+    get:
+      operationId: one
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/not_here", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+	assert.Len(t, errs, 1)
+	assert.Equal(t, "GET Path '/not_here' not found", errs[0].Message)
+
+}
