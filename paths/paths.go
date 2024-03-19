@@ -223,11 +223,11 @@ func checkPathAgainstBase(docPath, urlPath string, basePaths []string) bool {
 	if docPath == urlPath {
 		return true
 	}
-	for i := range basePaths {
-		if basePaths[i][len(basePaths[i])-1] == '/' {
-			basePaths[i] = basePaths[i][:len(basePaths[i])-1]
+	for _, basePath := range basePaths {
+		if basePath[len(basePath)-1] == '/' {
+			basePath = basePath[:len(basePath)-1]
 		}
-		merged := fmt.Sprintf("%s%s", basePaths[i], urlPath)
+		merged := fmt.Sprintf("%s%s", basePath, urlPath)
 		if docPath == merged {
 			return true
 		}
