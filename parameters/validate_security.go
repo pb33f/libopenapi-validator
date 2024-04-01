@@ -41,88 +41,99 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 			secName := pair.Key()
 
 			// look up security from components
+			if v.document.Components == nil || v.document.Components.SecuritySchemes.GetOrZero(secName) == nil {
+				return false, []*errors.ValidationError{
+					{
+						Message: fmt.Sprintf("Security scheme '%s' is missing", secName),
+						Reason: fmt.Sprintf("The security scheme '%s' is defined as being required, "+
+							"however it's missing from the components", secName),
+						ValidationType: "security",
+						SpecLine:       sec.GoLow().Requirements.ValueNode.Line,
+						SpecCol:        sec.GoLow().Requirements.ValueNode.Column,
+						HowToFix:       "Add the missing security scheme to the components",
+					},
+				}
+			}
 			secScheme := v.document.Components.SecuritySchemes.GetOrZero(secName)
-			if secScheme != nil {
-				switch strings.ToLower(secScheme.Type) {
-				case "http":
-					switch strings.ToLower(secScheme.Scheme) {
-					case "basic", "bearer", "digest":
-						// check for an authorization header
-						if request.Header.Get("Authorization") == "" {
-							return false, []*errors.ValidationError{
-								{
-									Message:           fmt.Sprintf("Authorization header for '%s' scheme", secScheme.Scheme),
-									Reason:            "Authorization header was not found",
-									ValidationType:    "security",
-									ValidationSubType: secScheme.Scheme,
-									SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
-									SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
-									HowToFix:          "Add an 'Authorization' header to this request",
-								},
-							}
+			switch strings.ToLower(secScheme.Type) {
+			case "http":
+				switch strings.ToLower(secScheme.Scheme) {
+				case "basic", "bearer", "digest":
+					// check for an authorization header
+					if request.Header.Get("Authorization") == "" {
+						return false, []*errors.ValidationError{
+							{
+								Message:           fmt.Sprintf("Authorization header for '%s' scheme", secScheme.Scheme),
+								Reason:            "Authorization header was not found",
+								ValidationType:    "security",
+								ValidationSubType: secScheme.Scheme,
+								SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
+								SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
+								HowToFix:          "Add an 'Authorization' header to this request",
+							},
 						}
 					}
+				}
 
-				case "apikey":
-					// check if the api key is in the request
-					if secScheme.In == "header" {
-						if request.Header.Get(secScheme.Name) == "" {
-							return false, []*errors.ValidationError{
-								{
-									Message:           fmt.Sprintf("API Key %s not found in header", secScheme.Name),
-									Reason:            "API Key not found in http header for security scheme 'apiKey' with type 'header'",
-									ValidationType:    "security",
-									ValidationSubType: "apiKey",
-									SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
-									SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
-									HowToFix:          fmt.Sprintf("Add the API Key via '%s' as a header of the request", secScheme.Name),
-								},
-							}
+			case "apikey":
+				// check if the api key is in the request
+				if secScheme.In == "header" {
+					if request.Header.Get(secScheme.Name) == "" {
+						return false, []*errors.ValidationError{
+							{
+								Message:           fmt.Sprintf("API Key %s not found in header", secScheme.Name),
+								Reason:            "API Key not found in http header for security scheme 'apiKey' with type 'header'",
+								ValidationType:    "security",
+								ValidationSubType: "apiKey",
+								SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
+								SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
+								HowToFix:          fmt.Sprintf("Add the API Key via '%s' as a header of the request", secScheme.Name),
+							},
 						}
 					}
-					if secScheme.In == "query" {
-						if request.URL.Query().Get(secScheme.Name) == "" {
-							copyUrl := *request.URL
-							fixed := &copyUrl
-							q := fixed.Query()
-							q.Add(secScheme.Name, "your-api-key")
-							fixed.RawQuery = q.Encode()
+				}
+				if secScheme.In == "query" {
+					if request.URL.Query().Get(secScheme.Name) == "" {
+						copyUrl := *request.URL
+						fixed := &copyUrl
+						q := fixed.Query()
+						q.Add(secScheme.Name, "your-api-key")
+						fixed.RawQuery = q.Encode()
 
-							return false, []*errors.ValidationError{
-								{
-									Message:           fmt.Sprintf("API Key %s not found in query", secScheme.Name),
-									Reason:            "API Key not found in URL query for security scheme 'apiKey' with type 'query'",
-									ValidationType:    "security",
-									ValidationSubType: "apiKey",
-									SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
-									SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
-									HowToFix: fmt.Sprintf("Add an API Key via '%s' to the query string "+
-										"of the URL, for example '%s'", secScheme.Name, fixed.String()),
-								},
-							}
+						return false, []*errors.ValidationError{
+							{
+								Message:           fmt.Sprintf("API Key %s not found in query", secScheme.Name),
+								Reason:            "API Key not found in URL query for security scheme 'apiKey' with type 'query'",
+								ValidationType:    "security",
+								ValidationSubType: "apiKey",
+								SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
+								SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
+								HowToFix: fmt.Sprintf("Add an API Key via '%s' to the query string "+
+									"of the URL, for example '%s'", secScheme.Name, fixed.String()),
+							},
 						}
 					}
-					if secScheme.In == "cookie" {
-						cookies := request.Cookies()
-						cookieFound := false
-						for _, cookie := range cookies {
-							if cookie.Name == secScheme.Name {
-								cookieFound = true
-								break
-							}
+				}
+				if secScheme.In == "cookie" {
+					cookies := request.Cookies()
+					cookieFound := false
+					for _, cookie := range cookies {
+						if cookie.Name == secScheme.Name {
+							cookieFound = true
+							break
 						}
-						if !cookieFound {
-							return false, []*errors.ValidationError{
-								{
-									Message:           fmt.Sprintf("API Key %s not found in cookies", secScheme.Name),
-									Reason:            "API Key not found in http request cookies for security scheme 'apiKey' with type 'cookie'",
-									ValidationType:    "security",
-									ValidationSubType: "apiKey",
-									SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
-									SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
-									HowToFix:          fmt.Sprintf("Submit an API Key '%s' as a cookie with the request", secScheme.Name),
-								},
-							}
+					}
+					if !cookieFound {
+						return false, []*errors.ValidationError{
+							{
+								Message:           fmt.Sprintf("API Key %s not found in cookies", secScheme.Name),
+								Reason:            "API Key not found in http request cookies for security scheme 'apiKey' with type 'cookie'",
+								ValidationType:    "security",
+								ValidationSubType: "apiKey",
+								SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
+								SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
+								HowToFix:          fmt.Sprintf("Submit an API Key '%s' as a cookie with the request", secScheme.Name),
+							},
 						}
 					}
 				}
