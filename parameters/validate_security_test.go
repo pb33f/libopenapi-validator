@@ -291,6 +291,53 @@ components:
 	assert.Equal(t, 1, len(errors))
 }
 
+func TestParamValidator_ValidateSecurity_MissingSecuritySchemes(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components: {}
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_NoComponents(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+}
+
 func TestParamValidator_ValidateSecurity_PresetPath(t *testing.T) {
 
 	spec := `openapi: 3.1.0
