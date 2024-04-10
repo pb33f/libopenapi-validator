@@ -22,15 +22,17 @@ import (
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
 	// find path
 	var pathItem *v3.PathItem
+	var foundPath string
 	var errs []*errors.ValidationError
 	if v.pathItem == nil {
-		pathItem, errs, _ = paths.FindPath(request, v.document)
+		pathItem, errs, foundPath = paths.FindPath(request, v.document)
 		if pathItem == nil || errs != nil {
 			v.errors = errs
 			return false, errs
 		}
 	} else {
 		pathItem = v.pathItem
+		foundPath = v.pathValue
 	}
 
 	// extract params for the operation
@@ -210,6 +212,8 @@ doneLooking:
 			}
 		}
 	}
+
+	errors.PopulateValidationErrors(validationErrors, request, foundPath)
 
 	v.errors = validationErrors
 	if len(validationErrors) > 0 {

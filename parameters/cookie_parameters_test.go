@@ -35,6 +35,9 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "", errors[0].SpecPath)
 }
 
 func TestNewValidator_CookieParamNumberValid(t *testing.T) {
@@ -202,6 +205,9 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t,
 		"Instead of 'milk', use one of the allowed values: 'beef, chicken, pea protein'", errors[0].HowToFix)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/burgers/beef", errors[0].SpecPath)
 }
 
 func TestNewValidator_CookieParamBooleanInvalid(t *testing.T) {

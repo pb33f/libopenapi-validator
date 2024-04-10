@@ -23,15 +23,17 @@ func (v *responseBodyValidator) ValidateResponseBody(
 ) (bool, []*errors.ValidationError) {
 	// find path
 	var pathItem *v3.PathItem
+	var pathFound string
 	var errs []*errors.ValidationError
 	if v.pathItem == nil {
-		pathItem, errs, _ = paths.FindPath(request, v.document)
+		pathItem, errs, pathFound = paths.FindPath(request, v.document)
 		if pathItem == nil || errs != nil {
 			v.errors = errs
 			return false, errs
 		}
 	} else {
 		pathItem = v.pathItem
+		pathFound = v.pathValue
 	}
 
 	var validationErrors []*errors.ValidationError
@@ -88,6 +90,9 @@ func (v *responseBodyValidator) ValidateResponseBody(
 				errors.ResponseCodeNotFound(operation, request, httpCode))
 		}
 	}
+
+	errors.PopulateValidationErrors(validationErrors, request, pathFound)
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}

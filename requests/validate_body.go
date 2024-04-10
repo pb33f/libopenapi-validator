@@ -11,25 +11,27 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/utils"
 )
 
 func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
 	// find path
-	var pathItem *v3.PathItem = v.pathItem
+	var pathItem = v.pathItem
+	var foundPath string
 	if v.pathItem == nil {
 		var validationErrors []*errors.ValidationError
-		pathItem, validationErrors, _ = paths.FindPath(request, v.document)
+		pathItem, validationErrors, foundPath = paths.FindPath(request, v.document)
 		if pathItem == nil || validationErrors != nil {
 			v.errors = validationErrors
 			return false, validationErrors
 		}
+	} else {
+		foundPath = v.pathValue
 	}
 
 	operation := helpers.ExtractOperation(request, pathItem)
 	if operation == nil {
-		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method)}
+		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method, foundPath)}
 	}
 	if operation.RequestBody == nil {
 		return true, nil
@@ -38,14 +40,14 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 	// extract the content type from the request
 	contentType := request.Header.Get(helpers.ContentTypeHeader)
 	if contentType == "" {
-		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request)}
+		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, foundPath)}
 	}
 
 	// extract the media type from the content type header.
 	ct, _, _ := helpers.ExtractContentType(contentType)
 	mediaType, ok := operation.RequestBody.Content.Get(ct)
 	if !ok {
-		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request)}
+		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, foundPath)}
 	}
 
 	// we currently only support JSON validation for request bodies
@@ -88,5 +90,9 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 	}
 
 	// render the schema, to be used for validation
-	return ValidateRequestSchema(request, schema, renderedInline, renderedJSON)
+	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON)
+
+	errors.PopulateValidationErrors(validationErrors, request, foundPath)
+
+	return validationSucceeded, validationErrors
 }

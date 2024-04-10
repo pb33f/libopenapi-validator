@@ -68,6 +68,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 2)
 	assert.Equal(t, "Path array parameter 'burgerIds' is not a valid number", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/burgers/{burgerIds*}/locate", errors[0].SpecPath)
 }
 
 func TestNewValidator_SimpleArrayEncodedPath_InvalidBool(t *testing.T) {

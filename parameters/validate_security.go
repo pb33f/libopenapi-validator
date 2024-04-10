@@ -18,15 +18,17 @@ import (
 func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*errors.ValidationError) {
 	// find path
 	var pathItem *v3.PathItem
+	var pathFound string
 	var errs []*errors.ValidationError
 	if v.pathItem == nil {
-		pathItem, errs, _ = paths.FindPath(request, v.document)
+		pathItem, errs, pathFound = paths.FindPath(request, v.document)
 		if pathItem == nil || errs != nil {
 			v.errors = errs
 			return false, errs
 		}
 	} else {
 		pathItem = v.pathItem
+		pathFound = v.pathValue
 	}
 
 	// extract security for the operation
@@ -42,7 +44,7 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 
 			// look up security from components
 			if v.document.Components == nil || v.document.Components.SecuritySchemes.GetOrZero(secName) == nil {
-				return false, []*errors.ValidationError{
+				validationErrors := []*errors.ValidationError{
 					{
 						Message: fmt.Sprintf("Security scheme '%s' is missing", secName),
 						Reason: fmt.Sprintf("The security scheme '%s' is defined as being required, "+
@@ -53,6 +55,9 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 						HowToFix:       "Add the missing security scheme to the components",
 					},
 				}
+				errors.PopulateValidationErrors(validationErrors, request, pathFound)
+
+				return false, validationErrors
 			}
 			secScheme := v.document.Components.SecuritySchemes.GetOrZero(secName)
 			switch strings.ToLower(secScheme.Type) {
@@ -61,7 +66,7 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 				case "basic", "bearer", "digest":
 					// check for an authorization header
 					if request.Header.Get("Authorization") == "" {
-						return false, []*errors.ValidationError{
+						validationErrors := []*errors.ValidationError{
 							{
 								Message:           fmt.Sprintf("Authorization header for '%s' scheme", secScheme.Scheme),
 								Reason:            "Authorization header was not found",
@@ -72,6 +77,10 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 								HowToFix:          "Add an 'Authorization' header to this request",
 							},
 						}
+
+						errors.PopulateValidationErrors(validationErrors, request, pathFound)
+
+						return false, validationErrors
 					}
 				}
 
@@ -79,7 +88,7 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 				// check if the api key is in the request
 				if secScheme.In == "header" {
 					if request.Header.Get(secScheme.Name) == "" {
-						return false, []*errors.ValidationError{
+						validationErrors := []*errors.ValidationError{
 							{
 								Message:           fmt.Sprintf("API Key %s not found in header", secScheme.Name),
 								Reason:            "API Key not found in http header for security scheme 'apiKey' with type 'header'",
@@ -90,6 +99,10 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 								HowToFix:          fmt.Sprintf("Add the API Key via '%s' as a header of the request", secScheme.Name),
 							},
 						}
+
+						errors.PopulateValidationErrors(validationErrors, request, pathFound)
+
+						return false, validationErrors
 					}
 				}
 				if secScheme.In == "query" {
@@ -100,7 +113,7 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 						q.Add(secScheme.Name, "your-api-key")
 						fixed.RawQuery = q.Encode()
 
-						return false, []*errors.ValidationError{
+						validationErrors := []*errors.ValidationError{
 							{
 								Message:           fmt.Sprintf("API Key %s not found in query", secScheme.Name),
 								Reason:            "API Key not found in URL query for security scheme 'apiKey' with type 'query'",
@@ -112,6 +125,10 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 									"of the URL, for example '%s'", secScheme.Name, fixed.String()),
 							},
 						}
+
+						errors.PopulateValidationErrors(validationErrors, request, pathFound)
+
+						return false, validationErrors
 					}
 				}
 				if secScheme.In == "cookie" {
@@ -124,7 +141,7 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 						}
 					}
 					if !cookieFound {
-						return false, []*errors.ValidationError{
+						validationErrors := []*errors.ValidationError{
 							{
 								Message:           fmt.Sprintf("API Key %s not found in cookies", secScheme.Name),
 								Reason:            "API Key not found in http request cookies for security scheme 'apiKey' with type 'cookie'",
@@ -135,6 +152,10 @@ func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*error
 								HowToFix:          fmt.Sprintf("Submit an API Key '%s' as a cookie with the request", secScheme.Name),
 							},
 						}
+
+						errors.PopulateValidationErrors(validationErrors, request, pathFound)
+
+						return false, validationErrors
 					}
 				}
 			}

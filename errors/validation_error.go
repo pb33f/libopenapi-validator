@@ -75,6 +75,15 @@ type ValidationError struct {
 	// HowToFix is a human-readable message describing how to fix the error.
 	HowToFix string `json:"howToFix" yaml:"howToFix"`
 
+	// RequestPath is the path of the request
+	RequestPath string `json:"requestPath" yaml:"requestPath"`
+
+	// SpecPath is the path from the specification that corresponds to the request
+	SpecPath string `json:"specPath" yaml:"specPath"`
+
+	// RequestMethod is the HTTP method of the request
+	RequestMethod string `json:"requestMethod" yaml:"requestMethod"`
+
 	// SchemaValidationErrors is a slice of SchemaValidationFailure objects that describe the validation errors
 	// This is only populated whe the validation type is against a schema.
 	SchemaValidationErrors []*SchemaValidationFailure `json:"validationErrors,omitempty" yaml:"validationErrors,omitempty"`

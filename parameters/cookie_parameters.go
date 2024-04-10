@@ -19,15 +19,18 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
 
 	// find path
 	var pathItem *v3.PathItem
+	var foundPath string
 	var errs []*errors.ValidationError
+
 	if v.pathItem == nil {
-		pathItem, errs, _ = paths.FindPath(request, v.document)
+		pathItem, errs, foundPath = paths.FindPath(request, v.document)
 		if pathItem == nil || errs != nil {
 			v.errors = errs
 			return false, errs
 		}
 	} else {
 		pathItem = v.pathItem
+		foundPath = v.pathValue
 	}
 
 	// extract params for the operation
@@ -121,6 +124,9 @@ func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*e
 			}
 		}
 	}
+
+	errors.PopulateValidationErrors(validationErrors, request, foundPath)
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}
