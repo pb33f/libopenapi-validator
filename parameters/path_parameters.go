@@ -276,6 +276,9 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 			}
 		}
 	}
+
+	errors.PopulateValidationErrors(validationErrors, request, foundPath)
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}

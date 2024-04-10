@@ -19,15 +19,17 @@ import (
 func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*errors.ValidationError) {
 	// find path
 	var pathItem *v3.PathItem
+	var specPath string
 	var errs []*errors.ValidationError
 	if v.pathItem == nil {
-		pathItem, errs, _ = paths.FindPath(request, v.document)
+		pathItem, errs, specPath = paths.FindPath(request, v.document)
 		if pathItem == nil || errs != nil {
 			v.errors = errs
 			return false, errs
 		}
 	} else {
 		pathItem = v.pathItem
+		specPath = v.pathValue
 	}
 
 	// extract params for the operation
@@ -142,6 +144,8 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 			}
 		}
 	}
+
+	errors.PopulateValidationErrors(validationErrors, request, specPath)
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors

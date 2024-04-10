@@ -187,8 +187,11 @@ pathFound:
 			SpecCol:  -1,
 			HowToFix: errors.HowToFixPath,
 		})
+
+		errors.PopulateValidationErrors(validationErrors, request, foundPath)
 		return pItem, validationErrors, foundPath
 	} else {
+		errors.PopulateValidationErrors(validationErrors, request, foundPath)
 		return pItem, validationErrors, foundPath
 	}
 }

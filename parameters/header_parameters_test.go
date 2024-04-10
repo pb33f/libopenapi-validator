@@ -36,6 +36,9 @@ paths:
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
 	assert.Equal(t, "Header parameter 'bash' is missing", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/bish/bosh", errors[0].SpecPath)
 }
 
 func TestNewValidator_HeaderPathMissing(t *testing.T) {
@@ -63,6 +66,9 @@ paths:
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
 	assert.Equal(t, "GET Path '/I/do/not/exist' not found", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "", errors[0].SpecPath)
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeNumber(t *testing.T) {

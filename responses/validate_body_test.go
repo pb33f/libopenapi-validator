@@ -74,6 +74,9 @@ paths:
 	assert.Equal(t, "POST / 200 operation response content type 'cheeky/monkey' does not exist", errors[0].Message)
 	assert.Equal(t, "The content type is invalid, Use one of the 1 "+
 		"supported types for this operation: application/json", errors[0].HowToFix)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/burgers/createBurger", errors[0].SpecPath)
 }
 
 func TestValidateBody_MissingPath(t *testing.T) {
@@ -132,6 +135,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST Path '/I do not exist' not found", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "", errors[0].SpecPath)
 }
 
 func TestValidateBody_SetPath(t *testing.T) {

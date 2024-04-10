@@ -40,6 +40,9 @@ components:
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
 	assert.Equal(t, "API Key X-API-Key not found in header", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/products", errors[0].SpecPath)
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyHeader(t *testing.T) {
@@ -104,6 +107,9 @@ components:
 	assert.Equal(t, "API Key X-API-Key not found in query", errors[0].Message)
 	assert.Equal(t, "Add an API Key via 'X-API-Key' to the query string of the URL, "+
 		"for example 'https://things.com/products?X-API-Key=your-api-key'", errors[0].HowToFix)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/products", errors[0].SpecPath)
 
 }
 
@@ -166,6 +172,9 @@ components:
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
 	assert.Equal(t, "API Key X-API-Key not found in cookies", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/products", errors[0].SpecPath)
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyCookie(t *testing.T) {
@@ -231,6 +240,9 @@ components:
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
 	assert.Equal(t, "Authorization header for 'basic' scheme", errors[0].Message)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/products", errors[0].SpecPath)
 }
 
 func TestParamValidator_ValidateSecurity_Basic(t *testing.T) {
@@ -289,6 +301,9 @@ components:
 	valid, errors := v.ValidateSecurity(request)
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "", errors[0].SpecPath)
 }
 
 func TestParamValidator_ValidateSecurity_MissingSecuritySchemes(t *testing.T) {
