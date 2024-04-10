@@ -14,6 +14,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewValidator(t *testing.T) {
@@ -147,6 +148,36 @@ paths:
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 
+}
+
+func TestNewValidator_slash_server_url(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+servers:
+  - url: /
+paths:
+  /burgers/{burgerId}/locate:
+    patch:
+      operationId: locateBurger
+      parameters:
+        - name: burgerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid		
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/edd0189c-420b-489c-98f2-0facc5a26f3a/locate", nil)
+	v, _ := NewValidator(doc)
+
+	valid, errors := v.ValidateHttpRequest(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 func TestNewValidator_ValidateHttpRequest_SetPath_ValidPostSimpleSchema(t *testing.T) {
