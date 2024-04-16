@@ -4,6 +4,7 @@
 package responses
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,7 +48,12 @@ func (v *responseBodyValidator) ValidateResponseBody(
 	mediaTypeSting, _, _ := helpers.ExtractContentType(contentType)
 
 	// check if the response code is in the contract
-	foundResponse := operation.Responses.FindResponseByCode(httpCode)
+	foundResponse := operation.Responses.Codes.GetOrZero(fmt.Sprintf("%d", httpCode))
+	if foundResponse == nil {
+		// check range definition for response codes
+		foundResponse = operation.Responses.Codes.GetOrZero(fmt.Sprintf("%dXX", httpCode/100))
+	}
+
 	if foundResponse != nil {
 		if foundResponse.Content != nil { // only validate if we have content types.
 			// check content type has been defined in the contract

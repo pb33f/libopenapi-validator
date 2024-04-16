@@ -1170,3 +1170,46 @@ func TestNewValidator_PetStore_PetFindByStatusGet200_Valid_responseOnly(t *testi
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
+
+func TestNewValidator_ValidateHttpResponse_RangeResponseCode(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    patties:
+                      type: integer
+                    vegetarian:
+                      type: boolean
+        '4XX':
+          description: Bad request
+        '5XX':
+          description: Server error`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	v, _ := NewValidator(doc)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers", nil)
+	request.Header.Set("Content-Type", "application/json")
+	response := &http.Response{
+		StatusCode: 400,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+	}
+	valid, errors := v.ValidateHttpResponse(request, response)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
