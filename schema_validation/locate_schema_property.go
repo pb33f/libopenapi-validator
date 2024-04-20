@@ -14,6 +14,7 @@ import (
 func LocateSchemaPropertyNodeByJSONPath(doc *yaml.Node, JSONPath string) *yaml.Node {
 	var locatedNode *yaml.Node
 	doneChan := make(chan bool)
+	locatedNodeChan := make(chan *yaml.Node)
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -30,8 +31,12 @@ func LocateSchemaPropertyNodeByJSONPath(doc *yaml.Node, JSONPath string) *yaml.N
 		if len(locatedNodes) > 0 {
 			locatedNode = locatedNodes[0]
 		}
-		doneChan <- true
+		locatedNodeChan <- locatedNode
 	}()
-	<-doneChan
-	return locatedNode
+	select {
+	case locatedNode = <-locatedNodeChan:
+		return locatedNode
+	case <-doneChan:
+		return nil
+	}
 }
