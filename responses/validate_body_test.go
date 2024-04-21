@@ -6,14 +6,16 @@ package responses
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestValidateBody_MissingContentType(t *testing.T) {
@@ -374,7 +376,7 @@ paths:
 	//assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
-func TestValidateBody_InvalidResponse(t *testing.T) {
+func TestValidateBody_InvalidResponseBodyNil(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -407,6 +409,51 @@ paths:
 		Header:     http.Header{},
 		StatusCode: http.StatusOK,
 		Body:       nil, // invalid response body
+	}
+	response.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+	// doubletap to hit cache
+	_, _ = v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+}
+
+func TestValidateBody_InvalidResponseBodyError(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", http.NoBody)
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// invalid response
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       &errorReader{},
 	}
 	response.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 
@@ -1134,4 +1181,13 @@ paths:
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 
+}
+
+type errorReader struct{}
+
+func (er *errorReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("some io error")
+}
+func (er *errorReader) Close() error {
+	return nil
 }
