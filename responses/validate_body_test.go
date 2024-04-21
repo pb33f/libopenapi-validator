@@ -374,6 +374,51 @@ paths:
 	//assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
+func TestValidateBody_InvalidResponse(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", http.NoBody)
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// invalid response
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       nil, // invalid response body
+	}
+	response.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+	// doubletap to hit cache
+	_, _ = v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+}
+
 func TestValidateBody_InvalidBasicSchema_SetPath(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
