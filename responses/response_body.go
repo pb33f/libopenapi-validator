@@ -4,10 +4,12 @@
 package responses
 
 import (
+	"net/http"
+	"sync"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
-	"net/http"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // ResponseBodyValidator is an interface that defines the methods for validating response bodies for Operations.
@@ -34,7 +36,7 @@ func (v *responseBodyValidator) SetPathItem(path *v3.PathItem, pathValue string)
 
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
 func NewResponseBodyValidator(document *v3.Document) ResponseBodyValidator {
-	return &responseBodyValidator{document: document, schemaCache: make(map[[32]byte]*schemaCache)}
+	return &responseBodyValidator{document: document, schemaCache: &sync.Map{}}
 }
 
 type schemaCache struct {
@@ -48,5 +50,5 @@ type responseBodyValidator struct {
 	pathItem    *v3.PathItem
 	pathValue   string
 	errors      []*errors.ValidationError
-	schemaCache map[[32]byte]*schemaCache
+	schemaCache *sync.Map
 }

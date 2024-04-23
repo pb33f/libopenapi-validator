@@ -126,12 +126,11 @@ func (v *responseBodyValidator) checkResponseSchema(
 			// have we seen this schema before? let's hash it and check the cache.
 			hash := mediaType.GoLow().Schema.Value.Hash()
 
-			if cacheHit, ch := v.schemaCache[hash]; ch {
-
+			if cacheHit, ch := v.schemaCache.Load(hash); ch {
 				// got a hit, use cached values
-				schema = cacheHit.schema
-				renderedInline = cacheHit.renderedInline
-				renderedJSON = cacheHit.renderedJSON
+				schema = cacheHit.(*schemaCache).schema
+				renderedInline = cacheHit.(*schemaCache).renderedInline
+				renderedJSON = cacheHit.(*schemaCache).renderedJSON
 
 			} else {
 
@@ -140,11 +139,11 @@ func (v *responseBodyValidator) checkResponseSchema(
 				schema = mediaType.Schema.Schema()
 				renderedInline, _ = schema.RenderInline()
 				renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-				v.schemaCache[hash] = &schemaCache{
+				v.schemaCache.Store(hash, &schemaCache{
 					schema:         schema,
 					renderedInline: renderedInline,
 					renderedJSON:   renderedJSON,
-				}
+				})
 			}
 
 			// render the schema, to be used for validation
