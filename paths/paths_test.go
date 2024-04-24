@@ -659,3 +659,41 @@ paths:
 	assert.Equal(t, "GET Path '/not_here' not found", errs[0].Message)
 
 }
+
+func TestGetBasePaths(t *testing.T) {
+	spec := `openapi: 3.1.0
+servers:
+  - url: 'https://things.com/'
+  - url: 'https://things.com/some/path'
+  - url: 'https://things.com/more//paths//please'
+  - url: 'https://{invalid}.com/'
+  - url: 'https://{invalid}.com/some/path'
+  - url: 'https://{invalid}.com/more//paths//please'
+  - url: 'https://{invalid}.com//even//more//paths//please'
+paths:
+  /dishy:
+    get:
+      operationId: one
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _ := doc.BuildV3Model()
+
+	basePaths := getBasePaths(&m.Model)
+
+	expectedPaths := []string{
+		"/",
+		"/some/path",
+		"/more//paths//please",
+		"/",
+		"/some/path",
+		"/more//paths//please",
+		"/even//more//paths//please",
+	}
+
+	assert.Equal(t, expectedPaths, basePaths)
+
+}
