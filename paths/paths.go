@@ -200,7 +200,21 @@ func getBasePaths(document *v3.Document) []string {
 	// extract base path from document to check against paths.
 	var basePaths []string
 	for _, s := range document.Servers {
-		u, _ := url.Parse(s.URL)
+		var u *url.URL = nil
+		u, err := url.Parse(s.URL)
+
+		// if the host contains special characters, we should attempt to split and parse only the relative path
+		if err != nil {
+			// split at first occurrence
+			_, serverPath, _ := strings.Cut(strings.Replace(s.URL, "//", "", 1), "/")
+
+			if !strings.HasPrefix(serverPath, "/") {
+				serverPath = "/" + serverPath
+			}
+
+			u, _ = url.Parse(serverPath)
+		}
+
 		if u != nil && u.Path != "" {
 			basePaths = append(basePaths, u.Path)
 		}
