@@ -39,7 +39,15 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 
 	// extract the content type from the request
 	contentType := request.Header.Get(helpers.ContentTypeHeader)
+	required := false
+	if operation.RequestBody.Required != nil {
+		required = *operation.RequestBody.Required
+	}
 	if contentType == "" {
+		if !required{
+			// request body is not required, the validation stop there.
+			return true, nil
+		}
 		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, foundPath)}
 	}
 
