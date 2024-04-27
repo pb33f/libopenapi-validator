@@ -14,12 +14,45 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidateBody_MissingContentType(t *testing.T) {
+func TestValidateBody_NotRequiredBody(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
       requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", http.NoBody)
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_UnknownContentType(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -252,6 +285,7 @@ paths:
   /burgers/createBurger:
     post:
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -299,6 +333,7 @@ paths:
   /burgers/createBurger:
     post:
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -338,12 +373,62 @@ paths:
 
 }
 
-func TestValidateBody_InvalidBasicSchema(t *testing.T) {
+func TestValidateBody_InvalidBasicSchema_NotRequired(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
       requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	// double-tap to hit the cache
+	_, _ = v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
+
+}
+
+func TestValidateBody_InvalidBasicSchema_Required(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: false
         content:
           application/json:
             schema:
