@@ -179,11 +179,19 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 		if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
 			continue // ignore this error, it's not useful
 		}
-		schemaValidationErrors = append(schemaValidationErrors, &errors.SchemaValidationFailure{
+
+		fail := &errors.SchemaValidationFailure{
 			Reason:        er.Error,
 			Location:      er.KeywordLocation,
 			OriginalError: scErrs,
-		})
+		}
+		if schema != nil {
+			rendered, err := schema.RenderInline()
+			if err == nil && rendered != nil {
+				fail.ReferenceSchema = fmt.Sprintf("%s", rendered)
+			}
+		}
+		schemaValidationErrors = append(schemaValidationErrors, fail)
 	}
 	schemaType := "undefined"
 	if len(schema.Type) > 0 {
