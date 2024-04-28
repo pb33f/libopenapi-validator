@@ -18,12 +18,10 @@ import (
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
 // the first return value will be a pointer to the PathItem. The second return value will contain any validation errors
-// that were picked up when locating the path. Number/Integer validation is performed in any path parameters in the request.
+// that were picked up when locating the path.
 // The third return value will be the path that was found in the document, as it pertains to the contract, so all path
 // parameters will not have been replaced with their values from the request - allowing model lookups.
 func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*errors.ValidationError, string) {
-	var validationErrors []*errors.ValidationError
-
 	basePaths := getBasePaths(document)
 	stripped := StripRequestPath(request, document)
 
@@ -34,7 +32,6 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
 
 	var pItem *v3.PathItem
 	var foundPath string
-pathFound:
 	for pair := orderedmap.First(document.Paths.PathItems); pair != nil; pair = pair.Next() {
 		path := pair.Key()
 		pathItem := pair.Value()
@@ -52,131 +49,63 @@ pathFound:
 			segs = segs[1:]
 		}
 
-		// collect path level params
-		var errs []*errors.ValidationError
-		var ok bool
+		ok := comparePaths(segs, reqPathSegments, basePaths)
+		if !ok {
+			continue
+		}
+		pItem = pathItem
+		foundPath = path
 		switch request.Method {
 		case http.MethodGet:
 			if pathItem.Get != nil {
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodPost:
 			if pathItem.Post != nil {
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodPut:
 			if pathItem.Put != nil {
-				// check for a literal match
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodDelete:
 			if pathItem.Delete != nil {
-				// check for a literal match
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodOptions:
 			if pathItem.Options != nil {
-				// check for a literal match
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodHead:
 			if pathItem.Head != nil {
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodPatch:
 			if pathItem.Patch != nil {
-				// check for a literal match
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		case http.MethodTrace:
 			if pathItem.Trace != nil {
-				if checkPathAgainstBase(request.URL.Path, path, basePaths) {
-					pItem = pathItem
-					foundPath = path
-					break pathFound
-				}
-				if ok = comparePaths(segs, reqPathSegments, basePaths); ok {
-					pItem = pathItem
-					foundPath = path
-					validationErrors = errs
-					break pathFound
-				}
+				return pathItem, nil, path
 			}
 		}
 	}
-	if pItem == nil && len(validationErrors) == 0 {
-		validationErrors = append(validationErrors, &errors.ValidationError{
+	if pItem != nil {
+		validationErrors := []*errors.ValidationError{{
+			ValidationType:    helpers.ParameterValidationPath,
+			ValidationSubType: "missingOperation",
+			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+			Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
+				request.Method),
+			SpecLine: -1,
+			SpecCol:  -1,
+			HowToFix: errors.HowToFixPath,
+		}}
+		errors.PopulateValidationErrors(validationErrors, request, foundPath)
+		return pItem, validationErrors, foundPath
+	}
+	validationErrors := []*errors.ValidationError{
+		{
 			ValidationType:    helpers.ParameterValidationPath,
 			ValidationSubType: "missing",
 			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
@@ -186,14 +115,10 @@ pathFound:
 			SpecLine: -1,
 			SpecCol:  -1,
 			HowToFix: errors.HowToFixPath,
-		})
-
-		errors.PopulateValidationErrors(validationErrors, request, foundPath)
-		return pItem, validationErrors, foundPath
-	} else {
-		errors.PopulateValidationErrors(validationErrors, request, foundPath)
-		return pItem, validationErrors, foundPath
+		},
 	}
+	errors.PopulateValidationErrors(validationErrors, request, "")
+	return nil, validationErrors, ""
 }
 
 func getBasePaths(document *v3.Document) []string {
