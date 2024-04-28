@@ -18,13 +18,8 @@ func TestValidateRequestSchema(t *testing.T) {
 		assertValidRequestSchema   assert.BoolAssertionFunc
 		expectedErrorsCount        int
 	}{
-		"FailRequestBodyValidation": {
-			// KeywordLocation: /allOf/1/$ref/properties/properties/additionalProperties/$dynamicRef/allOf/3/$ref/properties/exclusiveMinimum/type
-			// Message: expected number, but got boolean
-			request: &http.Request{
-				Method: http.MethodPost,
-				Body:   io.NopCloser(strings.NewReader(`{"exclusiveNumber": 13}`)),
-			},
+		"FailOnBooleanExclusiveMinimum": {
+			request: postRequestWithBody(`{"exclusiveNumber": 13}`),
 			schema: &base.Schema{
 				Type: []string{"object"},
 			},
@@ -39,6 +34,37 @@ properties:
 			assertValidRequestSchema: assert.False,
 			expectedErrorsCount:      1,
 		},
+		"PassWithCorrectExclusiveMinimum": {
+			request: postRequestWithBody(`{"exclusiveNumber": 15}`),
+			schema: &base.Schema{
+				Type: []string{"object"},
+			},
+			renderedSchema: []byte(`type: object
+properties:
+    exclusiveNumber:
+        type: number
+        description: This number is properly constrained by a numeric exclusive minimum.
+        exclusiveMinimum: 12
+        minimum: 12`),
+			jsonSchema:               []byte(`{"properties":{"exclusiveNumber":{"type":"number","description":"This number is properly constrained by a numeric exclusive minimum.","exclusiveMinimum":12,"minimum":12}},"type":"object"}`),
+			assertValidRequestSchema: assert.True,
+			expectedErrorsCount:      0,
+		},
+		"PassWithValidStringType": {
+			request: postRequestWithBody(`{"greeting": "Hello, world!"}`),
+			schema: &base.Schema{
+				Type: []string{"object"},
+			},
+			renderedSchema: []byte(`type: object
+properties:
+    greeting:
+        type: string
+        description: A simple greeting
+        example: "Hello, world!"`),
+			jsonSchema:               []byte(`{"properties":{"greeting":{"type":"string","description":"A simple greeting","example":"Hello, world!"}},"type":"object"}`),
+			assertValidRequestSchema: assert.True,
+			expectedErrorsCount:      0,
+		},
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
@@ -49,5 +75,12 @@ properties:
 			tc.assertValidRequestSchema(t, valid)
 			assert.Len(t, errors, tc.expectedErrorsCount)
 		})
+	}
+}
+
+func postRequestWithBody(payload string) *http.Request {
+	return &http.Request{
+		Method: http.MethodPost,
+		Body:   io.NopCloser(strings.NewReader(payload)),
 	}
 }
