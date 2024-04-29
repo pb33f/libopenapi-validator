@@ -44,7 +44,7 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 		required = *operation.RequestBody.Required
 	}
 	if contentType == "" {
-		if !required{
+		if !required {
 			// request body is not required, the validation stop there.
 			return true, nil
 		}
