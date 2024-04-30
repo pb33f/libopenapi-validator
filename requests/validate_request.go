@@ -74,6 +74,17 @@ func ValidateRequestSchema(
 
 	// no request body? but we do have a schema?
 	if len(requestBody) <= 0 && len(jsonSchema) > 0 {
+
+		line := -1
+		col := -1
+		if schema.Type != nil {
+			line = schema.GoLow().Type.KeyNode.Line
+			col = schema.GoLow().Type.KeyNode.Column
+		} else {
+			line = schema.ParentProxy.GetSchemaKeyNode().Line
+			col = schema.ParentProxy.GetSchemaKeyNode().Line
+		}
+
 		// cannot decode the request body, so it's not valid
 		violation := &errors.SchemaValidationFailure{
 			Reason:          "request body is empty, but there is a schema defined",
@@ -86,8 +97,8 @@ func ValidateRequestSchema(
 			Message: fmt.Sprintf("%s request body is empty for '%s'",
 				request.Method, request.URL.Path),
 			Reason:                 "The request body is empty but there is a schema defined",
-			SpecLine:               schema.GoLow().Type.KeyNode.Line,
-			SpecCol:                schema.GoLow().Type.KeyNode.Line,
+			SpecLine:               line,
+			SpecCol:                col,
 			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
 			HowToFix:               errors.HowToFixInvalidSchema,
 			Context:                string(renderedSchema), // attach the rendered schema to the error

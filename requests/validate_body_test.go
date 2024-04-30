@@ -6,6 +6,7 @@ package requests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -1192,5 +1193,141 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
+
+}
+
+func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {
+
+	spec := `{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "testing",
+    "description": "<p>This is for testing purpose</p>",
+    "version": "1.0",
+    "x-targetEndpoint": "https://mocktarget.apigee.net/json"
+  },
+  "servers": [
+    {
+      "url": "https://some-url.com"
+    }
+  ],
+  "paths": {
+    "/path1": {
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "age": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "email": {
+                        "type": "string"
+                      },
+                      "address": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "email"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/path2": {
+      "get": {
+        "parameters": [
+          {
+            "name": "X-My-Header",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/path3": {
+      "get": {
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  }
+}
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	if err != nil {
+		fmt.Println("error while creating open api spec document", err)
+		return
+	}
+
+	req, err := http.NewRequest("PUT", "/path1", nil)
+	if err != nil {
+		fmt.Println("error while creating new HTTP request", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	v3Model, errs := doc.BuildV3Model()
+	if len(errs) > 0 {
+		fmt.Println("error while building a Open API spec V3 model", errs)
+		return
+	}
+
+	reqBodyValidator := NewRequestBodyValidator(&v3Model.Model)
+	isSuccess, valErrs := reqBodyValidator.ValidateRequestBody(req)
+
+	assert.False(t, isSuccess)
+	assert.Len(t, valErrs, 1)
+	assert.Equal(t, "PUT request body is empty for '/path1'", valErrs[0].Message)
 
 }
