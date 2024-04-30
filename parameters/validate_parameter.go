@@ -75,7 +75,7 @@ func ValidateParameterSchema(
 	var validationErrors []*errors.ValidationError
 
 	// 1. build a JSON render of the schema.
-	renderedSchema, _ := schema.Render()
+	renderedSchema, _ := schema.RenderInline()
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
 
 	// 2. decode the object into a json blob.
