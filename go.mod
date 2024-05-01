@@ -3,7 +3,7 @@ module github.com/pb33f/libopenapi-validator
 go 1.21
 
 require (
-	github.com/pb33f/libopenapi v0.16.4
+	github.com/pb33f/libopenapi v0.16.5
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/stretchr/testify v1.9.0
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
