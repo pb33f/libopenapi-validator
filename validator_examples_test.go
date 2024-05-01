@@ -88,6 +88,44 @@ func ExampleNewValidator_validateHttpRequest() {
 	// Type: parameter, Failure: Path parameter 'petId' is not a valid number
 }
 
+func ExampleNewValidator_validateHttpRequestSync() {
+	// 1. Load the OpenAPI 3+ spec into a byte array
+	petstore, err := os.ReadFile("test_specs/petstorev3.json")
+
+	if err != nil {
+		panic(err)
+	}
+
+	// 2. Create a new OpenAPI document using libopenapi
+	document, docErrs := libopenapi.NewDocument(petstore)
+
+	if docErrs != nil {
+		panic(docErrs)
+	}
+
+	// 3. Create a new validator
+	docValidator, validatorErrs := NewValidator(document)
+
+	if validatorErrs != nil {
+		panic(validatorErrs)
+	}
+
+	// 4. Create a new *http.Request (normally, this would be where the host application will pass in the request)
+	request, _ := http.NewRequest(http.MethodGet, "/pet/NotAValidPetId", nil)
+
+	// 5. Validate!
+	valid, validationErrs := docValidator.ValidateHttpRequestSync(request)
+
+	if !valid {
+		for _, e := range validationErrs {
+			// 5. Handle the error
+			fmt.Printf("Type: %s, Failure: %s\n", e.ValidationType, e.Message)
+		}
+	}
+	// Type: parameter, Failure: Path parameter 'petId' is not a valid number
+	// Output: Type: security, Failure: API Key api_key not found in header
+}
+
 func ExampleNewValidator_validateHttpRequestResponse() {
 	// 1. Load the OpenAPI 3+ spec into a byte array
 	petstore, err := os.ReadFile("test_specs/petstorev3.json")
