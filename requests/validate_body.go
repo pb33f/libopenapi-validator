@@ -4,7 +4,6 @@
 package requests
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -32,7 +31,6 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 
 	operation := helpers.ExtractOperation(request, pathItem)
 	if operation == nil {
-		fmt.Println("HERE!!!!")
 		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method, foundPath)}
 	}
 	if operation.RequestBody == nil {
