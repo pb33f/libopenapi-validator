@@ -43,15 +43,19 @@ func (v *responseBodyValidator) ValidateResponseBody(
 	// extract the response code from the response
 	httpCode := response.StatusCode
 	contentType := response.Header.Get(helpers.ContentTypeHeader)
+	codeStr := strconv.Itoa(httpCode)
 
 	// extract the media type from the content type header.
 	mediaTypeSting, _, _ := helpers.ExtractContentType(contentType)
 
 	// check if the response code is in the contract
-	foundResponse := operation.Responses.Codes.GetOrZero(fmt.Sprintf("%d", httpCode))
+	foundResponse := operation.Responses.Codes.GetOrZero(codeStr)
 	if foundResponse == nil {
 		// check range definition for response codes
 		foundResponse = operation.Responses.Codes.GetOrZero(fmt.Sprintf("%dXX", httpCode/100))
+		if foundResponse != nil {
+			codeStr = fmt.Sprintf("%dXX", httpCode/100)
+		}
 	}
 
 	if foundResponse != nil {
@@ -65,7 +69,6 @@ func (v *responseBodyValidator) ValidateResponseBody(
 				if foundResponse.Content != nil && orderedmap.Len(foundResponse.Content) > 0 {
 
 					// content type not found in the contract
-					codeStr := strconv.Itoa(httpCode)
 					validationErrors = append(validationErrors,
 						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, false))
 
@@ -84,7 +87,6 @@ func (v *responseBodyValidator) ValidateResponseBody(
 				if operation.Responses.Default.Content != nil && orderedmap.Len(operation.Responses.Default.Content) > 0 {
 
 					// content type not found in the contract
-					codeStr := strconv.Itoa(httpCode)
 					validationErrors = append(validationErrors,
 						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, true))
 				}
