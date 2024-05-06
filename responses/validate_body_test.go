@@ -81,6 +81,65 @@ paths:
 	assert.Equal(t, "/burgers/createBurger", errors[0].SpecPath)
 }
 
+func TestValidateBody_MissingContentType4XX(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        4XX:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(bodyBytes)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST / 4XX operation response content type 'cheeky/monkey' does not exist", errors[0].Message)
+	assert.Equal(t, "The content type is invalid, Use one of the 1 "+
+		"supported types for this operation: application/json", errors[0].HowToFix)
+	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "/burgers/createBurger", errors[0].SpecPath)
+}
+
 func TestValidateBody_MissingPath(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
