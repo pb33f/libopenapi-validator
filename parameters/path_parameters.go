@@ -13,7 +13,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -85,7 +85,10 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 					}
 
 					if paramValue == "" {
-						// TODO: check path match issue.
+						//Mandatory path parameter cannot be empty
+						if p.Required != nil && *p.Required {
+							validationErrors = append(validationErrors, errors.PathParameterMissing(p))
+						}
 						continue
 					}
 

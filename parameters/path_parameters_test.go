@@ -1436,3 +1436,31 @@ paths:
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
+func TestNewValidator_MandatorydPathSegmentEmpty(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+servers:
+- url: https://api.pb33f.io
+  description: Live production endpoint for general use.
+paths:
+  /burgers/{burger}:
+    get:
+      parameters:
+        - name: burger
+          in: path
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+}

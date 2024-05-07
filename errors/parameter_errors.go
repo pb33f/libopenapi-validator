@@ -2,11 +2,12 @@ package errors
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/url"
 	"strings"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func IncorrectFormEncoding(param *v3.Parameter, qp *helpers.QueryParam, i int) *ValidationError {
@@ -466,5 +467,18 @@ func IncorrectPathParamArrayBoolean(
 		SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
 		Context:  itemsSchema,
 		HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, item),
+	}
+}
+
+func PathParameterMissing(param *v3.Parameter) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationPath,
+		Message:           fmt.Sprintf("Path parameter '%s' is missing", param.Name),
+		Reason: fmt.Sprintf("The path parameter '%s' is defined as being required, "+
+			"however it's missing from the requests", param.Name),
+		SpecLine: param.GoLow().Required.KeyNode.Line,
+		SpecCol:  param.GoLow().Required.KeyNode.Column,
+		HowToFix: HowToFixMissingValue,
 	}
 }
