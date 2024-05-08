@@ -88,6 +88,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 						//Mandatory path parameter cannot be empty
 						if p.Required != nil && *p.Required {
 							validationErrors = append(validationErrors, errors.PathParameterMissing(p))
+							break
 						}
 						continue
 					}
