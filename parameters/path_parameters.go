@@ -17,25 +17,30 @@ import (
 )
 
 func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError) {
-
-	// find path
-	var pathItem *v3.PathItem
-	var errs []*errors.ValidationError
-	var foundPath string
-	if v.pathItem == nil && v.pathValue == "" {
-		pathItem, errs, foundPath = paths.FindPath(request, v.document)
-		if pathItem == nil || errs != nil {
-			v.errors = errs
-			return false, errs
-		}
-	} else {
-		pathItem = v.pathItem
-		foundPath = v.pathValue
+	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	if len(errs) > 0 {
+		return false, errs
 	}
+	return v.ValidatePathParamsWithPathItem(request, pathItem, foundPath)
+}
 
+func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	if pathItem == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.ParameterValidationPath,
+			ValidationSubType: "missing",
+			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+				"however that path, or the %s method for that path does not exist in the specification",
+				request.Method, request.URL.Path, request.Method),
+			SpecLine: -1,
+			SpecCol:  -1,
+			HowToFix: errors.HowToFixPath,
+		}}
+	}
 	// split the path into segments
 	submittedSegments := strings.Split(paths.StripRequestPath(request, v.document), helpers.Slash)
-	pathSegments := strings.Split(foundPath, helpers.Slash)
+	pathSegments := strings.Split(pathValue, helpers.Slash)
 
 	// extract params for the operation
 	var params = helpers.ExtractParamsForOperation(request, pathItem)
@@ -283,7 +288,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 		}
 	}
 
-	errors.PopulateValidationErrors(validationErrors, request, foundPath)
+	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors

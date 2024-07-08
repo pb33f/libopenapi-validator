@@ -9,29 +9,38 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi-validator/paths"
+	"fmt"
 )
 
 func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
-	// find path
-	var pathItem = v.pathItem
-	var foundPath string
-	if v.pathItem == nil {
-		var validationErrors []*errors.ValidationError
-		pathItem, validationErrors, foundPath = paths.FindPath(request, v.document)
-		if pathItem == nil || validationErrors != nil {
-			v.errors = validationErrors
-			return false, validationErrors
-		}
-	} else {
-		foundPath = v.pathValue
+	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	if len(errs) > 0 {
+		return false, errs
 	}
+	return v.ValidateRequestBodyWithPathItem(request, pathItem, foundPath)
+}
 
+func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	if pathItem == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.ParameterValidationPath,
+			ValidationSubType: "missing",
+			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+				"however that path, or the %s method for that path does not exist in the specification",
+				request.Method, request.URL.Path, request.Method),
+			SpecLine: -1,
+			SpecCol:  -1,
+			HowToFix: errors.HowToFixPath,
+		}}
+	}
 	operation := helpers.ExtractOperation(request, pathItem)
 	if operation == nil {
-		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method, foundPath)}
+		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method, pathValue)}
 	}
 	if operation.RequestBody == nil {
 		return true, nil
@@ -48,14 +57,14 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 			// request body is not required, the validation stop there.
 			return true, nil
 		}
-		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, foundPath)}
+		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, pathValue)}
 	}
 
 	// extract the media type from the content type header.
 	ct, _, _ := helpers.ExtractContentType(contentType)
 	mediaType, ok := operation.RequestBody.Content.Get(ct)
 	if !ok {
-		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, foundPath)}
+		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, pathValue)}
 	}
 
 	// we currently only support JSON validation for request bodies
@@ -100,7 +109,7 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 	// render the schema, to be used for validation
 	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON)
 
-	errors.PopulateValidationErrors(validationErrors, request, foundPath)
+	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 
 	return validationSucceeded, validationErrors
 }

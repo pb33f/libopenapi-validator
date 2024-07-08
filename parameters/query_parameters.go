@@ -13,28 +13,34 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
-	// find path
-	var pathItem *v3.PathItem
-	var foundPath string
-	var errs []*errors.ValidationError
-	if v.pathItem == nil {
-		pathItem, errs, foundPath = paths.FindPath(request, v.document)
-		if pathItem == nil || errs != nil {
-			v.errors = errs
-			return false, errs
-		}
-	} else {
-		pathItem = v.pathItem
-		foundPath = v.pathValue
+	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	if len(errs) > 0 {
+		return false, errs
 	}
+	return v.ValidateQueryParamsWithPathItem(request, pathItem, foundPath)
+}
 
+func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	if pathItem == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.ParameterValidationPath,
+			ValidationSubType: "missing",
+			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+				"however that path, or the %s method for that path does not exist in the specification",
+				request.Method, request.URL.Path, request.Method),
+			SpecLine: -1,
+			SpecCol:  -1,
+			HowToFix: errors.HowToFixPath,
+		}}
+	}
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
 	queryParams := make(map[string][]*helpers.QueryParam)
@@ -213,9 +219,8 @@ doneLooking:
 		}
 	}
 
-	errors.PopulateValidationErrors(validationErrors, request, foundPath)
+	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 
-	v.errors = validationErrors
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}

@@ -624,12 +624,42 @@ paths:
 
 	// preset the path
 	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
 
-	valid, errors := v.ValidateHeaderParams(request)
+	valid, errors := v.ValidateHeaderParamsWithPathItem(request, path, pv)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Instead of '1200', "+
 		"use one of the allowed values: '1, 2, 99'", errors[0].HowToFix)
+}
+
+func TestNewValidator_HeaderParamSetPath_notfound(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: integer
+            enum: [1,2,99]`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/buying/drinks", nil)
+	request.Header.Set("coffeecups", "1200") // that's a lot of cups dude, we only have one dishwasher.
+
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+
+	valid, errors := v.ValidateHeaderParamsWithPathItem(request, path, pv)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "GET Path '/buying/drinks' not found", errors[0].Message)
 }
