@@ -209,26 +209,28 @@ paths:
 	// mix up the primitives to fire two schema violations.
 	body := map[string]interface{}{
 		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
+		"patties":    2,
+		"vegetarian": true,
 	}
 
 	bodyBytes, _ := json.Marshal(body)
 
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/createBurger",
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("Content-Type", "application/json")
 
-	pathItem := m.Model.Paths.PathItems.First().Value()
-	pathValue := m.Model.Paths.PathItems.First().Key()
-	v.SetPathItem(pathItem, pathValue)
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model)
+	assert.Len(t, validationErrors, 0)
 
-	valid, errors := v.ValidateRequestBody(request)
+	request2, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request2.Header.Set("Content-Type", "application/json")
+	valid, errors := v.ValidateRequestBodyWithPathItem(request2, pathItem, pathValue)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "GET operation request content type 'GET' does not exist", errors[0].Message)
-	assert.Equal(t, request.Method, errors[0].RequestMethod)
+	assert.Equal(t, request2.Method, errors[0].RequestMethod)
 	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
 	assert.Equal(t, "/burgers/createBurger", errors[0].SpecPath)
 }
@@ -269,14 +271,11 @@ paths:
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("Content-Type", "application/json")
 
-	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
+	valid, errors := v.ValidateRequestBodyWithPathItem(request, nil, "")
 
-	valid, errors := v.ValidateRequestBody(request)
-
-	assert.True(t, valid)
-	assert.Len(t, errors, 0)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST Path '/burgers/createBurger' not found", errors[0].Message)
 
 }
 
@@ -317,11 +316,9 @@ paths:
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("content-type", "application/not-json")
 
-	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
-
-	valid, errors := v.ValidateRequestBody(request)
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model)
+	assert.Len(t, validationErrors, 0)
+	valid, errors := v.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -363,11 +360,9 @@ paths:
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
 		bytes.NewBuffer(bodyBytes))
 
-	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
-
-	valid, errors := v.ValidateRequestBody(request)
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model)
+	assert.Len(t, validationErrors, 0)
+	valid, errors := v.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)

@@ -1397,14 +1397,46 @@ paths:
 
 	// preset the path
 	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
 
-	valid, errors := v.ValidatePathParams(request)
+	valid, errors := v.ValidatePathParamsWithPathItem(request, path, pv)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
 	assert.Equal(t, "Instead of '22334', use one of the allowed values: '1, 2, 99, 100'", errors[0].HowToFix)
+}
+
+func TestNewValidator_SetPathForPathParam_notfound(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{;burgerId}/locate:
+    parameters:
+      - name: burgerId
+        in: path
+        style: matrix
+        schema:
+          type: number
+          enum: [1,2,99,100]
+    get:
+      operationId: locateBurgers`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pizza/;burgerId=22334/locate", nil)
+
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+
+	valid, errors := v.ValidatePathParamsWithPathItem(request, path, pv)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "GET Path '/pizza/;burgerId=22334/locate' not found", errors[0].Message)
 }
 
 func TestNewValidator_ServerPathPrefixInRequestPath(t *testing.T) {

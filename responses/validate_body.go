@@ -22,24 +22,32 @@ func (v *responseBodyValidator) ValidateResponseBody(
 	request *http.Request,
 	response *http.Response,
 ) (bool, []*errors.ValidationError) {
-	// find path
-	var pathItem *v3.PathItem
-	var pathFound string
-	var errs []*errors.ValidationError
-	if v.pathItem == nil {
-		pathItem, errs, pathFound = paths.FindPath(request, v.document)
-		if pathItem == nil || errs != nil {
-			v.errors = errs
-			return false, errs
-		}
-	} else {
-		pathItem = v.pathItem
-		pathFound = v.pathValue
+	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	if len(errs) > 0 {
+		return false, errs
 	}
+	return v.ValidateResponseBodyWithPathItem(request, response, pathItem, foundPath)
+}
 
+func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.Request, response *http.Response, pathItem *v3.PathItem, pathFound string) (bool, []*errors.ValidationError) {
+	if pathItem == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.ParameterValidationPath,
+			ValidationSubType: "missing",
+			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+				"however that path, or the %s method for that path does not exist in the specification",
+				request.Method, request.URL.Path, request.Method),
+			SpecLine: -1,
+			SpecCol:  -1,
+			HowToFix: errors.HowToFixPath,
+		}}
+	}
 	var validationErrors []*errors.ValidationError
 	operation := helpers.ExtractOperation(request, pathItem)
-
+	if operation == nil {
+		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method, pathFound)}
+	}
 	// extract the response code from the response
 	httpCode := response.StatusCode
 	contentType := response.Header.Get(helpers.ContentTypeHeader)

@@ -239,7 +239,6 @@ paths:
 
 	// preset the path
 	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
 
 	// simulate a request/response
 	res := httptest.NewRecorder()
@@ -256,11 +255,75 @@ paths:
 	response := res.Result()
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := v.ValidateResponseBodyWithPathItem(request, response, path, pv)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST Path '/I do not exist' not found", errors[0].Message)
+}
+
+func TestValidateBody_SetPath_missing_operation(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": false,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType) // won't even matter!
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bodyBytes)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	request2, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+	request2.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// validate!
+	valid, errors := v.ValidateResponseBodyWithPathItem(request2, response, path, pv)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "GET operation request content type 'GET' does not exist", errors[0].Message)
 }
 
 func TestValidateBody_MissingStatusCode(t *testing.T) {
@@ -432,7 +495,7 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-	//assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	// assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
 func TestValidateBody_InvalidResponseBodyNil(t *testing.T) {
@@ -578,10 +641,9 @@ paths:
 
 	// preset the path
 	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := v.ValidateResponseBodyWithPathItem(request, response, path, pv)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)

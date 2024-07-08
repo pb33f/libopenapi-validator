@@ -16,6 +16,7 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sync"
 )
 
 func TestNewValidator(t *testing.T) {
@@ -43,6 +44,88 @@ paths:
 	assert.NotNil(t, v.GetParameterValidator())
 	assert.NotNil(t, v.GetResponseBodyValidator())
 	assert.NotNil(t, v.GetRequestBodyValidator())
+}
+
+func TestNewValidator_concurrent(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean
+  /burgers/createBurger/{burgerId}:
+    post:
+      parameters:
+        - in: path
+          name: burgerId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+
+	assert.Empty(t, err)
+
+	v, _ := NewValidator(doc)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+			bytes.NewBuffer(bodyBytes))
+		request.Header.Set("Content-Type", "application/json")
+
+		valid, errors := v.ValidateHttpRequest(request)
+
+		assert.True(t, valid)
+		assert.Len(t, errors, 0)
+	}()
+
+	go func() {
+		defer wg.Done()
+		request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger/toto",
+			bytes.NewBuffer(bodyBytes))
+		request.Header.Set("Content-Type", "application/json")
+
+		valid, errors := v.ValidateHttpRequest(request)
+
+		assert.True(t, valid)
+		assert.Len(t, errors, 0)
+	}()
+
+	wg.Wait()
 }
 
 func TestNewValidator_ValidateDocument(t *testing.T) {
@@ -258,10 +341,6 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	v, _ := NewValidator(doc)
-	v.(*validator).foundPath = &v3.PathItem{
-		Post: &v3.Operation{},
-	}
-	v.(*validator).foundPathValue = "/burgers/createBurger"
 
 	body := map[string]interface{}{
 		"name":       "Big Mac",
@@ -275,7 +354,9 @@ paths:
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("Content-Type", "application/json")
 
-	valid, errors := v.ValidateHttpRequestSync(request)
+	valid, errors := v.ValidateHttpRequestSyncWithPathItem(request, &v3.PathItem{
+		Post: &v3.Operation{},
+	}, "/burgers/createBurger")
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
