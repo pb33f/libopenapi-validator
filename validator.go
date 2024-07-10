@@ -32,6 +32,14 @@ type Validator interface {
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError)
 
+	// ValidateHttpRequestWithPathItem will validate an *http.Request object against an OpenAPI 3+ document.
+	// The path, query, cookie and header parameters and request body are validated.
+	ValidateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
+
+	// ValidateHttpRequestSyncWithPathItem will validate an *http.Request object against an OpenAPI 3+ document syncronously and without spawning any goroutines.
+	// The path, query, cookie and header parameters and request body are validated.
+	ValidateHttpRequestSyncWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
+
 	// ValidateHttpResponse will an *http.Response object against an OpenAPI 3+ document.
 	// The response body is validated. The request is only used to extract the correct reponse from the spec.
 	ValidateHttpResponse(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
@@ -107,23 +115,17 @@ func (v *validator) ValidateHttpResponse(
 
 	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
 	if pathItem == nil || errs != nil {
-		v.errors = errs
 		return false, errs
 	}
-	v.foundPath = pathItem
-	v.foundPathValue = pathValue
 
 	responseBodyValidator := v.responseValidator
-	responseBodyValidator.SetPathItem(pathItem, pathValue)
 
 	// validate response
-	_, responseErrors := responseBodyValidator.ValidateResponseBody(request, response)
+	_, responseErrors := responseBodyValidator.ValidateResponseBodyWithPathItem(request, response, pathItem, pathValue)
 
 	if len(responseErrors) > 0 {
 		return false, responseErrors
 	}
-	v.foundPath = nil
-	v.foundPathValue = ""
 	return true, nil
 }
 
@@ -137,53 +139,35 @@ func (v *validator) ValidateHttpRequestResponse(
 
 	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
 	if pathItem == nil || errs != nil {
-		v.errors = errs
 		return false, errs
 	}
-	v.foundPath = pathItem
-	v.foundPathValue = pathValue
 
 	responseBodyValidator := v.responseValidator
-	responseBodyValidator.SetPathItem(pathItem, pathValue)
 
 	// validate request and response
-	_, requestErrors := v.ValidateHttpRequest(request)
-	_, responseErrors := responseBodyValidator.ValidateResponseBody(request, response)
+	_, requestErrors := v.ValidateHttpRequestWithPathItem(request, pathItem, pathValue)
+	_, responseErrors := responseBodyValidator.ValidateResponseBodyWithPathItem(request, response, pathItem, pathValue)
 
 	if len(requestErrors) > 0 || len(responseErrors) > 0 {
 		return false, append(requestErrors, responseErrors...)
 	}
-	v.foundPath = nil
-	v.foundPathValue = ""
 	return true, nil
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
-
-	// find path
-	var pathItem *v3.PathItem
-	var pathValue string
-	var errs []*errors.ValidationError
-	if v.foundPath == nil {
-		pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
-		if pathItem == nil || errs != nil {
-			v.errors = errs
-			return false, errs
-		}
-		v.foundPath = pathItem
-		v.foundPathValue = pathValue
-	} else {
-		pathItem = v.foundPath
-		pathValue = v.foundPathValue
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model)
+	if len(errs) > 0 {
+		return false, errs
 	}
+	return v.ValidateHttpRequestWithPathItem(request, pathItem, foundPath)
+}
 
+func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	// create a new parameter validator
 	paramValidator := v.paramValidator
-	paramValidator.SetPathItem(pathItem, pathValue)
 
 	// create a new request body validator
 	reqBodyValidator := v.requestValidator
-	reqBodyValidator.SetPathItem(pathItem, pathValue)
 
 	// create some channels to handle async validation
 	doneChan := make(chan bool)
@@ -198,11 +182,11 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 		var paramValidationErrors []*errors.ValidationError
 
 		validations := []validationFunction{
-			paramValidator.ValidatePathParams,
-			paramValidator.ValidateCookieParams,
-			paramValidator.ValidateHeaderParams,
-			paramValidator.ValidateQueryParams,
-			paramValidator.ValidateSecurity,
+			paramValidator.ValidatePathParamsWithPathItem,
+			paramValidator.ValidateCookieParamsWithPathItem,
+			paramValidator.ValidateHeaderParamsWithPathItem,
+			paramValidator.ValidateQueryParamsWithPathItem,
+			paramValidator.ValidateSecurityWithPathItem,
 		}
 
 		// listen for validation errors on parameters. everything will run async.
@@ -226,7 +210,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 			control chan bool,
 			errorChan chan []*errors.ValidationError,
 			validatorFunc validationFunction) {
-			valid, pErrs := validatorFunc(request)
+			valid, pErrs := validatorFunc(request, pathItem, pathValue)
 			if !valid {
 				errorChan <- pErrs
 			}
@@ -248,7 +232,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 	}
 
 	requestBodyValidationFunc := func(control chan bool, errorChan chan []*errors.ValidationError) {
-		valid, pErrs := reqBodyValidator.ValidateRequestBody(request)
+		valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 		if !valid {
 			errorChan <- pErrs
 		}
@@ -273,8 +257,6 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 
 	// wait for all the validations to complete
 	<-doneChan
-	v.foundPathValue = ""
-	v.foundPath = nil
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}
@@ -282,48 +264,37 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	// find path
-	var pathItem *v3.PathItem
-	var pathValue string
-	var errs []*errors.ValidationError
-	if v.foundPath == nil {
-		pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
-		if pathItem == nil || errs != nil {
-			v.errors = errs
-			return false, errs
-		}
-		v.foundPath = pathItem
-		v.foundPathValue = pathValue
-	} else {
-		pathItem = v.foundPath
-		pathValue = v.foundPathValue
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model)
+	if len(errs) > 0 {
+		return false, errs
 	}
+	return v.ValidateHttpRequestSyncWithPathItem(request, pathItem, foundPath)
+}
 
+func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	// create a new parameter validator
 	paramValidator := v.paramValidator
-	paramValidator.SetPathItem(pathItem, pathValue)
 
 	// create a new request body validator
 	reqBodyValidator := v.requestValidator
-	reqBodyValidator.SetPathItem(pathItem, pathValue)
 
 	validationErrors := make([]*errors.ValidationError, 0)
 
 	paramValidationErrors := make([]*errors.ValidationError, 0)
 	for _, validateFunc := range []validationFunction{
-		paramValidator.ValidatePathParams,
-		paramValidator.ValidateCookieParams,
-		paramValidator.ValidateHeaderParams,
-		paramValidator.ValidateQueryParams,
-		paramValidator.ValidateSecurity,
+		paramValidator.ValidatePathParamsWithPathItem,
+		paramValidator.ValidateCookieParamsWithPathItem,
+		paramValidator.ValidateHeaderParamsWithPathItem,
+		paramValidator.ValidateQueryParamsWithPathItem,
+		paramValidator.ValidateSecurityWithPathItem,
 	} {
-		valid, pErrs := validateFunc(request)
+		valid, pErrs := validateFunc(request, pathItem, pathValue)
 		if !valid {
 			paramValidationErrors = append(paramValidationErrors, pErrs...)
 		}
 	}
 
-	valid, pErrs := reqBodyValidator.ValidateRequestBody(request)
+	valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 	if !valid {
 		paramValidationErrors = append(paramValidationErrors, pErrs...)
 	}
@@ -340,12 +311,9 @@ func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*err
 type validator struct {
 	v3Model           *v3.Document
 	document          libopenapi.Document
-	foundPath         *v3.PathItem
-	foundPathValue    string
 	paramValidator    parameters.ParameterValidator
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
-	errors            []*errors.ValidationError
 }
 
 var validationLock sync.Mutex
@@ -371,5 +339,5 @@ func runValidation(control, doneChan chan bool,
 	}
 }
 
-type validationFunction func(request *http.Request) (bool, []*errors.ValidationError)
+type validationFunction func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 type validationFunctionAsync func(control chan bool, errorChan chan []*errors.ValidationError)

@@ -2347,13 +2347,51 @@ paths:
 
 	// preset the path
 	path, _, pv := paths.FindPath(request, &m.Model)
-	v.SetPathItem(path, pv)
 
-	valid, errors := v.ValidateQueryParams(request)
+	valid, errors := v.ValidateQueryParamsWithPathItem(request, path, pv)
 	assert.False(t, valid)
 
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+func TestNewValidator_QueryParamSetPath_notfound(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              ocean:
+                type: string
+              salt:
+                type: boolean
+            required: [ocean, salt]
+      operationId: locateFishy`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/a/beef/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
+
+	// preset the path
+	path, _, pv := paths.FindPath(request, &m.Model)
+
+	valid, errors := v.ValidateQueryParamsWithPathItem(request, path, pv)
+	assert.False(t, valid)
+
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "GET Path '/a/beef/on/a/dishy' not found", errors[0].Message)
 }
 
 func TestNewValidator_QueryParamValidateStyle_DeepObjectMultiValuesFailedMultipleSchemas(t *testing.T) {

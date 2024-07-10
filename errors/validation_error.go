@@ -5,6 +5,7 @@ package errors
 
 import (
 	"fmt"
+
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
@@ -117,4 +118,9 @@ func (v *ValidationError) Error() string {
 // IsPathMissingError returns true if the error has a ValidationType of "path" and a ValidationSubType of "missing"
 func (v *ValidationError) IsPathMissingError() bool {
 	return v.ValidationType == "path" && v.ValidationSubType == "missing"
+}
+
+// IsOperationMissingError returns true if the error has a ValidationType of "request" and a ValidationSubType of "missingOperation"
+func (v *ValidationError) IsOperationMissingError() bool {
+	return v.ValidationType == "path" && v.ValidationSubType == "missingOperation"
 }

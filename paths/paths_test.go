@@ -314,7 +314,29 @@ paths:
 	assert.Nil(t, pathItem)
 	assert.NotNil(t, errs)
 	assert.Equal(t, "HEAD Path '/not/here' not found", errs[0].Message)
+	assert.True(t, errs[0].IsPathMissingError())
 
+}
+
+func TestNewValidator_FindOperationMissing(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}:
+    trace:
+      operationId: locateBurger
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPut, "https://things.com/burgers/12345", nil)
+
+	pathItem, errs, _ := FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+	assert.NotNil(t, errs)
+	assert.Equal(t, "PUT Path '/burgers/12345' not found", errs[0].Message)
+	assert.True(t, errs[0].IsOperationMissingError())
 }
 
 func TestNewValidator_GetLiteralMatch(t *testing.T) {

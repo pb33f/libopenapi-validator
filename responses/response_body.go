@@ -23,15 +23,10 @@ type ResponseBodyValidator interface {
 	// schema of the response body are valid.
 	ValidateResponseBody(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
 
-	// SetPathItem will set the pathItem for the ResponseBodyValidator, all validations will be performed
-	// against this pathItem otherwise if not set, each validation will perform a lookup for the
-	// pathItem based on the *http.Request
-	SetPathItem(path *v3.PathItem, pathValue string)
-}
-
-func (v *responseBodyValidator) SetPathItem(path *v3.PathItem, pathValue string) {
-	v.pathItem = path
-	v.pathValue = pathValue
+	// ValidateResponseBodyWithPathItem will validate the response body for a http.Response pointer. The request is used to
+	// locate the operation in the specification, the response is used to ensure the response code, media type and the
+	// schema of the response body are valid.
+	ValidateResponseBodyWithPathItem(request *http.Request, response *http.Response, pathItem *v3.PathItem, pathFound string) (bool, []*errors.ValidationError)
 }
 
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
@@ -47,8 +42,5 @@ type schemaCache struct {
 
 type responseBodyValidator struct {
 	document    *v3.Document
-	pathItem    *v3.PathItem
-	pathValue   string
-	errors      []*errors.ValidationError
 	schemaCache *sync.Map
 }

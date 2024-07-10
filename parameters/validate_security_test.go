@@ -368,11 +368,33 @@ paths:
 	v := NewParameterValidator(&m.Model)
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
-	pathItem, errs, _ := paths.FindPath(request, &m.Model)
+	pathItem, errs, pv := paths.FindPath(request, &m.Model)
 	assert.Nil(t, errs)
-	v.(*paramValidator).pathItem = pathItem
 
-	valid, errors := v.ValidateSecurity(request)
+	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)
 	assert.True(t, valid)
 	assert.Equal(t, 0, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_PresetPath_notfound(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/beef", nil)
+	pathItem, _, pv := paths.FindPath(request, &m.Model)
+
+	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST Path '/beef' not found", errors[0].Message)
 }
