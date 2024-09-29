@@ -68,7 +68,7 @@ properties:
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+			//t.Parallel()
 
 			valid, errors := ValidateRequestSchema(tc.request, tc.schema, tc.renderedSchema, tc.jsonSchema)
 
