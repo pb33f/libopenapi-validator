@@ -11,7 +11,9 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
@@ -107,7 +109,19 @@ func ValidateRequestSchema(
 	}
 
 	compiler := jsonschema.NewCompiler()
-	_ = compiler.AddResource("requestBody.json", strings.NewReader(string(jsonSchema)))
+	compiler.UseLoader(helpers.NewCompilerLoader())
+	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
+	rErr := compiler.AddResource("requestBody.json", decodedSchema)
+	if rErr != nil {
+		validationErrors = append(validationErrors, &errors.ValidationError{
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           rErr.Error(),
+			Reason:            "Failed to add the request body schema to the compiler.",
+			Context:           string(jsonSchema),
+		})
+		return false, validationErrors
+	}
 	jsch, err := compiler.Compile("requestBody.json")
 	if err != nil {
 		validationErrors = append(validationErrors, &errors.ValidationError{
@@ -123,6 +137,7 @@ func ValidateRequestSchema(
 	// validate the object against the schema
 	scErrs := jsch.Validate(decodedObj)
 	if scErrs != nil {
+
 		jk := scErrs.(*jsonschema.ValidationError)
 
 		// flatten the validationErrors
@@ -130,10 +145,13 @@ func ValidateRequestSchema(
 		var schemaValidationErrors []*errors.SchemaValidationFailure
 		for q := range schFlatErrs {
 			er := schFlatErrs[q]
-			if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+
+			errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+
+			if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
 				continue // ignore this error, it's useless tbh, utter noise.
 			}
-			if er.Error != "" {
+			if er.Error != nil {
 
 				// re-encode the schema.
 				var renderedNode yaml.Node
@@ -158,8 +176,10 @@ func ValidateRequestSchema(
 					referenceObject = string(requestBody)
 				}
 
+				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+
 				violation := &errors.SchemaValidationFailure{
-					Reason:          er.Error,
+					Reason:          errMsg,
 					Location:        er.KeywordLocation,
 					ReferenceSchema: string(renderedSchema),
 					ReferenceObject: referenceObject,

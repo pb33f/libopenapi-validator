@@ -855,8 +855,8 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
-	assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[2].Reason)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "got number, want boolean", errors[0].SchemaValidationErrors[1].Reason)
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {

@@ -301,7 +301,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got number, want boolean", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_CookieParamArrayValidNumber(t *testing.T) {

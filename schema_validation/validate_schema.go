@@ -12,8 +12,9 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
-	"github.com/santhosh-tekuri/jsonschema/v5"
-	_ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
@@ -124,22 +125,23 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.UseLoader(helpers.NewCompilerLoader())
 
-	_ = compiler.AddResource("schema.json", strings.NewReader(string(jsonSchema)))
+	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
+	_ = compiler.AddResource("schema.json", decodedSchema)
 	jsch, err := compiler.Compile("schema.json")
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 
 	// is the schema even valid? did it compile?
 	if err != nil {
-		var se *jsonschema.SchemaError
-		if errors.As(err, &se) {
-			var ve *jsonschema.ValidationError
-			if errors.As(se.Err, &ve) {
+		var ve *jsonschema.SchemaValidationError
+		if errors.As(err, &ve) {
+			if ve != nil {
 
 				// no, this won't work, so we need to extract the errors and return them.
-				basicErrors := ve.BasicOutput().Errors
-				schemaValidationErrors = extractBasicErrors(basicErrors, renderedSchema, decodedObject, payload, ve, schemaValidationErrors)
+				//basicErrors := ve.BasicOutput().Errors
+				//schemaValidationErrors = extractBasicErrors(basicErrors, renderedSchema, decodedObject, payload, ve, schemaValidationErrors)
 				// cannot compile schema, so it's not valid
 				violation := &liberrors.SchemaValidationFailure{
 					Reason:          err.Error(),
@@ -168,23 +170,13 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 		scErrs := jsch.Validate(decodedObject)
 		if scErrs != nil {
 
-			// check for invalid JSON type errors.
-			var invalidJSONTypeError jsonschema.InvalidJSONTypeError
-			if errors.As(scErrs, &invalidJSONTypeError) {
-				violation := &liberrors.SchemaValidationFailure{
-					Reason:   scErrs.Error(),
-					Location: "unavailable", // we don't have a location for this error, so we'll just say it's unavailable.
-				}
-				schemaValidationErrors = append(schemaValidationErrors, violation)
-			}
-
 			var jk *jsonschema.ValidationError
 			if errors.As(scErrs, &jk) {
 
 				// flatten the validationErrors
-				schFlatErrs := jk.BasicOutput().Errors
-
-				schemaValidationErrors = extractBasicErrors(schFlatErrs, renderedSchema, decodedObject, payload, jk, schemaValidationErrors)
+				schFlatErr := jk.BasicOutput().Errors
+				schemaValidationErrors = extractBasicErrors(schFlatErr, renderedSchema,
+					decodedObject, payload, jk, schemaValidationErrors)
 			}
 			line := 1
 			col := 0
@@ -212,16 +204,18 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 	return true, nil
 }
 
-func extractBasicErrors(schFlatErrs []jsonschema.BasicError,
+func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	renderedSchema []byte, decodedObject interface{},
 	payload []byte, jk *jsonschema.ValidationError,
 	schemaValidationErrors []*liberrors.SchemaValidationFailure) []*liberrors.SchemaValidationFailure {
 	for q := range schFlatErrs {
 		er := schFlatErrs[q]
-		if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+
+		errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+		if helpers.IgnoreRegex.MatchString(errMsg) {
 			continue // ignore this error, it's useless tbh, utter noise.
 		}
-		if er.Error != "" {
+		if er.Error != nil {
 
 			// re-encode the schema.
 			var renderedNode yaml.Node
@@ -247,7 +241,7 @@ func extractBasicErrors(schFlatErrs []jsonschema.BasicError,
 			}
 
 			violation := &liberrors.SchemaValidationFailure{
-				Reason:           er.Error,
+				Reason:           errMsg,
 				Location:         er.InstanceLocation,
 				DeepLocation:     er.KeywordLocation,
 				AbsoluteLocation: er.AbsoluteKeywordLocation,

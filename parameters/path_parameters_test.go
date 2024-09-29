@@ -315,7 +315,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: must be >= 10 but found 1, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 1, want 10, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_SimpleEncodedPath_Integer(t *testing.T) {
@@ -428,7 +428,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: must be >= 10 but found 3, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 3, want 10, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidBoolean(t *testing.T) {
@@ -805,7 +805,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: must be >= 5 but found 3, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 3, want 5, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidPrimitiveBoolean(t *testing.T) {
@@ -927,7 +927,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got string, want boolean", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidObject_Exploded(t *testing.T) {
@@ -993,7 +993,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got string, want boolean", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidArray(t *testing.T) {
@@ -1226,7 +1226,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: length must be >= 4, but got 3, Location: /minLength", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minLength: got 3, want 4, Location: /minLength", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_PathParamIntegerEnumValid(t *testing.T) {

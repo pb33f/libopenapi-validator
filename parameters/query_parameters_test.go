@@ -1045,7 +1045,7 @@ paths:
 	assert.Equal(t, "Query array parameter 'fishy' failed to validate", errors[0].Message)
 	assert.Equal(t, "The query parameter (which is an array) 'fishy' is defined as an object, "+
 		"however it failed to pass a schema validation", errors[0].Reason)
-	assert.Equal(t, "missing properties: 'vinegar', 'chips'", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "missing properties 'vinegar', 'chips'", errors[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "/required", errors[0].SchemaValidationErrors[0].Location)
 }
 
@@ -1283,7 +1283,7 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected number, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want number", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_RefViaContentWrapped(t *testing.T) {
@@ -1364,7 +1364,7 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected number, but got string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got string, want number", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_JSONInvalid(t *testing.T) {
@@ -1764,7 +1764,7 @@ paths:
 	assert.False(t, valid)
 
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "value must be one of \"salad\", \"soup\", \"stew\"", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "value must be one of 'salad', 'soup', 'stew'", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidateStyle_SpaceDelimitedObjectDecode(t *testing.T) {
@@ -1853,7 +1853,7 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "value must be one of \"salad\", \"soup\", \"stew\"", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "value must be one of 'salad', 'soup', 'stew'", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamValidateStyle_PipeDelimitedObjectInvalidMultiple(t *testing.T) {
@@ -2042,8 +2042,8 @@ paths:
 	assert.False(t, valid)
 
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[0].Reason)
-	assert.Equal(t, "expected boolean, but got string", errors[0].SchemaValidationErrors[1].Reason)
+	assert.Equal(t, "got string, want boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got string, want boolean", errors[0].SchemaValidationErrors[1].Reason)
 }
 
 func TestNewValidator_QueryParamValidateStyle_FormEncodingArray(t *testing.T) {
@@ -2313,7 +2313,7 @@ paths:
 	assert.False(t, valid)
 
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got number, want boolean", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamSetPath(t *testing.T) {
@@ -2352,7 +2352,7 @@ paths:
 	assert.False(t, valid)
 
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got number, want boolean", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_QueryParamSetPath_notfound(t *testing.T) {
@@ -2460,9 +2460,9 @@ paths:
 	assert.False(t, valid)
 
 	assert.Len(t, errors, 3)
-	assert.Equal(t, "expected boolean, but got number", errors[0].SchemaValidationErrors[0].Reason)
-	assert.Equal(t, "expected number, but got boolean", errors[1].SchemaValidationErrors[0].Reason)
-	assert.Equal(t, "expected number, but got boolean", errors[2].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got number, want boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want number", errors[1].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want number", errors[2].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_ValidateEncodedObjectIsCorrect(t *testing.T) {
@@ -2611,7 +2611,7 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected string, but got number", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got number, want string", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 // https://github.com/pb33f/wiretap/issues/83

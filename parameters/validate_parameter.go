@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	stdError "errors"
 	"fmt"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"net/url"
 	"reflect"
 	"strings"
@@ -14,7 +17,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func ValidateSingleParameterSchema(
@@ -39,7 +42,9 @@ func ValidateSingleParameterSchema(
 // compileSchema create a new json schema compiler and add the schema to it.
 func compileSchema(name string, jsonSchema []byte) *jsonschema.Schema {
 	compiler := jsonschema.NewCompiler()
-	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), strings.NewReader(string(jsonSchema)))
+	compiler.UseLoader(helpers.NewCompilerLoader())
+	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema))) // decode the schema into a json blob
+	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), decodedSchema)
 	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
 	return jsch
 }
@@ -102,7 +107,9 @@ func ValidateParameterSchema(
 	}
 	// 3. create a new json schema compiler and add the schema to it
 	compiler := jsonschema.NewCompiler()
-	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), strings.NewReader(string(jsonSchema)))
+
+	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
+	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), decodedSchema)
 	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
 
 	// 4. validate the object against the schema
@@ -176,14 +183,16 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 	var schemaValidationErrors []*errors.SchemaValidationFailure
 	for q := range schFlatErrs {
 		er := schFlatErrs[q]
-		if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+
+		errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+		if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
 			continue // ignore this error, it's not useful
 		}
 
 		fail := &errors.SchemaValidationFailure{
-			Reason:        er.Error,
-			Location:      er.KeywordLocation,
-			OriginalError: scErrs,
+			Reason:   errMsg,
+			Location: er.KeywordLocation,
+			//OriginalError: scErrs,
 		}
 		if schema != nil {
 			rendered, err := schema.RenderInline()

@@ -9,8 +9,9 @@ import (
 	"github.com/pb33f/libopenapi"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/santhosh-tekuri/jsonschema/v5"
-	_ "github.com/santhosh-tekuri/jsonschema/v5/httploader"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 	"strings"
 )
@@ -25,7 +26,11 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.Valida
 	decodedDocument := *info.SpecJSON
 
 	compiler := jsonschema.NewCompiler()
-	_ = compiler.AddResource("schema.json", strings.NewReader(loadedSchema))
+	compiler.UseLoader(helpers.NewCompilerLoader())
+
+	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(loadedSchema)))
+
+	_ = compiler.AddResource("schema.json", decodedSchema)
 	jsch, _ := compiler.Compile("schema.json")
 
 	scErrs := jsch.Validate(decodedDocument)
@@ -42,21 +47,17 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.Valida
 
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
-				if er.KeywordLocation == "" ||
-					strings.HasPrefix(er.Error, "oneOf failed") ||
-					strings.HasPrefix(er.Error, "allOf failed") ||
-					strings.HasPrefix(er.Error, "anyOf failed") ||
-					strings.HasPrefix(er.Error, "if failed") ||
-					strings.HasPrefix(er.Error, "else failed") ||
-					strings.HasPrefix(er.Error, "doesn't validate with") {
+
+				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+				if er.KeywordLocation == "" && helpers.IgnoreRegex.MatchString(errMsg) {
 					continue // ignore this error, it's useless tbh, utter noise.
 				}
-				if er.Error != "" {
+				if errMsg != "" {
 
 					// locate the violated property in the schema
 					located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
 					violation := &liberrors.SchemaValidationFailure{
-						Reason:           er.Error,
+						Reason:           errMsg,
 						Location:         er.InstanceLocation,
 						DeepLocation:     er.KeywordLocation,
 						AbsoluteLocation: er.AbsoluteKeywordLocation,

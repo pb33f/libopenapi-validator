@@ -517,7 +517,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected integer, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want integer", errors[0].SchemaValidationErrors[0].Reason)
 
 }
 
@@ -561,7 +561,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected integer, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want integer", errors[0].SchemaValidationErrors[0].Reason)
 
 }
 
@@ -861,7 +861,7 @@ func TestNewValidator_PetStore_PetPost200_Invalid(t *testing.T) {
 	// check errors
 	for i := range errors {
 		if errors[i].SchemaValidationErrors != nil {
-			assert.Equal(t, "missing properties: 'photoUrls'", errors[i].SchemaValidationErrors[0].Reason)
+			assert.Equal(t, "missing property 'photoUrls'", errors[i].SchemaValidationErrors[0].Reason)
 		} else {
 			assert.Equal(t, "POST operation request response code '407' does not exist", errors[i].Message)
 		}
