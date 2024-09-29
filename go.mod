@@ -3,7 +3,7 @@ module github.com/pb33f/libopenapi-validator
 go 1.23.0
 
 require (
-	github.com/pb33f/libopenapi v0.18.1
+	github.com/pb33f/libopenapi v0.18.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/stretchr/testify v1.9.0
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
@@ -19,5 +19,4 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.9-0.20240815153524-6ea36470d1bd // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 )
