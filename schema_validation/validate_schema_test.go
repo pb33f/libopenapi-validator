@@ -204,7 +204,7 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "jsonschema: invalid jsonType: struct { name string }", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "invalid jsonType struct { name string }", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestValidateSchema_ReffyComplex_Valid(t *testing.T) {
@@ -397,13 +397,13 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 
 	valid, errors = v.ValidateSchemaObject(sch.Schema(), cakePlease)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 
 	// or death!
 	bodyBytes, _ = json.Marshal(death)
@@ -414,13 +414,13 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 
 	valid, errors = v.ValidateSchemaObject(sch.Schema(), death)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
 func TestValidateSchema_EmptySchema(t *testing.T) {

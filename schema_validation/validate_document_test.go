@@ -48,7 +48,7 @@ func TestValidateDocument_Invalid31(t *testing.T) {
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 4)
+	assert.Len(t, errors[0].SchemaValidationErrors, 6)
 
 }
 

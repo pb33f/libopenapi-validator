@@ -5,8 +5,7 @@ package errors
 
 import (
 	"fmt"
-
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // SchemaValidationFailure is a wrapper around the jsonschema.ValidationError object, to provide a more

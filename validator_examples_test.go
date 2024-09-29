@@ -194,7 +194,7 @@ func ExampleNewValidator_validateHttpRequestResponse() {
 		}
 	}
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
-	//Schema Error: expected integer, but got string, Line: 19, Col: 27
+	//Schema Error: got string, want integer, Line: 19, Col: 27
 }
 
 func ExampleNewValidator_validateHttpResponse() {
@@ -265,5 +265,5 @@ func ExampleNewValidator_validateHttpResponse() {
 		}
 	}
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
-	//Schema Error: expected integer, but got string, Line: 19, Col: 27
+	//Schema Error: got string, want integer, Line: 19, Col: 27
 }

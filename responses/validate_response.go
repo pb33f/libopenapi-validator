@@ -11,7 +11,9 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
@@ -123,9 +125,14 @@ func ValidateResponseSchema(
 
 	// create a new jsonschema compiler and add in the rendered JSON schema.
 	compiler := jsonschema.NewCompiler()
+	compiler.UseLoader(helpers.NewCompilerLoader())
 	fName := fmt.Sprintf("%s.json", helpers.ResponseBodyValidation)
-	_ = compiler.AddResource(fName,
-		strings.NewReader(string(jsonSchema)))
+	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
+	issue := compiler.AddResource(fName, decodedSchema)
+	if issue != nil {
+		panic(issue)
+	}
+
 	jsch, _ := compiler.Compile(fName)
 
 	// validate the object against the schema
@@ -138,10 +145,12 @@ func ValidateResponseSchema(
 		var schemaValidationErrors []*errors.SchemaValidationFailure
 		for q := range schFlatErrs {
 			er := schFlatErrs[q]
-			if er.KeywordLocation == "" || strings.HasPrefix(er.Error, "doesn't validate with") {
+
+			errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+			if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
 				continue // ignore this error, it's useless tbh, utter noise.
 			}
-			if er.Error != "" {
+			if er.Error != nil {
 
 				// re-encode the schema.
 				var renderedNode yaml.Node
@@ -167,7 +176,7 @@ func ValidateResponseSchema(
 				}
 
 				violation := &errors.SchemaValidationFailure{
-					Reason:          er.Error,
+					Reason:          errMsg,
 					Location:        er.KeywordLocation,
 					ReferenceSchema: string(renderedSchema),
 					ReferenceObject: referenceObject,

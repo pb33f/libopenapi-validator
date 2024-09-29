@@ -186,7 +186,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
-	assert.Equal(t, "expected number, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want number", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectBoolean(t *testing.T) {
@@ -218,7 +218,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
-	assert.Equal(t, "expected number, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want number", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_ValidParamTypeObjectBoolean(t *testing.T) {
@@ -346,7 +346,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "expected number, but got boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want number", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeArrayString(t *testing.T) {

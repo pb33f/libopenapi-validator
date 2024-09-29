@@ -681,7 +681,7 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3) // throws 'allOf failure' in addition
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
 func TestValidateBody_ValidSchemaUsingAllOfAnyOf(t *testing.T) {
@@ -854,10 +854,9 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
-	assert.Equal(t, "oneOf failed", errors[0].SchemaValidationErrors[0].Reason)
-	assert.Equal(t, "missing properties: 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[1].Reason)
-	assert.Equal(t, "missing properties: 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[2].Reason)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "missing properties 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "missing properties 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[1].Reason)
 
 }
 
@@ -911,7 +910,7 @@ components:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "must be <= 3 but found 5", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "maximum: got 5, want 3", errors[0].SchemaValidationErrors[0].Reason)
 
 }
 
@@ -968,9 +967,9 @@ components:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "maxItems: got 4, want 2", errors[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, 2, errors[0].SchemaValidationErrors[0].Line)
-	assert.Equal(t, "maximum 2 items required, but found 4 items", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "maxItems: got 4, want 2", errors[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, 11, errors[0].SchemaValidationErrors[0].Column)
 }
 
