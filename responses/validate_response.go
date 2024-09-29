@@ -128,11 +128,7 @@ func ValidateResponseSchema(
 	compiler.UseLoader(helpers.NewCompilerLoader())
 	fName := fmt.Sprintf("%s.json", helpers.ResponseBodyValidation)
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
-	issue := compiler.AddResource(fName, decodedSchema)
-	if issue != nil {
-		panic(issue)
-	}
-
+	_ = compiler.AddResource(fName, decodedSchema)
 	jsch, _ := compiler.Compile(fName)
 
 	// validate the object against the schema
