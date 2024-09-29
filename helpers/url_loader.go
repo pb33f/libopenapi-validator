@@ -15,6 +15,9 @@ import (
 // this change was made in jsonschema v6. The httploader package was removed and the HTTPURLLoader
 // type was introduced.
 // https://github.com/santhosh-tekuri/jsonschema/blob/boon/example_http_test.go
+// TODO: make all this stuff configurable, right now it's all hard wired and not very flexible.
+//
+//	use interfaces and abstractions on all this.
 type HTTPURLLoader http.Client
 
 func (l *HTTPURLLoader) Load(url string) (any, error) {
