@@ -316,12 +316,12 @@ type validator struct {
 	responseValidator responses.ResponseBodyValidator
 }
 
-var validationLock sync.Mutex
-
 func runValidation(control, doneChan chan bool,
 	errorChan chan []*errors.ValidationError,
 	validationErrors *[]*errors.ValidationError,
 	total int) {
+
+	var validationLock sync.Mutex
 	completedValidations := 0
 	for {
 		select {
