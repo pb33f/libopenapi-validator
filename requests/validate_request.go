@@ -122,17 +122,7 @@ func ValidateRequestSchema(
 		})
 		return false, validationErrors
 	}
-	jsch, err := compiler.Compile("requestBody.json")
-	if err != nil {
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:    helpers.RequestBodyValidation,
-			ValidationSubType: helpers.Schema,
-			Message:           err.Error(),
-			Reason:            "Failed to compile the request body for validation.",
-			Context:           string(renderedSchema),
-		})
-		return false, validationErrors
-	}
+	jsch, _ := compiler.Compile("requestBody.json")
 
 	// validate the object against the schema
 	scErrs := jsch.Validate(decodedObj)
