@@ -49,7 +49,7 @@ func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.Valida
 				er := schFlatErrs[q]
 
 				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
-				if er.KeywordLocation == "" && helpers.IgnoreRegex.MatchString(errMsg) {
+				if er.KeywordLocation == "" || helpers.IgnorePolyRegex.MatchString(errMsg) {
 					continue // ignore this error, it's useless tbh, utter noise.
 				}
 				if errMsg != "" {
