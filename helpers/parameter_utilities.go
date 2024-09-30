@@ -292,7 +292,9 @@ func ConstructParamMapFromFormEncodingArray(values []*QueryParam) map[string]int
 		exploded := strings.Split(v.Values[0], Comma)
 		for i := range exploded {
 			if i%2 == 0 {
-				props[exploded[i]] = cast(exploded[i+1])
+				if len(exploded) > i+1 {
+					props[exploded[i]] = cast(exploded[i+1])
+				}
 			}
 		}
 		decoded[v.Key] = props
