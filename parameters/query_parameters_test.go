@@ -2748,3 +2748,52 @@ paths:
 	assert.Equal(t, "lemons 'pizza' is defined as an object, "+
 		"however it failed to be decoded as an object", errs[0].Reason)
 }
+
+// https://github.com/pb33f/wiretap/issues/83
+func TestNewValidator_QueryParamValidateStyle_EmptyDeepObject(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 0.1.0
+security:
+  - apiKeyAuth: []
+paths:
+  /anything/queryParams/deepObject/obj:
+    get:
+      operationId: deepObjectQueryParamsObject
+      parameters:
+        - name: objParam
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              cake:
+                type: string
+          required: true
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Authenticate using an API Key generated via our platform.`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, err := doc.BuildV3Model()
+	assert.Len(t, err, 0) // no patch build here
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"http://localhost:9090/anything/queryParams/deepObject/obj?objParam", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+
+}
