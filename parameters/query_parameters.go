@@ -13,10 +13,10 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -181,7 +181,7 @@ doneLooking:
 								// well we're already in an array, so we need to check the items schema
 								// to ensure this array items matches the type
 								// only check if items is a schema, not a boolean
-								if sch.Items.IsA() {
+								if sch.Items != nil && sch.Items.IsA() {
 									validationErrors = append(validationErrors,
 										ValidateQueryArray(sch, params[p], ef, contentWrapped)...)
 								}

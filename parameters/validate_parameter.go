@@ -190,9 +190,9 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 		}
 
 		fail := &errors.SchemaValidationFailure{
-			Reason:   errMsg,
-			Location: er.KeywordLocation,
-			//OriginalError: scErrs,
+			Reason:        errMsg,
+			Location:      er.KeywordLocation,
+			OriginalError: scErrs,
 		}
 		if schema != nil {
 			rendered, err := schema.RenderInline()

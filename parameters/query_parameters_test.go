@@ -102,6 +102,35 @@ paths:
 	assert.Equal(t, "Query parameter 'fishy' failed to validate", errors[0].Message)
 }
 
+func TestNewValidator_QueryParamMinimum_ignoredviolation(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: object
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.Len(t, errs, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+	assert.Equal(t, "Query parameter 'fishy' failed to validate", errors[0].Message)
+}
+
 func TestNewValidator_QueryParamMinimum(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
