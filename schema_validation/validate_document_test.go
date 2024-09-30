@@ -75,3 +75,19 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 }
+
+func TestValidateSchema_GeneratePointlessValidation(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  version: 1
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	// validate!
+	valid, errors := ValidateOpenAPIDocument(doc)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 6)
+}

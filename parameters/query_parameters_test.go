@@ -2708,3 +2708,43 @@ components:
 	assert.Equal(t, "The query parameter 'objParam' is defined as an object,"+
 		" however it failed to pass a schema validation", errors[0].Reason)
 }
+
+func TestNewValidator_ValidateRawMap(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              ocean:
+                type: string
+              salt:
+                type: boolean
+            required: [ocean, salt]
+      operationId: locateFishy`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	sch := m.Model.Paths.PathItems.GetOrZero("/a/fishy/on/a/dishy").Get.Parameters[0].Schema
+
+	s := sch.Schema()
+
+	// this is not compatible.
+	rawObject := map[int]int{
+		1: 2,
+	}
+
+	errs := ValidateParameterSchema(s, rawObject, "cake", "burger", "lemons",
+		"pizza", "rice", "herbs")
+
+	assert.Len(t, errs, 1)
+	assert.Equal(t, "lemons 'pizza' is defined as an object, "+
+		"however it failed to be decoded as an object", errs[0].Reason)
+}
