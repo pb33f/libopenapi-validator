@@ -118,7 +118,7 @@ func ValidateParameterSchema(
 		p := decodedObj
 		if rawIsMap {
 			if g, ko := rawObject.(map[string]interface{}); ko {
-				if len(g) == 0 || g[""] != nil {
+				if len(g) == 0 || (g[""] != nil && g[""] == "") {
 					p = nil
 				}
 			}
