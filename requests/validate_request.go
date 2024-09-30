@@ -111,17 +111,7 @@ func ValidateRequestSchema(
 	compiler := jsonschema.NewCompiler()
 	compiler.UseLoader(helpers.NewCompilerLoader())
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
-	rErr := compiler.AddResource("requestBody.json", decodedSchema)
-	if rErr != nil {
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:    helpers.RequestBodyValidation,
-			ValidationSubType: helpers.Schema,
-			Message:           rErr.Error(),
-			Reason:            "Failed to add the request body schema to the compiler.",
-			Context:           string(jsonSchema),
-		})
-		return false, validationErrors
-	}
+	_ = compiler.AddResource("requestBody.json", decodedSchema)
 	jsch, err := compiler.Compile("requestBody.json")
 	if err != nil {
 		validationErrors = append(validationErrors, &errors.ValidationError{
