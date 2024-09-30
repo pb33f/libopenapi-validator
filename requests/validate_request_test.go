@@ -68,7 +68,7 @@ properties:
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 
 			valid, errors := ValidateRequestSchema(tc.request, tc.schema, tc.renderedSchema, tc.jsonSchema)
 
@@ -83,4 +83,24 @@ func postRequestWithBody(payload string) *http.Request {
 		Method: http.MethodPost,
 		Body:   io.NopCloser(strings.NewReader(payload)),
 	}
+}
+
+func TestInvalidMin(t *testing.T) {
+
+	renderedSchema := []byte(`type: object
+properties:
+    exclusiveNumber:
+        type: number
+        description: This number starts its journey where most numbers are too scared to begin!
+        exclusiveMinimum: true
+        minimum: !!float 10`)
+
+	jsonSchema := []byte(`{"properties":{"exclusiveNumber":{"description":"This number starts its journey where most numbers are too scared to begin!","exclusiveMinimum":true,"minimum":10,"type":"number"}},"type":"object"}`)
+
+	valid, errors := ValidateRequestSchema(postRequestWithBody(`{"exclusiveNumber": 13}`), &base.Schema{
+		Type: []string{"object"},
+	}, renderedSchema, jsonSchema)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
 }
