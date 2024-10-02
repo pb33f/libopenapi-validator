@@ -695,6 +695,30 @@ func TestInvalidCookieParamNumber(t *testing.T) {
 	require.Contains(t, err.HowToFix, "milky")
 }
 
+func TestIncorrectHeaderParamBool(t *testing.T) {
+
+	enum := `name: blip`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "cookies"
+
+	err := IncorrectHeaderParamBool(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationHeader, err.ValidationSubType)
+	require.Contains(t, err.Message, "Header parameter 'cookies' is not a valid boolean")
+	require.Contains(t, err.Reason, "The header parameter 'cookies' is defined as being a boolean")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
 func TestIncorrectCookieParamBool(t *testing.T) {
 
 	enum := `name: blip`
@@ -721,7 +745,8 @@ func TestIncorrectCookieParamBool(t *testing.T) {
 
 func TestIncorrectCookieParamEnum(t *testing.T) {
 
-	enum := `items:
+	enum := `enum: [fish, crab, lobster]
+items:
   enum: [fish, crab, lobster]`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
@@ -830,7 +855,8 @@ func TestIncorrectPathParamBool(t *testing.T) {
 }
 
 func TestIncorrectPathParamEnum(t *testing.T) {
-	items := `items:
+	items := `enum: [fish, crab, lobster]
+items:
   enum: [fish, crab, lobster]`
 
 	var n yaml.Node
