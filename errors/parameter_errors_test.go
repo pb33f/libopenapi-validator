@@ -465,6 +465,9 @@ func createMockParameter() *v3.Parameter {
 			KeyNode:   &yaml.Node{},
 			ValueNode: &yaml.Node{},
 		},
+		Required: low.NodeReference[bool]{
+			KeyNode: &yaml.Node{},
+		},
 	}
 	return v3.NewParameter(param)
 }
@@ -824,4 +827,140 @@ func TestIncorrectPathParamBool(t *testing.T) {
 	require.Contains(t, err.Message, "Path parameter 'testQueryParam' is not a valid boolean")
 	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' is defined as being a boolean")
 	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectPathParamEnum(t *testing.T) {
+	items := `items:
+  enum: [fish, crab, lobster]`
+
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.Value = schemaProxy
+	param.GoLow().Schema.Value.Schema().Enum.Value = []low.ValueReference[*yaml.Node]{
+		{Value: &yaml.Node{Value: "fish, crab, lobster"}},
+	}
+	param.GoLow().Schema.Value.Schema().Enum.KeyNode = &yaml.Node{}
+
+	err := IncorrectPathParamEnum(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path parameter 'testQueryParam' does not match allowed values")
+	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' has pre-defined values set via an enum")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectPathParamNumber(t *testing.T) {
+
+	items := `items:
+  type: number`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := IncorrectPathParamNumber(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path parameter 'testQueryParam' is not a valid number")
+	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' is defined as being a number")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectPathParamArrayNumber(t *testing.T) {
+
+	items := `items:
+  type: number`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	highSchema.GoLow().Items.Value.A.Schema()
+
+	param := createMockParameter()
+	param.Name = "bubbles"
+
+	err := IncorrectPathParamArrayNumber(param, "milky", highSchema, nil)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path array parameter 'bubbles' is not a valid number")
+	require.Contains(t, err.Reason, "The path parameter (which is an array) 'bubbles' is defined as being a number")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectPathParamArrayBoolean(t *testing.T) {
+
+	items := `items:
+  type: number`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	highSchema.GoLow().Items.Value.A.Schema()
+
+	param := createMockParameter()
+	param.Name = "bubbles"
+
+	err := IncorrectPathParamArrayBoolean(param, "milky", highSchema, nil)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path array parameter 'bubbles' is not a valid boolean")
+	require.Contains(t, err.Reason, "The path parameter (which is an array) 'bubbles' is defined as being a boolean")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestPathParameterMissing(t *testing.T) {
+
+	items := `required: 
+  - testQueryParam`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := PathParameterMissing(param)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path parameter 'testQueryParam' is missing")
+	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' is defined as being required")
+	require.Contains(t, err.HowToFix, "Ensure the value has been set")
 }

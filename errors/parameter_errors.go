@@ -418,7 +418,7 @@ func IncorrectPathParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *V
 		ValidationSubType: helpers.ParameterValidationPath,
 		Message:           fmt.Sprintf("Path parameter '%s' does not match allowed values", param.Name),
 		Reason: fmt.Sprintf("The path parameter '%s' has pre-defined "+
-			"values setvia an enum. The value '%s' is not one of those values.", param.Name, ef),
+			"values set via an enum. The value '%s' is not one of those values.", param.Name, ef),
 		SpecLine: param.GoLow().Schema.Value.Schema().Enum.KeyNode.Line,
 		SpecCol:  param.GoLow().Schema.Value.Schema().Enum.KeyNode.Column,
 		Context:  sch,
