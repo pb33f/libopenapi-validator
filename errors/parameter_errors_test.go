@@ -691,3 +691,137 @@ func TestInvalidCookieParamNumber(t *testing.T) {
 	require.Contains(t, err.Reason, "The cookie parameter 'cookies' is defined as being a number")
 	require.Contains(t, err.HowToFix, "milky")
 }
+
+func TestIncorrectCookieParamBool(t *testing.T) {
+
+	enum := `name: blip`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "cookies"
+
+	err := IncorrectCookieParamBool(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationCookie, err.ValidationSubType)
+	require.Contains(t, err.Message, "Cookie parameter 'cookies' is not a valid boolean")
+	require.Contains(t, err.Reason, "The cookie parameter 'cookies' is defined as being a boolean")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectCookieParamEnum(t *testing.T) {
+
+	enum := `items:
+  enum: [fish, crab, lobster]`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.Value = schemaProxy
+	param.GoLow().Schema.Value.Schema().Enum.Value = []low.ValueReference[*yaml.Node]{
+		{Value: &yaml.Node{Value: "fish, crab, lobster"}},
+	}
+	param.GoLow().Schema.Value.Schema().Enum.KeyNode = &yaml.Node{}
+
+	err := IncorrectCookieParamEnum(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationCookie, err.ValidationSubType)
+	require.Contains(t, err.Message, "Cookie parameter 'testQueryParam' does not match allowed values")
+	require.Contains(t, err.Reason, "The cookie parameter 'testQueryParam' has pre-defined values set via an enum")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectHeaderParamArrayBoolean(t *testing.T) {
+
+	items := `items:
+  type: boolean`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	highSchema.GoLow().Items.Value.A.Schema()
+
+	param := createMockParameter()
+	param.Name = "bubbles"
+
+	err := IncorrectHeaderParamArrayBoolean(param, "milky", highSchema, nil)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationHeader, err.ValidationSubType)
+	require.Contains(t, err.Message, "Header array parameter 'bubbles' is not a valid boolean")
+	require.Contains(t, err.Reason, "The header parameter (which is an array) 'bubbles' is defined as being a boolean")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectHeaderParamArrayNumber(t *testing.T) {
+
+	items := `items:
+  type: number`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	highSchema.GoLow().Items.Value.A.Schema()
+
+	param := createMockParameter()
+	param.Name = "bubbles"
+
+	err := IncorrectHeaderParamArrayNumber(param, "milky", highSchema, nil)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationHeader, err.ValidationSubType)
+	require.Contains(t, err.Message, "Header array parameter 'bubbles' is not a valid number")
+	require.Contains(t, err.Reason, "The header parameter (which is an array) 'bubbles' is defined as being a number")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectPathParamBool(t *testing.T) {
+
+	items := `items:
+  type: number`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := IncorrectPathParamBool(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path parameter 'testQueryParam' is not a valid boolean")
+	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' is defined as being a boolean")
+	require.Contains(t, err.HowToFix, "milky")
+}
