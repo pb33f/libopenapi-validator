@@ -461,7 +461,9 @@ func createMockParameter() *v3.Parameter {
 			ValueNode: &yaml.Node{},
 		},
 		Schema: low.NodeReference[*lowbase.SchemaProxy]{
-			Value: schemaProxy,
+			Value:     schemaProxy,
+			KeyNode:   &yaml.Node{},
+			ValueNode: &yaml.Node{},
 		},
 	}
 	return v3.NewParameter(param)
@@ -544,4 +546,148 @@ func TestIncorrectQueryParamBool(t *testing.T) {
 	require.Contains(t, err.Message, "Query parameter 'testQueryParam' is not a valid boolean")
 	require.Contains(t, err.Reason, "the value 'notBoolean' is not a valid boolean")
 	require.Contains(t, err.HowToFix, "true/false")
+}
+
+func TestInvalidQueryParamNumber(t *testing.T) {
+	param := createMockParameter()
+	baseSchema := createMockLowBaseSchema()
+
+	// Call the function with an invalid number value
+	err := InvalidQueryParamNumber(param, "notNumber", base.NewSchema(baseSchema))
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query parameter 'testQueryParam' is not a valid number")
+	require.Contains(t, err.Reason, "the value 'notNumber' is not a valid number")
+	require.Contains(t, err.HowToFix, "notNumber")
+}
+
+func TestIncorrectQueryParamEnum(t *testing.T) {
+
+	enum := `enum: [fish, crab, lobster]`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.Value.Schema().Enum.KeyNode = &yaml.Node{}
+
+	// Call the function with an invalid enum value
+	err := IncorrectQueryParamEnum(param, "invalidEnum", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query parameter 'testQueryParam' does not match allowed values")
+	require.Contains(t, err.Reason, "'invalidEnum' is not one of those values")
+	require.Contains(t, err.HowToFix, "fish, crab, lobster")
+}
+
+func TestIncorrectQueryParamEnumArray(t *testing.T) {
+
+	enum := `items:
+  enum: [fish, crab, lobster]`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.Value = schemaProxy
+	param.GoLow().Schema.Value.Schema().Items.Value.A.Schema().Enum.Value = []low.ValueReference[*yaml.Node]{
+		{Value: &yaml.Node{Value: "fish, crab, lobster"}},
+	}
+
+	// Call the function with an invalid enum value
+	err := IncorrectQueryParamEnumArray(param, "invalidEnum", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query array parameter 'testQueryParam' does not match allowed values")
+	require.Contains(t, err.Reason, "'invalidEnum' is not one of those values")
+	require.Contains(t, err.HowToFix, "fish, crab, lobster")
+}
+
+func TestIncorrectReservedValues(t *testing.T) {
+
+	enum := `name: bork`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "borked::?^&*"
+
+	err := IncorrectReservedValues(param, "borked::?^&*", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query parameter 'borked::?^&*' value contains reserved values")
+	require.Contains(t, err.Reason, "The query parameter 'borked::?^&*' has 'allowReserved' set to false")
+	require.Contains(t, err.HowToFix, "borked%3A%3A%3F%5E%26%2A")
+}
+
+func TestInvalidHeaderParamNumber(t *testing.T) {
+
+	enum := `name: blip`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "bunny"
+
+	err := InvalidHeaderParamNumber(param, "bunmy", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationHeader, err.ValidationSubType)
+	require.Contains(t, err.Message, "Header parameter 'bunny' is not a valid number")
+	require.Contains(t, err.Reason, "The header parameter 'bunny' is defined as being a number")
+	require.Contains(t, err.HowToFix, "bunmy")
+}
+
+func TestInvalidCookieParamNumber(t *testing.T) {
+
+	enum := `name: blip`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "cookies"
+
+	err := InvalidCookieParamNumber(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationCookie, err.ValidationSubType)
+	require.Contains(t, err.Message, "Cookie parameter 'cookies' is not a valid number")
+	require.Contains(t, err.Reason, "The cookie parameter 'cookies' is defined as being a number")
+	require.Contains(t, err.HowToFix, "milky")
 }
