@@ -10,9 +10,9 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/paths"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func (v *paramValidator) ValidateSecurity(request *http.Request) (bool, []*errors.ValidationError) {
@@ -44,7 +44,13 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 		return true, nil
 	}
 
+	allErrors := []*errors.ValidationError{}
+
 	for _, sec := range security {
+		if sec.ContainsEmptyRequirement {
+			return true, nil
+		}
+
 		for pair := orderedmap.First(sec.Requirements); pair != nil; pair = pair.Next() {
 			secName := pair.Key()
 
@@ -85,8 +91,9 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 						}
 
 						errors.PopulateValidationErrors(validationErrors, request, pathValue)
-
-						return false, validationErrors
+						allErrors = append(allErrors, validationErrors...)
+					} else {
+						return true, nil
 					}
 				}
 
@@ -107,8 +114,9 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 						}
 
 						errors.PopulateValidationErrors(validationErrors, request, pathValue)
-
-						return false, validationErrors
+						allErrors = append(allErrors, validationErrors...)
+					} else {
+						return true, nil
 					}
 				}
 				if secScheme.In == "query" {
@@ -133,8 +141,9 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 						}
 
 						errors.PopulateValidationErrors(validationErrors, request, pathValue)
-
-						return false, validationErrors
+						allErrors = append(allErrors, validationErrors...)
+					} else {
+						return true, nil
 					}
 				}
 				if secScheme.In == "cookie" {
@@ -160,12 +169,14 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 						}
 
 						errors.PopulateValidationErrors(validationErrors, request, pathValue)
-
-						return false, validationErrors
+						allErrors = append(allErrors, validationErrors...)
+					} else {
+						return true, nil
 					}
 				}
 			}
 		}
 	}
-	return true, nil
+
+	return false, allErrors
 }
