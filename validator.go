@@ -170,15 +170,15 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 	reqBodyValidator := v.requestValidator
 
 	// create some channels to handle async validation
-	doneChan := make(chan bool)
+	doneChan := make(chan struct{})
 	errChan := make(chan []*errors.ValidationError)
-	controlChan := make(chan bool)
+	controlChan := make(chan struct{})
 
 	// async param validation function.
-	parameterValidationFunc := func(control chan bool, errorChan chan []*errors.ValidationError) {
+	parameterValidationFunc := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
 		paramErrs := make(chan []*errors.ValidationError)
-		paramControlChan := make(chan bool)
-		paramFunctionControlChan := make(chan bool)
+		paramControlChan := make(chan struct{})
+		paramFunctionControlChan := make(chan struct{})
 		var paramValidationErrors []*errors.ValidationError
 
 		validations := []validationFunction{
@@ -190,7 +190,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 		}
 
 		// listen for validation errors on parameters. everything will run async.
-		paramListener := func(control chan bool, errorChan chan []*errors.ValidationError) {
+		paramListener := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
 			completedValidations := 0
 			for {
 				select {
@@ -199,7 +199,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 				case <-control:
 					completedValidations++
 					if completedValidations == len(validations) {
-						paramFunctionControlChan <- true
+						paramFunctionControlChan <- struct{}{}
 						return
 					}
 				}
@@ -207,14 +207,14 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 		}
 
 		validateParamFunction := func(
-			control chan bool,
+			control chan struct{},
 			errorChan chan []*errors.ValidationError,
 			validatorFunc validationFunction) {
 			valid, pErrs := validatorFunc(request, pathItem, pathValue)
 			if !valid {
 				errorChan <- pErrs
 			}
-			control <- true
+			control <- struct{}{}
 		}
 		go paramListener(paramControlChan, paramErrs)
 		for i := range validations {
@@ -228,15 +228,15 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 		}
 
 		// let runValidation know we are done with this part.
-		controlChan <- true
+		controlChan <- struct{}{}
 	}
 
-	requestBodyValidationFunc := func(control chan bool, errorChan chan []*errors.ValidationError) {
+	requestBodyValidationFunc := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
 		valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 		if !valid {
 			errorChan <- pErrs
 		}
-		control <- true
+		control <- struct{}{}
 	}
 
 	// build async functions
@@ -257,10 +257,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 
 	// wait for all the validations to complete
 	<-doneChan
-	if len(validationErrors) > 0 {
-		return false, validationErrors
-	}
-	return true, nil
+	return !(len(validationErrors) > 0), validationErrors
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
@@ -300,12 +297,7 @@ func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, p
 	}
 
 	validationErrors = append(validationErrors, paramValidationErrors...)
-
-	if len(validationErrors) > 0 {
-		return false, validationErrors
-	}
-
-	return true, nil
+	return !(len(validationErrors) > 0), validationErrors
 }
 
 type validator struct {
@@ -316,7 +308,7 @@ type validator struct {
 	responseValidator responses.ResponseBodyValidator
 }
 
-func runValidation(control, doneChan chan bool,
+func runValidation(control, doneChan chan struct{},
 	errorChan chan []*errors.ValidationError,
 	validationErrors *[]*errors.ValidationError,
 	total int) {
@@ -332,7 +324,7 @@ func runValidation(control, doneChan chan bool,
 		case <-control:
 			completedValidations++
 			if completedValidations == total {
-				doneChan <- true
+				doneChan <- struct{}{}
 				return
 			}
 		}
@@ -340,4 +332,4 @@ func runValidation(control, doneChan chan bool,
 }
 
 type validationFunction func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
-type validationFunctionAsync func(control chan bool, errorChan chan []*errors.ValidationError)
+type validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
