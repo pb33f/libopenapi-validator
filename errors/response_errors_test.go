@@ -4,20 +4,22 @@
 package errors
 
 import (
-	"github.com/pb33f/libopenapi-validator/helpers"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"net/http"
+	"testing"
+
 	"github.com/pb33f/libopenapi/datamodel/low"
-	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-	"net/http"
-	"testing"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // Helper to create a mock v3.Operation object
 func createMockOperation() *v3.Operation {
-
 	content := orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]]()
 	content.Set(low.KeyReference[string]{
 		Value: "application/json",

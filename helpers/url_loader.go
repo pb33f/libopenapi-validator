@@ -6,9 +6,10 @@ package helpers
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"time"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // HTTPURLLoader is a type that implements the Loader interface for loading schemas from HTTP URLs.

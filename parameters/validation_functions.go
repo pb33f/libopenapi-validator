@@ -5,19 +5,21 @@ package parameters
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // ValidateCookieArray will validate a cookie parameter that is an array
 func ValidateCookieArray(
-	sch *base.Schema, param *v3.Parameter, value string) []*errors.ValidationError {
-
+	sch *base.Schema, param *v3.Parameter, value string,
+) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
 
@@ -56,8 +58,8 @@ func ValidateCookieArray(
 
 // ValidateHeaderArray will validate a header parameter that is an array
 func ValidateHeaderArray(
-	sch *base.Schema, param *v3.Parameter, value string) []*errors.ValidationError {
-
+	sch *base.Schema, param *v3.Parameter, value string,
+) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
 
@@ -96,8 +98,8 @@ func ValidateHeaderArray(
 
 // ValidateQueryArray will validate a query parameter that is an array
 func ValidateQueryArray(
-	sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool) []*errors.ValidationError {
-
+	sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool,
+) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
 
@@ -186,7 +188,6 @@ func ValidateQueryArray(
 
 // ValidateQueryParamStyle will validate a query parameter by style
 func ValidateQueryParamStyle(param *v3.Parameter, as []*helpers.QueryParam) []*errors.ValidationError {
-
 	var validationErrors []*errors.ValidationError
 stopValidation:
 	for _, qp := range as {
@@ -201,7 +202,7 @@ stopValidation:
 					}
 					if pSchema.AdditionalProperties != nil && pSchema.AdditionalProperties.IsA() {
 						addPropSchema := pSchema.AdditionalProperties.A.Schema()
-						if addPropSchema.Type != nil && len(addPropSchema.Type) > 0 {
+						if len(addPropSchema.Type) > 0 {
 							if slices.Contains(addPropSchema.Type, helpers.Array) {
 								// an array can have more than one value.
 								continue

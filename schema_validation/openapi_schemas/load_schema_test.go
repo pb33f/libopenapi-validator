@@ -4,27 +4,20 @@
 package openapi_schemas
 
 import (
-	"crypto/md5"
-	"encoding/hex"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-)
 
-// Helper function to calculate the MD5 hash of a string
-func calculateMD5Hash(data string) string {
-	hash := md5.Sum([]byte(data))
-	return hex.EncodeToString(hash[:])
-}
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 // Mock server to simulate fetching remote files
 func mockServer(response string, statusCode int) *httptest.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(statusCode)
-		io.WriteString(w, response)
+		_, _ = io.WriteString(w, response)
 	})
 	return httptest.NewServer(handler)
 }

@@ -5,9 +5,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func IncorrectFormEncoding(param *v3.Parameter, qp *helpers.QueryParam, i int) *ValidationError {
@@ -133,7 +135,8 @@ func IncorrectHeaderParamEnum(param *v3.Parameter, ef string, sch *base.Schema) 
 }
 
 func IncorrectQueryParamArrayBoolean(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationQuery,
@@ -148,7 +151,8 @@ func IncorrectQueryParamArrayBoolean(
 }
 
 func IncorrectCookieParamArrayBoolean(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationCookie,
@@ -163,7 +167,8 @@ func IncorrectCookieParamArrayBoolean(
 }
 
 func IncorrectQueryParamArrayNumber(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationQuery,
@@ -178,7 +183,8 @@ func IncorrectQueryParamArrayNumber(
 }
 
 func IncorrectCookieParamArrayNumber(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationCookie,
@@ -364,7 +370,8 @@ func IncorrectCookieParamEnum(param *v3.Parameter, ef string, sch *base.Schema) 
 }
 
 func IncorrectHeaderParamArrayBoolean(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationHeader,
@@ -379,7 +386,8 @@ func IncorrectHeaderParamArrayBoolean(
 }
 
 func IncorrectHeaderParamArrayNumber(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationHeader,
@@ -441,7 +449,8 @@ func IncorrectPathParamNumber(param *v3.Parameter, item string, sch *base.Schema
 }
 
 func IncorrectPathParamArrayNumber(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationPath,
@@ -456,7 +465,8 @@ func IncorrectPathParamArrayNumber(
 }
 
 func IncorrectPathParamArrayBoolean(
-	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema) *ValidationError {
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationPath,

@@ -13,9 +13,10 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateBody_MissingContentType(t *testing.T) {
@@ -955,7 +956,6 @@ paths:
 	// simulate a request/response
 	res := httptest.NewRecorder()
 	handler := func(w http.ResponseWriter, r *http.Request) {
-
 		// inject a full content type header, including charset and boundary
 		w.Header().Set(helpers.ContentTypeHeader,
 			fmt.Sprintf("%s; charset=utf-8; boundary=---12223344", helpers.JSONContentType))
@@ -1205,7 +1205,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateBody_InvalidBodyJSON(t *testing.T) {
@@ -1259,7 +1258,6 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
 	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestValidateBody_NoContentType_Valid(t *testing.T) {
@@ -1301,7 +1299,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 type errorReader struct{}
@@ -1309,6 +1306,7 @@ type errorReader struct{}
 func (er *errorReader) Read(p []byte) (n int, err error) {
 	return 0, errors.New("some io error")
 }
+
 func (er *errorReader) Close() error {
 	return nil
 }

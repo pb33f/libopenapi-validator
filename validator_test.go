@@ -9,18 +9,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sync"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func TestNewValidator(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -47,7 +48,6 @@ paths:
 }
 
 func TestNewValidator_concurrent(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -129,7 +129,6 @@ paths:
 }
 
 func TestNewValidator_ValidateDocument(t *testing.T) {
-
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 	v, _ := NewValidator(doc)
 	valid, errs := v.ValidateDocument()
@@ -138,7 +137,6 @@ func TestNewValidator_ValidateDocument(t *testing.T) {
 }
 
 func TestNewValidator_BadDoc(t *testing.T) {
-
 	spec := `swagger: 2.0`
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))
@@ -146,11 +144,9 @@ func TestNewValidator_BadDoc(t *testing.T) {
 	_, errs := NewValidator(doc)
 
 	assert.Len(t, errs, 1)
-
 }
 
 func TestNewValidator_ValidateHttpRequest_BadPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -189,11 +185,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST Path '/I am a potato man' not found", errors[0].Message)
-
 }
 
 func TestNewValidator_ValidateHttpRequestSync_BadPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -232,11 +226,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST Path '/I am a potato man' not found", errors[0].Message)
-
 }
 
 func TestNewValidator_ValidateHttpRequest_ValidPostSimpleSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -274,11 +266,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_ValidateHttpRequestSync_ValidPostSimpleSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -316,11 +306,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_ValidateHttpRequestSync_ValidPostSimpleSchema_FoundPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -360,11 +348,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_slash_server_url(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 servers:
   - url: /
@@ -394,7 +380,6 @@ paths:
 }
 
 func TestNewValidator_ValidateHttpRequest_SetPath_ValidPostSimpleSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -432,11 +417,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_ValidateHttpRequestSync_SetPath_ValidPostSimpleSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -474,11 +457,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_ValidateHttpRequest_InvalidPostSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -518,11 +499,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "got boolean, want integer", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestNewValidator_ValidateHttpRequestSync_InvalidPostSchema(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -562,11 +541,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "got boolean, want integer", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestNewValidator_ValidateHttpRequest_InvalidQuery(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -611,11 +588,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Query parameter 'cheese' is missing", errors[0].Message)
-
 }
 
 func TestNewValidator_ValidateHttpRequestSync_InvalidQuery(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
@@ -660,7 +635,6 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Query parameter 'cheese' is missing", errors[0].Message)
-
 }
 
 var petstoreBytes []byte
@@ -670,7 +644,6 @@ func init() {
 }
 
 func TestNewValidator_PetStore_MissingContentType(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -719,11 +692,9 @@ func TestNewValidator_PetStore_MissingContentType(t *testing.T) {
 	assert.Equal(t, "The content type 'application/not-json' of the PUT response received "+
 		"has not been defined, it's an unknown type",
 		errors[0].Reason)
-
 }
 
 func TestNewValidator_PetStore_PetPost200_Valid_PathPreset(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -769,7 +740,6 @@ func TestNewValidator_PetStore_PetPost200_Valid_PathPreset(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetPost200_Valid(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -815,7 +785,6 @@ func TestNewValidator_PetStore_PetPost200_Valid(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetPost200_Invalid(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -869,7 +838,6 @@ func TestNewValidator_PetStore_PetPost200_Invalid(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetFindByStatusGet200_Valid(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -915,7 +883,6 @@ func TestNewValidator_PetStore_PetFindByStatusGet200_Valid(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetFindByStatusGet200_BadEnum(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -961,11 +928,9 @@ func TestNewValidator_PetStore_PetFindByStatusGet200_BadEnum(t *testing.T) {
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Query parameter 'status' does not match allowed values", errors[0].Message)
 	assert.Equal(t, "Instead of 'invalidEnum', use one of the allowed values: 'available, pending, sold'", errors[0].HowToFix)
-
 }
 
 func TestNewValidator_PetStore_PetFindByTagsGet200_Valid(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1011,7 +976,6 @@ func TestNewValidator_PetStore_PetFindByTagsGet200_Valid(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetFindByTagsGet200_InvalidExplode(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1057,7 +1021,6 @@ func TestNewValidator_PetStore_PetFindByTagsGet200_InvalidExplode(t *testing.T) 
 }
 
 func TestNewValidator_PetStore_PetGet200_Valid(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1103,7 +1066,6 @@ func TestNewValidator_PetStore_PetGet200_Valid(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetGet200_PathNotFound(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1150,7 +1112,6 @@ func TestNewValidator_PetStore_PetGet200_PathNotFound(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetGet200(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1197,7 +1158,6 @@ func TestNewValidator_PetStore_PetGet200(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetGet200_ServerBadMediaType(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1246,7 +1206,6 @@ func TestNewValidator_PetStore_PetGet200_ServerBadMediaType(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetWithIdPost200_Missing200(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1274,11 +1233,9 @@ func TestNewValidator_PetStore_PetWithIdPost200_Missing200(t *testing.T) {
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST operation request response code '200' does not exist", errors[0].Message)
-
 }
 
 func TestNewValidator_PetStore_UploadImage200_InvalidRequestBodyType(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1306,11 +1263,9 @@ func TestNewValidator_PetStore_UploadImage200_InvalidRequestBodyType(t *testing.
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-
 }
 
 func TestNewValidator_PetStore_UploadImage200_Valid(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1352,7 +1307,6 @@ func TestNewValidator_PetStore_UploadImage200_Valid(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_UploadImage200_InvalidAPIResponse(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1395,7 +1349,6 @@ func TestNewValidator_PetStore_UploadImage200_InvalidAPIResponse(t *testing.T) {
 }
 
 func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
-
 	careRequestBytes, _ := os.ReadFile("test_specs/care_request.yaml")
 	doc, _ := libopenapi.NewDocument(careRequestBytes)
 
@@ -1439,11 +1392,9 @@ func TestNewValidator_CareRequest_WrongContentType(t *testing.T) {
 	assert.Equal(t, "The content type 'application/not-json' "+
 		"of the GET response received has not been defined, it's an unknown type",
 		errors[0].Reason)
-
 }
 
 func TestNewValidator_PetStore_InvalidPath_Response(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1474,7 +1425,6 @@ func TestNewValidator_PetStore_InvalidPath_Response(t *testing.T) {
 }
 
 func TestNewValidator_PetStore_PetFindByStatusGet200_Valid_responseOnly(t *testing.T) {
-
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
 
@@ -1520,7 +1470,6 @@ func TestNewValidator_PetStore_PetFindByStatusGet200_Valid_responseOnly(t *testi
 }
 
 func TestNewValidator_ValidateHttpResponse_RangeResponseCode(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers:

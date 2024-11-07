@@ -4,11 +4,13 @@
 package requests
 
 import (
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"sync"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
 )
 
 // RequestBodyValidator is an interface that defines the methods for validating request bodies for Operations.
@@ -32,7 +34,6 @@ func NewRequestBodyValidator(document *v3.Document) RequestBodyValidator {
 	return &requestBodyValidator{document: document, schemaCache: &sync.Map{}}
 }
 
-
 type schemaCache struct {
 	schema         *base.Schema
 	renderedInline []byte
@@ -41,6 +42,5 @@ type schemaCache struct {
 
 type requestBodyValidator struct {
 	document    *v3.Document
-	errors      []*errors.ValidationError
 	schemaCache *sync.Map
 }

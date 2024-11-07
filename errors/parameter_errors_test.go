@@ -5,23 +5,25 @@ package errors
 
 import (
 	"context"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/orderedmap"
 	"testing"
 
-	"github.com/pb33f/libopenapi-validator/helpers"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/low"
-	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
-	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // Helper to create a mock v3.Parameter object with a schema
 func createMockParameterWithSchema() *v3.Parameter {
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	_ = schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -162,7 +164,7 @@ func TestHeaderParameterCannotBeDecoded(t *testing.T) {
 func TestIncorrectHeaderParamEnum(t *testing.T) {
 	param := createMockParameterWithSchema()
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil))
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -199,10 +201,9 @@ func TestIncorrectHeaderParamEnum(t *testing.T) {
 }
 
 func TestIncorrectQueryParamArrayBoolean(t *testing.T) {
-
 	param := createMockParameterWithSchema()
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil))
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -293,7 +294,7 @@ func createMockLowBaseSchemaForBooleanArray() *lowbase.Schema {
 		ValueNode: &yaml.Node{},
 	}
 
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	_ = schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -304,6 +305,7 @@ func createMockLowBaseSchemaForBooleanArray() *lowbase.Schema {
 
 	return itemsSchema
 }
+
 func TestIncorrectCookieParamArrayBoolean(t *testing.T) {
 	// Create mock parameter and schemas
 	param := createMockParameterForBooleanArray()
@@ -353,7 +355,7 @@ func createMockLowBaseSchemaForNumberArray() *lowbase.Schema {
 		ValueNode: &yaml.Node{},
 	}
 
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	_ = schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -414,7 +416,7 @@ func createMockLowBaseSchemaForCookieNumberArray() *lowbase.Schema {
 		ValueNode: &yaml.Node{},
 	}
 
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	_ = schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -447,9 +449,8 @@ func TestIncorrectCookieParamArrayNumber(t *testing.T) {
 
 // Helper function to create a mock v3.Parameter
 func createMockParameter() *v3.Parameter {
-
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	_ = schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
 
 	m := orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]]()
 	m.Set(low.KeyReference[string]{Value: "application/json"}, low.ValueReference[*lowv3.MediaType]{ValueNode: &yaml.Node{}, Value: &lowv3.MediaType{}})
@@ -494,7 +495,7 @@ func createMockLowBaseSchema() *lowbase.Schema {
 		ValueNode: &yaml.Node{},
 	}
 
-	schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	_ = schemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
 	schemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -527,7 +528,7 @@ func TestIncorrectQueryParamBool(t *testing.T) {
 	baseSchema := createMockLowBaseSchema()
 
 	lschemaProxy := &lowbase.SchemaProxy{}
-	lschemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil)
+	require.NoError(t, lschemaProxy.Build(context.Background(), &yaml.Node{}, &yaml.Node{}, nil))
 	lschemaProxy.Schema().Type = low.NodeReference[lowbase.SchemaDynamicValue[string, []low.ValueReference[string]]]{
 		KeyNode:   &yaml.Node{},
 		ValueNode: &yaml.Node{},
@@ -568,13 +569,12 @@ func TestInvalidQueryParamNumber(t *testing.T) {
 }
 
 func TestIncorrectQueryParamEnum(t *testing.T) {
-
 	enum := `enum: [fish, crab, lobster]`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -594,14 +594,13 @@ func TestIncorrectQueryParamEnum(t *testing.T) {
 }
 
 func TestIncorrectQueryParamEnumArray(t *testing.T) {
-
 	enum := `items:
   enum: [fish, crab, lobster]`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -624,13 +623,12 @@ func TestIncorrectQueryParamEnumArray(t *testing.T) {
 }
 
 func TestIncorrectReservedValues(t *testing.T) {
-
 	enum := `name: bork`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -648,13 +646,12 @@ func TestIncorrectReservedValues(t *testing.T) {
 }
 
 func TestInvalidHeaderParamNumber(t *testing.T) {
-
 	enum := `name: blip`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -672,13 +669,12 @@ func TestInvalidHeaderParamNumber(t *testing.T) {
 }
 
 func TestInvalidCookieParamNumber(t *testing.T) {
-
 	enum := `name: blip`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -696,13 +692,12 @@ func TestInvalidCookieParamNumber(t *testing.T) {
 }
 
 func TestIncorrectHeaderParamBool(t *testing.T) {
-
 	enum := `name: blip`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -720,13 +715,12 @@ func TestIncorrectHeaderParamBool(t *testing.T) {
 }
 
 func TestIncorrectCookieParamBool(t *testing.T) {
-
 	enum := `name: blip`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -744,7 +738,6 @@ func TestIncorrectCookieParamBool(t *testing.T) {
 }
 
 func TestIncorrectCookieParamEnum(t *testing.T) {
-
 	enum := `enum: [fish, crab, lobster]
 items:
   enum: [fish, crab, lobster]`
@@ -752,7 +745,7 @@ items:
 	_ = yaml.Unmarshal([]byte(enum), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -775,14 +768,13 @@ items:
 }
 
 func TestIncorrectHeaderParamArrayBoolean(t *testing.T) {
-
 	items := `items:
   type: boolean`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	highSchema.GoLow().Items.Value.A.Schema()
@@ -802,14 +794,13 @@ func TestIncorrectHeaderParamArrayBoolean(t *testing.T) {
 }
 
 func TestIncorrectHeaderParamArrayNumber(t *testing.T) {
-
 	items := `items:
   type: number`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	highSchema.GoLow().Items.Value.A.Schema()
@@ -829,14 +820,13 @@ func TestIncorrectHeaderParamArrayNumber(t *testing.T) {
 }
 
 func TestIncorrectPathParamBool(t *testing.T) {
-
 	items := `items:
   type: number`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -863,7 +853,7 @@ items:
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -886,14 +876,13 @@ items:
 }
 
 func TestIncorrectPathParamNumber(t *testing.T) {
-
 	items := `items:
   type: number`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()
@@ -912,14 +901,13 @@ func TestIncorrectPathParamNumber(t *testing.T) {
 }
 
 func TestIncorrectPathParamArrayNumber(t *testing.T) {
-
 	items := `items:
   type: number`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	highSchema.GoLow().Items.Value.A.Schema()
@@ -939,14 +927,13 @@ func TestIncorrectPathParamArrayNumber(t *testing.T) {
 }
 
 func TestIncorrectPathParamArrayBoolean(t *testing.T) {
-
 	items := `items:
   type: number`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	highSchema.GoLow().Items.Value.A.Schema()
@@ -966,14 +953,13 @@ func TestIncorrectPathParamArrayBoolean(t *testing.T) {
 }
 
 func TestPathParameterMissing(t *testing.T) {
-
 	items := `required: 
   - testQueryParam`
 	var n yaml.Node
 	_ = yaml.Unmarshal([]byte(items), &n)
 
 	schemaProxy := &lowbase.SchemaProxy{}
-	schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil)
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
 
 	highSchema := base.NewSchema(schemaProxy.Schema())
 	param := createMockParameter()

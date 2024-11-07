@@ -4,14 +4,14 @@
 package schema_validation
 
 import (
-	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateDocument(t *testing.T) {
-
 	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
 
 	doc, _ := libopenapi.NewDocument(petstore)
@@ -21,11 +21,9 @@ func TestValidateDocument(t *testing.T) {
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateDocument_31(t *testing.T) {
-
 	petstore, _ := os.ReadFile("../test_specs/valid_31.yaml")
 
 	doc, _ := libopenapi.NewDocument(petstore)
@@ -38,7 +36,6 @@ func TestValidateDocument_31(t *testing.T) {
 }
 
 func TestValidateDocument_Invalid31(t *testing.T) {
-
 	petstore, _ := os.ReadFile("../test_specs/invalid_31.yaml")
 
 	doc, _ := libopenapi.NewDocument(petstore)
@@ -49,7 +46,6 @@ func TestValidateDocument_Invalid31(t *testing.T) {
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 6)
-
 }
 
 func TestValidateSchema_ValidateLicenseIndentifier(t *testing.T) {

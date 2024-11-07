@@ -5,6 +5,7 @@ package errors
 
 import (
 	"fmt"
+
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -53,7 +54,6 @@ func (s *SchemaValidationFailure) Error() string {
 
 // ValidationError is a struct that contains all the information about a validation error.
 type ValidationError struct {
-
 	// Message is a human-readable message describing the error.
 	Message string `json:"message" yaml:"message"`
 

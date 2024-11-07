@@ -6,20 +6,21 @@ package schema_validation
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/pb33f/libopenapi"
-	liberrors "github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
-	"strings"
+
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
 func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.ValidationError) {
-
 	info := doc.GetSpecInfo()
 	loadedSchema := info.APISchema
 	var validationErrors []*liberrors.ValidationError

@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/pb33f/libopenapi-validator/helpers"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/datamodel/low"
-	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // Helper to create a mock v3.Operation object with a RequestBody

@@ -4,17 +4,19 @@
 package helpers
 
 import (
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/stretchr/testify/require"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // Test ExtractParamsForOperation with various HTTP methods
 func TestExtractParamsForOperation(t *testing.T) {
 	pathItem := &v3.PathItem{
-		//Parameters: []*v3.Parameter{{Name: "param"}},
+		// Parameters: []*v3.Parameter{{Name: "param"}},
 		Get:     &v3.Operation{Parameters: []*v3.Parameter{{Name: "getParam"}}},
 		Post:    &v3.Operation{Parameters: []*v3.Parameter{{Name: "postParam"}}},
 		Put:     &v3.Operation{Parameters: []*v3.Parameter{{Name: "putParam"}}},
@@ -55,7 +57,6 @@ func TestExtractParamsForOperation(t *testing.T) {
 			require.Equal(t, tt.expected[i], param.Name)
 		}
 	}
-
 }
 
 // Test cast with different values (bool, int, float, string)
@@ -75,13 +76,17 @@ func TestExtractSecurityForOperation(t *testing.T) {
 		Put:    &v3.Operation{Security: []*base.SecurityRequirement{{}}},
 		Delete: &v3.Operation{Security: []*base.SecurityRequirement{{}}},
 		Options: &v3.Operation{
-			Security: []*base.SecurityRequirement{{}}},
+			Security: []*base.SecurityRequirement{{}},
+		},
 		Head: &v3.Operation{
-			Security: []*base.SecurityRequirement{{}}},
+			Security: []*base.SecurityRequirement{{}},
+		},
 		Patch: &v3.Operation{
-			Security: []*base.SecurityRequirement{{}}},
+			Security: []*base.SecurityRequirement{{}},
+		},
 		Trace: &v3.Operation{
-			Security: []*base.SecurityRequirement{{}}},
+			Security: []*base.SecurityRequirement{{}},
+		},
 	}
 
 	// Test all HTTP methods
@@ -108,7 +113,6 @@ func TestExtractSecurityForOperation(t *testing.T) {
 		// Check if the number of security requirements matches the expected count (1 in all cases)
 		require.Len(t, security, 1, "Failed for method: "+tt.method)
 	}
-
 }
 
 func TestConstructParamMapFromDeepObjectEncoding(t *testing.T) {
@@ -170,7 +174,6 @@ func TestConstructParamMapFromDeepObjectEncoding(t *testing.T) {
 }
 
 func TestConstructParamMapFromDeepObjectEncoding_ElseCase(t *testing.T) {
-
 	arraySchema := &base.Schema{Type: []string{"array"}, AdditionalProperties: &base.DynamicValue[*base.SchemaProxy, bool]{
 		A: base.CreateSchemaProxy(&base.Schema{Type: []string{"array"}}),
 	}}
@@ -190,7 +193,6 @@ func TestConstructParamMapFromDeepObjectEncoding_ElseCase(t *testing.T) {
 	}
 	decoded = ConstructParamMapFromDeepObjectEncoding(newValues, arraySchema)
 	require.Equal(t, int64(999), decoded["key1"].(map[string]interface{})["prop3"])
-
 }
 
 func TestConstructKVFromLabelEncoding(t *testing.T) {
@@ -328,7 +330,6 @@ func TestConstructMapFromCSV(t *testing.T) {
 	// add odd number of keys/values
 	result = ConstructMapFromCSV("key1,value1,key2")
 	require.Equal(t, "value1", result["key1"])
-
 }
 
 // Test ConstructKVFromCSV

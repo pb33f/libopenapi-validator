@@ -5,13 +5,16 @@ package parameters
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -38,7 +41,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 		}}
 	}
 	// extract params for the operation
-	var params = helpers.ExtractParamsForOperation(request, pathItem)
+	params := helpers.ExtractParamsForOperation(request, pathItem)
 	var validationErrors []*errors.ValidationError
 	for _, p := range params {
 		if p.In == helpers.Cookie {

@@ -5,12 +5,14 @@ package helpers
 
 import (
 	"fmt"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // QueryParam is a struct that holds the key, values and property name for a query parameter
@@ -104,7 +106,6 @@ func ExtractSecurityForOperation(request *http.Request, item *v3.PathItem) []*ba
 }
 
 func cast(v string) any {
-
 	if v == "true" || v == "false" {
 		b, _ := strconv.ParseBool(v)
 		return b
@@ -320,7 +321,6 @@ func ExplodeQueryValue(value, style string) []string {
 	default:
 		return strings.Split(value, Comma)
 	}
-
 }
 
 func CollapseCSVIntoFormStyle(key string, value string) string {

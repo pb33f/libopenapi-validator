@@ -4,9 +4,11 @@
 package parameters
 
 import (
-	"github.com/pb33f/libopenapi-validator/errors"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"net/http"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
 )
 
 // ParameterValidator is an interface that defines the methods for validating parameters

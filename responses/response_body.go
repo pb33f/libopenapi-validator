@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
 )
 
 // ResponseBodyValidator is an interface that defines the methods for validating response bodies for Operations.
@@ -17,7 +19,6 @@ import (
 //	ValidateResponseBody method accepts an *http.Request and returns true if validation passed,
 //	                     false if validation failed and a slice of ValidationError pointers.
 type ResponseBodyValidator interface {
-
 	// ValidateResponseBody will validate the response body for a http.Response pointer. The request is used to
 	// locate the operation in the specification, the response is used to ensure the response code, media type and the
 	// schema of the response body are valid.

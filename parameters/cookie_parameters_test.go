@@ -4,15 +4,16 @@
 package parameters
 
 import (
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestNewValidator_CookieNoPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -41,7 +42,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamNumberValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -67,7 +67,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamNumberValidFloat(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -93,7 +92,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamNumberInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -120,7 +118,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamBooleanValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -146,7 +143,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamEnumValidString(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -176,7 +172,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamEnumInvalidString(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -211,7 +206,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamBooleanInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -238,7 +232,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamObjectValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -271,7 +264,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamObjectInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -305,7 +297,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayValidNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -333,7 +324,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayInvalidNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -361,7 +351,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayValidBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -389,7 +378,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayString(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -417,7 +405,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayInvalidBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -445,7 +432,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayInvalidBooleanZeroOne(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -473,7 +459,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayValidIntegerEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -500,7 +485,6 @@ paths:
 }
 
 func TestNewValidator_CookieParamArrayInvalidIntegerEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -528,7 +512,6 @@ paths:
 }
 
 func TestNewValidator_PresetPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:
@@ -559,7 +542,6 @@ paths:
 }
 
 func TestNewValidator_PresetPath_notfound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/beef:

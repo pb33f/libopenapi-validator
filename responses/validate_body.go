@@ -9,13 +9,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/orderedmap"
+	"github.com/pb33f/libopenapi/utils"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/pb33f/libopenapi/orderedmap"
-	"github.com/pb33f/libopenapi/utils"
 )
 
 func (v *responseBodyValidator) ValidateResponseBody(
@@ -75,11 +77,9 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 			} else {
 				// check that the operation *actually* returns a body. (i.e. a 204 response)
 				if foundResponse.Content != nil && orderedmap.Len(foundResponse.Content) > 0 {
-
 					// content type not found in the contract
 					validationErrors = append(validationErrors,
 						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, false))
-
 				}
 			}
 		}
@@ -93,7 +93,6 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 			} else {
 				// check that the operation *actually* returns a body. (i.e. a 204 response)
 				if operation.Responses.Default.Content != nil && orderedmap.Len(operation.Responses.Default.Content) > 0 {
-
 					// content type not found in the contract
 					validationErrors = append(validationErrors,
 						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, true))

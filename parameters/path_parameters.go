@@ -9,11 +9,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -43,11 +45,10 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 	pathSegments := strings.Split(pathValue, helpers.Slash)
 
 	// extract params for the operation
-	var params = helpers.ExtractParamsForOperation(request, pathItem)
+	params := helpers.ExtractParamsForOperation(request, pathItem)
 	var validationErrors []*errors.ValidationError
 	for _, p := range params {
 		if p.In == helpers.Path {
-
 			// var paramTemplate string
 			for x := range pathSegments {
 				if pathSegments[x] == "" { // skip empty segments
@@ -90,7 +91,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					}
 
 					if paramValue == "" {
-						//Mandatory path parameter cannot be empty
+						// Mandatory path parameter cannot be empty
 						if p.Required != nil && *p.Required {
 							validationErrors = append(validationErrors, errors.PathParameterMissing(p))
 							break
@@ -119,7 +120,6 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					// for each type, check the value.
 					if sch != nil && sch.Type != nil {
 						for typ := range sch.Type {
-
 							switch sch.Type[typ] {
 							case helpers.String:
 
