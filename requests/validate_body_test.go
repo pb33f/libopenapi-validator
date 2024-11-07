@@ -11,8 +11,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestValidateBody_NotRequiredBody(t *testing.T) {
@@ -276,7 +277,6 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST Path '/burgers/createBurger' not found", errors[0].Message)
-
 }
 
 func TestValidateBody_ContentTypeNotFound(t *testing.T) {
@@ -322,7 +322,6 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-
 }
 
 func TestValidateBody_ContentTypeNotSet(t *testing.T) {
@@ -366,7 +365,6 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-
 }
 
 func TestValidateBody_InvalidBasicSchema_NotRequired(t *testing.T) {
@@ -415,7 +413,6 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
-
 }
 
 func TestValidateBody_InvalidBasicSchema_Required(t *testing.T) {
@@ -464,7 +461,6 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
-
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {
@@ -506,7 +502,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
@@ -548,7 +543,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateBody_ValidSchemaUsingAllOf(t *testing.T) {
@@ -857,7 +851,6 @@ components:
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "missing properties 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "missing properties 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[1].Reason)
-
 }
 
 func TestValidateBody_InvalidSchemaMinMax(t *testing.T) {
@@ -911,7 +904,6 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Equal(t, "maximum: got 5, want 3", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestValidateBody_InvalidSchemaMaxItems(t *testing.T) {
@@ -992,7 +984,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateBody_MediaTypeHasNullSchema(t *testing.T) {
@@ -1017,7 +1008,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateBody_MissingBody(t *testing.T) {
@@ -1061,7 +1051,6 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-
 }
 
 func TestValidateBody_NoBodyNoNothing(t *testing.T) {
@@ -1083,7 +1072,6 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestValidateBody_InvalidSchemaMultipleItems(t *testing.T) {
@@ -1144,7 +1132,6 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
-
 }
 
 func TestValidateBody_InvalidSchema_BadDecode(t *testing.T) {
@@ -1187,11 +1174,9 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
-
 }
 
 func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {
-
 	spec := `{
   "openapi": "3.0.1",
   "info": {
@@ -1323,5 +1308,4 @@ func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {
 	assert.False(t, isSuccess)
 	assert.Len(t, valErrs, 1)
 	assert.Equal(t, "PUT request body is empty for '/path1'", valErrs[0].Message)
-
 }

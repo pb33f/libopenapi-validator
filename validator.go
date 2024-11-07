@@ -8,13 +8,15 @@ import (
 	"sync"
 
 	"github.com/pb33f/libopenapi"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/requests"
 	"github.com/pb33f/libopenapi-validator/responses"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // Validator provides a coarse grained interface for validating an OpenAPI 3+ documents.
@@ -24,7 +26,6 @@ import (
 // Validating *http.Response objects against an OpenAPI 3+ document
 // Validating an OpenAPI 3+ document against the OpenAPI 3+ specification
 type Validator interface {
-
 	// ValidateHttpRequest will validate an *http.Request object against an OpenAPI 3+ document.
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError)
@@ -94,9 +95,11 @@ func NewValidatorFromV3Model(m *v3.Document) Validator {
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
 	return v.paramValidator
 }
+
 func (v *validator) GetRequestBodyValidator() requests.RequestBodyValidator {
 	return v.requestValidator
 }
+
 func (v *validator) GetResponseBodyValidator() responses.ResponseBodyValidator {
 	return v.responseValidator
 }
@@ -107,8 +110,8 @@ func (v *validator) ValidateDocument() (bool, []*errors.ValidationError) {
 
 func (v *validator) ValidateHttpResponse(
 	request *http.Request,
-	response *http.Response) (bool, []*errors.ValidationError) {
-
+	response *http.Response,
+) (bool, []*errors.ValidationError) {
 	var pathItem *v3.PathItem
 	var pathValue string
 	var errs []*errors.ValidationError
@@ -131,8 +134,8 @@ func (v *validator) ValidateHttpResponse(
 
 func (v *validator) ValidateHttpRequestResponse(
 	request *http.Request,
-	response *http.Response) (bool, []*errors.ValidationError) {
-
+	response *http.Response,
+) (bool, []*errors.ValidationError) {
 	var pathItem *v3.PathItem
 	var pathValue string
 	var errs []*errors.ValidationError
@@ -209,7 +212,8 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 		validateParamFunction := func(
 			control chan struct{},
 			errorChan chan []*errors.ValidationError,
-			validatorFunc validationFunction) {
+			validatorFunc validationFunction,
+		) {
 			valid, pErrs := validatorFunc(request, pathItem, pathValue)
 			if !valid {
 				errorChan <- pErrs
@@ -311,8 +315,8 @@ type validator struct {
 func runValidation(control, doneChan chan struct{},
 	errorChan chan []*errors.ValidationError,
 	validationErrors *[]*errors.ValidationError,
-	total int) {
-
+	total int,
+) {
 	var validationLock sync.Mutex
 	completedValidations := 0
 	for {
@@ -331,5 +335,7 @@ func runValidation(control, doneChan chan struct{},
 	}
 }
 
-type validationFunction func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
-type validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
+type (
+	validationFunction      func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
+	validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
+)

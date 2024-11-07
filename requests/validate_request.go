@@ -7,20 +7,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/schema_validation"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v6"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"gopkg.in/yaml.v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
@@ -31,8 +33,8 @@ func ValidateRequestSchema(
 	request *http.Request,
 	schema *base.Schema,
 	renderedSchema,
-	jsonSchema []byte) (bool, []*errors.ValidationError) {
-
+	jsonSchema []byte,
+) (bool, []*errors.ValidationError) {
 	var validationErrors []*errors.ValidationError
 
 	var requestBody []byte
@@ -49,7 +51,6 @@ func ValidateRequestSchema(
 
 	if len(requestBody) > 0 {
 		err := json.Unmarshal(requestBody, &decodedObj)
-
 		if err != nil {
 			// cannot decode the request body, so it's not valid
 			violation := &errors.SchemaValidationFailure{
@@ -75,16 +76,13 @@ func ValidateRequestSchema(
 	}
 
 	// no request body? but we do have a schema?
-	if len(requestBody) <= 0 && len(jsonSchema) > 0 {
+	if len(requestBody) == 0 && len(jsonSchema) > 0 {
 
-		line := -1
-		col := -1
+		line := schema.ParentProxy.GetSchemaKeyNode().Line
+		col := schema.ParentProxy.GetSchemaKeyNode().Line
 		if schema.Type != nil {
 			line = schema.GoLow().Type.KeyNode.Line
 			col = schema.GoLow().Type.KeyNode.Column
-		} else {
-			line = schema.ParentProxy.GetSchemaKeyNode().Line
-			col = schema.ParentProxy.GetSchemaKeyNode().Line
 		}
 
 		// cannot decode the request body, so it's not valid

@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestParamValidator_ValidateSecurity_APIKeyHeader_NotFound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -47,7 +47,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyHeader(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -78,7 +77,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyQuery_NotFound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -111,11 +109,9 @@ components:
 	assert.Equal(t, request.Method, errors[0].RequestMethod)
 	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
 	assert.Equal(t, "/products", errors[0].SpecPath)
-
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyQuery(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -145,7 +141,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyCookie_NotFound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -179,7 +174,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_APIKeyCookie(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -214,7 +208,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_Basic_NotFound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -247,7 +240,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_Basic(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -277,7 +269,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_BadPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -308,7 +299,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_MissingSecuritySchemes(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -332,7 +322,6 @@ components: {}
 }
 
 func TestParamValidator_ValidateSecurity_NoComponents(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -355,7 +344,6 @@ paths:
 }
 
 func TestParamValidator_ValidateSecurity_PresetPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -378,7 +366,6 @@ paths:
 }
 
 func TestParamValidator_ValidateSecurity_PresetPath_notfound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -401,7 +388,6 @@ paths:
 }
 
 func TestParamValidator_ValidateSecurity_MultipleSecurity(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -438,7 +424,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_MultipleSecurity_EmptyOption(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -469,7 +454,6 @@ components:
 }
 
 func TestParamValidator_ValidateSecurity_MultipleSecurity_NotFound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /products:

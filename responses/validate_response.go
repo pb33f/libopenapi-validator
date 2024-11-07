@@ -7,20 +7,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/schema_validation"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v6"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-	"gopkg.in/yaml.v3"
 	"io"
 	"net/http"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"gopkg.in/yaml.v3"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
@@ -35,8 +37,8 @@ func ValidateResponseSchema(
 	response *http.Response,
 	schema *base.Schema,
 	renderedSchema,
-	jsonSchema []byte) (bool, []*errors.ValidationError) {
-
+	jsonSchema []byte,
+) (bool, []*errors.ValidationError) {
 	var validationErrors []*errors.ValidationError
 
 	if response == nil || response.Body == nil {
@@ -51,7 +53,7 @@ func ValidateResponseSchema(
 			ValidationSubType: "object",
 			Message: fmt.Sprintf("%s response object is missing for '%s'",
 				request.Method, request.URL.Path),
-			Reason:                 fmt.Sprintf("The response object is completely missing"),
+			Reason:                 "The response object is completely missing",
 			SpecLine:               1,
 			SpecCol:                0,
 			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
@@ -93,7 +95,6 @@ func ValidateResponseSchema(
 
 	if len(responseBody) > 0 {
 		err := json.Unmarshal(responseBody, &decodedObj)
-
 		if err != nil {
 			// cannot decode the response body, so it's not valid
 			violation := &errors.SchemaValidationFailure{

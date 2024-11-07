@@ -4,15 +4,16 @@
 package parameters
 
 import (
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestNewValidator_HeaderParamMissing(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /bish/bosh:
@@ -42,7 +43,6 @@ paths:
 }
 
 func TestNewValidator_HeaderPathMissing(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /bish/bosh:
@@ -72,7 +72,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -99,7 +98,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -126,7 +124,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -158,7 +155,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -190,7 +186,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -222,7 +217,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamDefaultEncoding_ValidParamTypeObjectBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -253,7 +247,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamInvalidSimpleEncoding(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -285,7 +278,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeObject(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -317,7 +309,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_InvalidParamTypeObject(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -350,7 +341,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeArrayString(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -378,7 +368,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeArrayNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -406,7 +395,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeArrayBool(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -434,7 +422,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_InvalidParamTypeArrayNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -462,7 +449,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_InvalidParamTypeArrayBool(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -490,7 +476,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamStringValidEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -517,7 +502,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamStringInvalidEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -546,7 +530,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamIntegerValidEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -573,7 +556,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNumberInvalidEnum(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -602,7 +584,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamSetPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -634,7 +615,6 @@ paths:
 }
 
 func TestNewValidator_HeaderParamSetPath_notfound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:

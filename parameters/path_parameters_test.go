@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestNewValidator_SimpleArrayEncodedPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerIds*}/locate:
@@ -42,7 +42,6 @@ paths:
 }
 
 func TestNewValidator_SimpleArrayEncodedPath_InvalidNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerIds*}/locate:
@@ -74,7 +73,6 @@ paths:
 }
 
 func TestNewValidator_SimpleArrayEncodedPath_InvalidBool(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerIds*}/locate:
@@ -103,7 +101,6 @@ paths:
 }
 
 func TestNewValidator_SimpleObjectEncodedPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burger}/locate:
@@ -134,7 +131,6 @@ paths:
 }
 
 func TestNewValidator_SimpleObjectEncodedPath_Invalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burger}/locate:
@@ -166,7 +162,6 @@ paths:
 }
 
 func TestNewValidator_SimpleObjectEncodedPath_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burger}/locate:
@@ -198,7 +193,6 @@ paths:
 }
 
 func TestNewValidator_SimpleObjectEncodedPath_ExplodedInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burger}/locate:
@@ -231,7 +225,6 @@ paths:
 }
 
 func TestNewValidator_ObjectEncodedPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burger}/locate:
@@ -262,7 +255,6 @@ paths:
 }
 
 func TestNewValidator_SimpleEncodedPath_InvalidInteger(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -289,7 +281,6 @@ paths:
 }
 
 func TestNewValidator_SimpleEncodedPath_IntegerViolation(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -319,7 +310,6 @@ paths:
 }
 
 func TestNewValidator_SimpleEncodedPath_Integer(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -346,7 +336,6 @@ paths:
 }
 
 func TestNewValidator_SimpleEncodedPath_InvalidBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -373,7 +362,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidInteger(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -401,7 +389,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_IntegerViolation(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -432,7 +419,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -460,7 +446,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_ValidArray_Number(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -489,7 +474,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_ValidArray_Number_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -519,7 +503,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidArray_Number_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -550,7 +533,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidArray_Number(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -580,7 +562,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidObject(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -613,7 +594,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidObject_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -647,7 +627,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_ValidMultiParam(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate/{.query}:
@@ -685,7 +664,6 @@ paths:
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidMultiParam(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate/{.query}:
@@ -723,7 +701,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidPrimitiveNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -750,7 +727,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidPrimitiveNumber(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -778,7 +754,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_PrimitiveNumberViolation(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -809,7 +784,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidPrimitiveBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -836,7 +810,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidPrimitiveBoolean(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -861,11 +834,9 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' is not a valid boolean", errors[0].Message)
-
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidObject(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger}/locate:
@@ -894,11 +865,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidObject(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger}/locate:
@@ -931,7 +900,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidObject_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -960,11 +928,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidObject_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -997,7 +963,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidArray(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -1022,11 +987,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidArray(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -1054,7 +1017,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidArray_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -1083,7 +1045,6 @@ paths:
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidArray_Exploded(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -1113,7 +1074,6 @@ paths:
 }
 
 func TestNewValidator_PathParams_PathNotFound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burger*}/locate:
@@ -1142,7 +1102,6 @@ paths:
 }
 
 func TestNewValidator_PathParamStringEnumValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -1166,11 +1125,9 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }
 
 func TestNewValidator_PathParamStringEnumInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -1196,11 +1153,9 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' does not match allowed values", errors[0].Message)
 	assert.Equal(t, "Instead of 'hello', use one of the allowed values: 'bigMac, whopper, mcCrispy'", errors[0].HowToFix)
-
 }
 
 func TestNewValidator_PathParamStringViolation(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -1230,7 +1185,6 @@ paths:
 }
 
 func TestNewValidator_PathParamIntegerEnumValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -1257,7 +1211,6 @@ paths:
 }
 
 func TestNewValidator_PathParamIntegerEnumInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}/locate:
@@ -1285,7 +1238,6 @@ paths:
 }
 
 func TestNewValidator_PathLabelEumValid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -1313,7 +1265,6 @@ paths:
 }
 
 func TestNewValidator_PathLabelEumInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -1343,7 +1294,6 @@ paths:
 }
 
 func TestNewValidator_PathMatrixEumInvalid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -1373,7 +1323,6 @@ paths:
 }
 
 func TestNewValidator_SetPathForPathParam(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -1407,7 +1356,6 @@ paths:
 }
 
 func TestNewValidator_SetPathForPathParam_notfound(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{;burgerId}/locate:
@@ -1440,7 +1388,6 @@ paths:
 }
 
 func TestNewValidator_ServerPathPrefixInRequestPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 servers:
   - url: https://api.pb33f.io/lorem/ipsum
@@ -1468,8 +1415,8 @@ paths:
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
-func TestNewValidator_MandatorydPathSegmentEmpty(t *testing.T) {
 
+func TestNewValidator_MandatorydPathSegmentEmpty(t *testing.T) {
 	spec := `openapi: 3.1.0
 servers:
 - url: https://api.pb33f.io

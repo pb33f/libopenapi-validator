@@ -86,7 +86,6 @@ func postRequestWithBody(payload string) *http.Request {
 }
 
 func TestInvalidMin(t *testing.T) {
-
 	renderedSchema := []byte(`type: object
 properties:
     exclusiveNumber:

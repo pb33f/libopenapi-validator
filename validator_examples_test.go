@@ -11,13 +11,13 @@ import (
 	"os"
 
 	"github.com/pb33f/libopenapi"
+
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func ExampleNewValidator_validateDocument() {
 	// 1. Load the OpenAPI 3+ spec into a byte array
 	petstore, err := os.ReadFile("test_specs/invalid_31.yaml")
-
 	if err != nil {
 		panic(err)
 	}
@@ -47,13 +47,12 @@ func ExampleNewValidator_validateDocument() {
 		}
 	}
 	// Output: 0: Type: schema, Failure: Document does not pass validation
-	//Fix: Ensure that the object being submitted, matches the schema correctly
+	// Fix: Ensure that the object being submitted, matches the schema correctly
 }
 
 func ExampleNewValidator_validateHttpRequest() {
 	// 1. Load the OpenAPI 3+ spec into a byte array
 	petstore, err := os.ReadFile("test_specs/petstorev3.json")
-
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +90,6 @@ func ExampleNewValidator_validateHttpRequest() {
 func ExampleNewValidator_validateHttpRequestSync() {
 	// 1. Load the OpenAPI 3+ spec into a byte array
 	petstore, err := os.ReadFile("test_specs/petstorev3.json")
-
 	if err != nil {
 		panic(err)
 	}
@@ -129,7 +127,6 @@ func ExampleNewValidator_validateHttpRequestSync() {
 func ExampleNewValidator_validateHttpRequestResponse() {
 	// 1. Load the OpenAPI 3+ spec into a byte array
 	petstore, err := os.ReadFile("test_specs/petstorev3.json")
-
 	if err != nil {
 		panic(err)
 	}
@@ -155,7 +152,6 @@ func ExampleNewValidator_validateHttpRequestResponse() {
 	// Normally, this would be where the host application would pass in the response.
 	recorder := httptest.NewRecorder()
 	handler := func(w http.ResponseWriter, r *http.Request) {
-
 		// set return content type.
 		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 		w.WriteHeader(http.StatusOK)
@@ -194,13 +190,12 @@ func ExampleNewValidator_validateHttpRequestResponse() {
 		}
 	}
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
-	//Schema Error: got string, want integer, Line: 19, Col: 27
+	// Schema Error: got string, want integer, Line: 19, Col: 27
 }
 
 func ExampleNewValidator_validateHttpResponse() {
 	// 1. Load the OpenAPI 3+ spec into a byte array
 	petstore, err := os.ReadFile("test_specs/petstorev3.json")
-
 	if err != nil {
 		panic(err)
 	}
@@ -226,7 +221,6 @@ func ExampleNewValidator_validateHttpResponse() {
 	// Normally, this would be where the host application would pass in the response.
 	recorder := httptest.NewRecorder()
 	handler := func(w http.ResponseWriter, r *http.Request) {
-
 		// set return content type.
 		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 		w.WriteHeader(http.StatusOK)
@@ -265,5 +259,5 @@ func ExampleNewValidator_validateHttpResponse() {
 		}
 	}
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
-	//Schema Error: got string, want integer, Line: 19, Col: 27
+	// Schema Error: got string, want integer, Line: 19, Col: 27
 }

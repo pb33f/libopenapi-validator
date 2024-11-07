@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestNewValidator_QueryParamMissing(t *testing.T) {
@@ -2824,5 +2825,4 @@ components:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
-
 }

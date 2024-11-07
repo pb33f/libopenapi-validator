@@ -8,10 +8,11 @@ package openapi_schemas
 
 import (
 	"crypto/md5"
-	_ "embed"
 	"encoding/hex"
 	"io"
 	"net/http"
+
+	_ "embed"
 )
 
 var schema30, schema31 string

@@ -13,7 +13,6 @@ import (
 )
 
 func TestNewValidator_BadParam(t *testing.T) {
-
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pet/doggy", nil)
 
 	// load a doc
@@ -27,7 +26,6 @@ func TestNewValidator_BadParam(t *testing.T) {
 }
 
 func TestNewValidator_GoodParamFloat(t *testing.T) {
-
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pet/232.233", nil)
 
 	b, _ := os.ReadFile("../test_specs/petstorev3.json")
@@ -39,7 +37,6 @@ func TestNewValidator_GoodParamFloat(t *testing.T) {
 }
 
 func TestNewValidator_GoodParamInt(t *testing.T) {
-
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pet/12334", nil)
 
 	b, _ := os.ReadFile("../test_specs/petstorev3.json")
@@ -51,7 +48,6 @@ func TestNewValidator_GoodParamInt(t *testing.T) {
 }
 
 func TestNewValidator_FindSimpleEncodedArrayPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId*}/locate:
@@ -71,7 +67,6 @@ paths:
 }
 
 func TestNewValidator_FindSimpleEncodedObjectPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId*}/locate:
@@ -91,7 +86,6 @@ paths:
 }
 
 func TestNewValidator_FindLabelEncodedArrayPath(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{.burgerId}/locate:
@@ -110,7 +104,6 @@ paths:
 }
 
 func TestNewValidator_FindPathPost(t *testing.T) {
-
 	// load a doc
 	b, _ := os.ReadFile("../test_specs/petstorev3.json")
 	doc, _ := libopenapi.NewDocument(b)
@@ -124,7 +117,6 @@ func TestNewValidator_FindPathPost(t *testing.T) {
 }
 
 func TestNewValidator_FindPathDelete(t *testing.T) {
-
 	// load a doc
 	b, _ := os.ReadFile("../test_specs/petstorev3.json")
 	doc, _ := libopenapi.NewDocument(b)
@@ -137,7 +129,6 @@ func TestNewValidator_FindPathDelete(t *testing.T) {
 }
 
 func TestNewValidator_FindPathPatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}:
@@ -153,11 +144,9 @@ paths:
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
-
 }
 
 func TestNewValidator_FindPathOptions(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}:
@@ -173,11 +162,9 @@ paths:
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Options.OperationId)
-
 }
 
 func TestNewValidator_FindPathTrace(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}:
@@ -193,11 +180,9 @@ paths:
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Trace.OperationId)
-
 }
 
 func TestNewValidator_FindPathPut(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}:
@@ -214,11 +199,9 @@ paths:
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Put.OperationId)
-
 }
 
 func TestNewValidator_FindPathHead(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}:
@@ -234,11 +217,9 @@ paths:
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Head.OperationId)
-
 }
 
 func TestNewValidator_FindPathWithBaseURLInServer(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 servers:
   - url: https://things.com/base1
@@ -270,11 +251,9 @@ paths:
 	pathItem, _, _ = FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
-
 }
 
 func TestNewValidator_FindPathWithBaseURLInServer_Args(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 servers:
   - url: https://things.com/base3/base4/base5/base6/
@@ -292,11 +271,9 @@ paths:
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
-
 }
 
 func TestNewValidator_FindPathMissing(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /a/fishy/on/a/dishy:
@@ -315,11 +292,9 @@ paths:
 	assert.NotNil(t, errs)
 	assert.Equal(t, "HEAD Path '/not/here' not found", errs[0].Message)
 	assert.True(t, errs[0].IsPathMissingError())
-
 }
 
 func TestNewValidator_FindOperationMissing(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /burgers/{burgerId}:
@@ -340,7 +315,6 @@ paths:
 }
 
 func TestNewValidator_GetLiteralMatch(t *testing.T) {
-
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/store/inventory", nil)
 
 	// load a doc
@@ -355,7 +329,6 @@ func TestNewValidator_GetLiteralMatch(t *testing.T) {
 }
 
 func TestNewValidator_PostLiteralMatch(t *testing.T) {
-
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/user", nil)
 
 	// load a doc
@@ -370,7 +343,6 @@ func TestNewValidator_PostLiteralMatch(t *testing.T) {
 }
 
 func TestNewValidator_PutLiteralMatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/burger:
@@ -388,7 +360,6 @@ paths:
 }
 
 func TestNewValidator_PutMatch_Error(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/{cakes}:
@@ -413,7 +384,6 @@ paths:
 }
 
 func TestNewValidator_OptionsMatch_Error(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/{cakes}:
@@ -438,7 +408,6 @@ paths:
 }
 
 func TestNewValidator_PatchLiteralMatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/burger:
@@ -456,7 +425,6 @@ paths:
 }
 
 func TestNewValidator_PatchMatch_Error(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/{cakes}:
@@ -481,7 +449,6 @@ paths:
 }
 
 func TestNewValidator_DeleteLiteralMatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/burger:
@@ -499,7 +466,6 @@ paths:
 }
 
 func TestNewValidator_OptionsLiteralMatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/burger:
@@ -517,7 +483,6 @@ paths:
 }
 
 func TestNewValidator_HeadLiteralMatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/burger:
@@ -535,7 +500,6 @@ paths:
 }
 
 func TestNewValidator_TraceLiteralMatch(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/burger:
@@ -553,7 +517,6 @@ paths:
 }
 
 func TestNewValidator_TraceMatch_Error(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/{cakes}:
@@ -578,7 +541,6 @@ paths:
 }
 
 func TestNewValidator_DeleteMatch_Error(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/{cakes}:
@@ -603,7 +565,6 @@ paths:
 }
 
 func TestNewValidator_PostMatch_Error(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /pizza/{cakes}:
@@ -628,7 +589,6 @@ paths:
 }
 
 func TestNewValidator_FindPathWithFragment(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /hashy#one:
@@ -654,11 +614,9 @@ paths:
 	assert.Len(t, errs, 0)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "two", pathItem.Post.OperationId)
-
 }
 
 func TestNewValidator_FindPathMissingWithBaseURLInServer(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 servers:
   - url: 'https://things.com/'
@@ -679,7 +637,6 @@ paths:
 	_, errs, _ := FindPath(request, &m.Model)
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "GET Path '/not_here' not found", errs[0].Message)
-
 }
 
 func TestGetBasePaths(t *testing.T) {
@@ -717,5 +674,4 @@ paths:
 	}
 
 	assert.Equal(t, expectedPaths, basePaths)
-
 }

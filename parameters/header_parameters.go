@@ -9,10 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 

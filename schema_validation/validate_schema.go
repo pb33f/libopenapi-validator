@@ -4,18 +4,9 @@
 package schema_validation
 
 import (
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	liberrors "github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/utils"
-	"github.com/santhosh-tekuri/jsonschema/v6"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"reflect"
@@ -23,6 +14,18 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/utils"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"gopkg.in/yaml.v3"
+
+	_ "embed"
+
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // SchemaValidator is an interface that defines the methods for validating a *base.Schema (V3+ Only) object.
@@ -32,7 +35,6 @@ import (
 //	ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
 //	ValidateSchemaBytes accepts a schema object to validate against, and a JSON/YAML blob that is defined as a byte array.
 type SchemaValidator interface {
-
 	// ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 	ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError)
 
@@ -78,7 +80,6 @@ func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byt
 }
 
 func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *slog.Logger) (bool, []*liberrors.ValidationError) {
-
 	var validationErrors []*liberrors.ValidationError
 
 	if schema == nil {
@@ -87,7 +88,7 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 	}
 
 	// extract index of schema, and check the version
-	//schemaIndex := schema.GoLow().Index
+	// schemaIndex := schema.GoLow().Index
 	var renderedSchema []byte
 
 	// render the schema, to be used for validation, stop this from running concurrently, mutations are made to state
@@ -100,7 +101,6 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 
 	if decodedObject == nil && len(payload) > 0 {
 		err := json.Unmarshal(payload, &decodedObject)
-
 		if err != nil {
 			// cannot decode the request body, so it's not valid
 			violation := &liberrors.SchemaValidationFailure{
@@ -140,8 +140,8 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 			if ve != nil {
 
 				// no, this won't work, so we need to extract the errors and return them.
-				//basicErrors := ve.BasicOutput().Errors
-				//schemaValidationErrors = extractBasicErrors(basicErrors, renderedSchema, decodedObject, payload, ve, schemaValidationErrors)
+				// basicErrors := ve.BasicOutput().Errors
+				// schemaValidationErrors = extractBasicErrors(basicErrors, renderedSchema, decodedObject, payload, ve, schemaValidationErrors)
 				// cannot compile schema, so it's not valid
 				violation := &liberrors.SchemaValidationFailure{
 					Reason:          err.Error(),
@@ -207,7 +207,8 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	renderedSchema []byte, decodedObject interface{},
 	payload []byte, jk *jsonschema.ValidationError,
-	schemaValidationErrors []*liberrors.SchemaValidationFailure) []*liberrors.SchemaValidationFailure {
+	schemaValidationErrors []*liberrors.SchemaValidationFailure,
+) []*liberrors.SchemaValidationFailure {
 	for q := range schFlatErrs {
 		er := schFlatErrs[q]
 

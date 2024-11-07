@@ -4,9 +4,10 @@
 package errors
 
 import (
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create a mock ValidationError

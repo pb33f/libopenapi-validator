@@ -5,19 +5,21 @@ package parameters
 
 import (
 	"encoding/json"
-	stdError "errors"
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"net/url"
 	"reflect"
 	"strings"
 
-	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+
+	stdError "errors"
+
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func ValidateSingleParameterSchema(
@@ -75,8 +77,8 @@ func ValidateParameterSchema(
 	reasonEntity,
 	name,
 	validationType,
-	subValType string) []*errors.ValidationError {
-
+	subValType string,
+) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 
 	// 1. build a JSON render of the schema.
@@ -197,7 +199,7 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 		if schema != nil {
 			rendered, err := schema.RenderInline()
 			if err == nil && rendered != nil {
-				fail.ReferenceSchema = fmt.Sprintf("%s", rendered)
+				fail.ReferenceSchema = string(rendered)
 			}
 		}
 		schemaValidationErrors = append(schemaValidationErrors, fail)

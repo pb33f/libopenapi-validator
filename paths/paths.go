@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pb33f/libopenapi/orderedmap"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
@@ -125,9 +127,7 @@ func getBasePaths(document *v3.Document) []string {
 	// extract base path from document to check against paths.
 	var basePaths []string
 	for _, s := range document.Servers {
-		var u *url.URL = nil
 		u, err := url.Parse(s.URL)
-
 		// if the host contains special characters, we should attempt to split and parse only the relative path
 		if err != nil {
 			// split at first occurrence
@@ -150,7 +150,6 @@ func getBasePaths(document *v3.Document) []string {
 
 // StripRequestPath strips the base path from the request path, based on the server paths provided in the specification
 func StripRequestPath(request *http.Request, document *v3.Document) string {
-
 	basePaths := getBasePaths(document)
 
 	// strip any base path
