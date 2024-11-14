@@ -7,7 +7,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/stretchr/testify v1.9.0
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
-	golang.org/x/text v0.18.0
+	golang.org/x/text v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
