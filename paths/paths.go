@@ -153,7 +153,7 @@ func StripRequestPath(request *http.Request, document *v3.Document) string {
 	basePaths := getBasePaths(document)
 
 	// strip any base path
-	stripped := stripBaseFromPath(request.URL.Path, basePaths)
+	stripped := stripBaseFromPath(request.URL.EscapedPath(), basePaths)
 	if request.URL.Fragment != "" {
 		stripped = fmt.Sprintf("%s#%s", stripped, request.URL.Fragment)
 	}
