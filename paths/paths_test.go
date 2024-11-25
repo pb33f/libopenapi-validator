@@ -675,3 +675,24 @@ paths:
 
 	assert.Equal(t, expectedPaths, basePaths)
 }
+
+func TestNewValidator_FindPathWithEncodedArg(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+paths:
+  /something/{string_contains_encoded}:
+    put:
+      operationId: putSomething
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPut, "https://things.com/something/pkg%3Agithub%2Frs%2Fzerolog%40v1.18.0", nil)
+
+	pathItem, errs, _ := FindPath(request, &m.Model)
+
+	assert.Equal(t, 0, len(errs), "Errors found: %v", errs)
+	assert.NotNil(t, pathItem)
+}
