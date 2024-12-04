@@ -4,6 +4,7 @@
 package validator
 
 import (
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"sync"
 
@@ -62,27 +63,41 @@ type Validator interface {
 	GetResponseBodyValidator() responses.ResponseBodyValidator
 }
 
+// Configuration Holds any Validator configuration overrides.
+type Configuration struct {
+	// Use this regex engine in place of the standard Go (RE2) pattern processor
+	RegexEngine jsonschema.RegexpEngine
+}
+
 // NewValidator will create a new Validator from an OpenAPI 3+ document
-func NewValidator(document libopenapi.Document) (Validator, []error) {
+func NewValidator(document libopenapi.Document, config ...Configuration) (Validator, []error) {
 	m, errs := document.BuildV3Model()
 	if errs != nil {
 		return nil, errs
 	}
-	v := NewValidatorFromV3Model(&m.Model)
+	v := NewValidatorFromV3Model(&m.Model, config...)
 	v.(*validator).document = document
 	return v, nil
 }
 
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
-func NewValidatorFromV3Model(m *v3.Document) Validator {
+func NewValidatorFromV3Model(m *v3.Document, config ...Configuration) Validator {
+
+	// Assume a default configuration
+	cfg := Configuration{}
+
+	if len(config) > 0 {
+		cfg = config[0]
+	}
+
 	// create a new parameter validator
-	paramValidator := parameters.NewParameterValidator(m)
+	paramValidator := parameters.NewParameterValidator(m, parameters.Config{RegexEngine: cfg.RegexEngine})
 
 	// create a new request body validator
-	reqBodyValidator := requests.NewRequestBodyValidator(m)
+	reqBodyValidator := requests.NewRequestBodyValidator(m, requests.Config{RegexEngine: cfg.RegexEngine})
 
 	// create a response body validator
-	respBodyValidator := responses.NewResponseBodyValidator(m)
+	respBodyValidator := responses.NewResponseBodyValidator(m, responses.Config{RegexEngine: cfg.RegexEngine})
 
 	return &validator{
 		v3Model:           m,

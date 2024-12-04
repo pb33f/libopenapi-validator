@@ -136,6 +136,19 @@ func TestNewValidator_ValidateDocument(t *testing.T) {
 	assert.Len(t, errs, 0)
 }
 
+func TestNewValidator_WithConfig(t *testing.T) {
+
+	// This needs work.
+	validatorConfig := Configuration{}
+
+	doc, _ := libopenapi.NewDocument(petstoreBytes)
+	v, _ := NewValidator(doc, validatorConfig)
+	require.NotNil(t, v, "Failed to build validator")
+	valid, errs := v.ValidateDocument()
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+}
+
 func TestNewValidator_BadDoc(t *testing.T) {
 	spec := `swagger: 2.0`
 

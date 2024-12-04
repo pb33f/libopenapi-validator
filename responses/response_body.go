@@ -4,6 +4,7 @@
 package responses
 
 import (
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"sync"
 
@@ -30,9 +31,20 @@ type ResponseBodyValidator interface {
 	ValidateResponseBodyWithPathItem(request *http.Request, response *http.Response, pathItem *v3.PathItem, pathFound string) (bool, []*errors.ValidationError)
 }
 
+type Config struct {
+	RegexEngine jsonschema.RegexpEngine
+}
+
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
-func NewResponseBodyValidator(document *v3.Document) ResponseBodyValidator {
-	return &responseBodyValidator{document: document, schemaCache: &sync.Map{}}
+func NewResponseBodyValidator(document *v3.Document, cfg ...Config) ResponseBodyValidator {
+
+	config := Config{} // Default
+
+	if len(cfg) > 0 {
+		config = cfg[0]
+	}
+
+	return &responseBodyValidator{Config: config, document: document, schemaCache: &sync.Map{}}
 }
 
 type schemaCache struct {
@@ -42,6 +54,7 @@ type schemaCache struct {
 }
 
 type responseBodyValidator struct {
+	Config
 	document    *v3.Document
 	schemaCache *sync.Map
 }
