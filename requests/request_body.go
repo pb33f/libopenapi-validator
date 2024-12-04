@@ -31,13 +31,19 @@ type RequestBodyValidator interface {
 }
 
 type Config struct {
-	Document    *v3.Document
 	RegexEngine jsonschema.RegexpEngine
 }
 
 // NewRequestBodyValidator will create a new RequestBodyValidator from an OpenAPI 3+ document
-func NewRequestBodyValidator(config Config) RequestBodyValidator {
-	return &requestBodyValidator{Config: config, schemaCache: &sync.Map{}}
+func NewRequestBodyValidator(document *v3.Document, cfg ...Config) RequestBodyValidator {
+
+	config := Config{} // Default
+
+	if len(cfg) > 0 {
+		config = cfg[0]
+	}
+
+	return &requestBodyValidator{Config: config, document: document, schemaCache: &sync.Map{}}
 }
 
 type schemaCache struct {
@@ -48,5 +54,6 @@ type schemaCache struct {
 
 type requestBodyValidator struct {
 	Config
+	document    *v3.Document
 	schemaCache *sync.Map
 }

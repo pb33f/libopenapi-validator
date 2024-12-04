@@ -91,10 +91,10 @@ func NewValidatorFromV3Model(m *v3.Document, config ...Configuration) Validator 
 	}
 
 	// create a new parameter validator
-	paramValidator := parameters.NewParameterValidator(parameters.Config{Document: m, RegexEngine: cfg.RegexEngine})
+	paramValidator := parameters.NewParameterValidator(m, parameters.Config{RegexEngine: cfg.RegexEngine})
 
 	// create a new request body validator
-	reqBodyValidator := requests.NewRequestBodyValidator(requests.Config{Document: m, RegexEngine: cfg.RegexEngine})
+	reqBodyValidator := requests.NewRequestBodyValidator(m, requests.Config{RegexEngine: cfg.RegexEngine})
 
 	// create a response body validator
 	respBodyValidator := responses.NewResponseBodyValidator(m)

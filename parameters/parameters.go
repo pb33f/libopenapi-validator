@@ -67,15 +67,22 @@ type ParameterValidator interface {
 }
 
 type Config struct {
-	Document    *v3.Document
 	RegexEngine jsonschema.RegexpEngine
 }
 
 // NewParameterValidator will create a new ParameterValidator from an OpenAPI 3+ document
-func NewParameterValidator(config Config) ParameterValidator {
-	return &paramValidator{config}
+func NewParameterValidator(document *v3.Document, cfg ...Config) ParameterValidator {
+
+	config := Config{}
+
+	if len(cfg) > 0 {
+		config = cfg[0]
+	}
+
+	return &paramValidator{config, document}
 }
 
 type paramValidator struct {
 	Config
+	document *v3.Document
 }
