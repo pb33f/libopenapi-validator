@@ -20,13 +20,20 @@ import (
 
 // ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
-func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.ValidationError) {
+func ValidateOpenAPIDocument(doc libopenapi.Document, config ...Config) (bool, []*liberrors.ValidationError) {
+
+	cfg := Config{} // Default Configuration
+	if len(config) > 0 {
+		cfg = config[0]
+	}
+
 	info := doc.GetSpecInfo()
 	loadedSchema := info.APISchema
 	var validationErrors []*liberrors.ValidationError
 	decodedDocument := *info.SpecJSON
 
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(cfg.RegexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(loadedSchema)))
