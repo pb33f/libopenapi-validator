@@ -47,24 +47,36 @@ type SchemaValidator interface {
 	ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*liberrors.ValidationError)
 }
 
+// Config  Holds Schema Validation options
+type Config struct {
+	RegexEngine jsonschema.RegexpEngine // Use the given Regular Expression Engine
+}
+
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 type schemaValidator struct {
+	Config
 	logger *slog.Logger
 	lock   sync.Mutex
 }
 
 // NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
-func NewSchemaValidatorWithLogger(logger *slog.Logger) SchemaValidator {
-	return &schemaValidator{logger: logger, lock: sync.Mutex{}}
+func NewSchemaValidatorWithLogger(logger *slog.Logger, config ...Config) SchemaValidator {
+
+	cfg := Config{} // Default Config
+	if len(config) > 0 {
+		cfg = config[0]
+	}
+
+	return &schemaValidator{Config: cfg, logger: logger, lock: sync.Mutex{}}
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
-func NewSchemaValidator() SchemaValidator {
+func NewSchemaValidator(config ...Config) SchemaValidator {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelError,
 	}))
-	return NewSchemaValidatorWithLogger(logger)
+	return NewSchemaValidatorWithLogger(logger, config...)
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError) {
@@ -125,6 +137,7 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(s.RegexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))

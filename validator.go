@@ -4,6 +4,7 @@
 package validator
 
 import (
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"sync"
 
@@ -62,34 +63,44 @@ type Validator interface {
 	GetResponseBodyValidator() responses.ResponseBodyValidator
 }
 
+type Option func(*validator)
+
+func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
+	return func(v *validator) {
+		v.regexEngine = engine
+	}
+}
+
 // NewValidator will create a new Validator from an OpenAPI 3+ document
-func NewValidator(document libopenapi.Document) (Validator, []error) {
+func NewValidator(document libopenapi.Document, opts ...Option) (Validator, []error) {
 	m, errs := document.BuildV3Model()
 	if errs != nil {
 		return nil, errs
 	}
-	v := NewValidatorFromV3Model(&m.Model)
+	v := NewValidatorFromV3Model(&m.Model, opts...)
 	v.(*validator).document = document
 	return v, nil
 }
 
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
-func NewValidatorFromV3Model(m *v3.Document) Validator {
-	// create a new parameter validator
-	paramValidator := parameters.NewParameterValidator(m)
+func NewValidatorFromV3Model(m *v3.Document, opts ...Option) Validator {
 
-	// create a new request body validator
-	reqBodyValidator := requests.NewRequestBodyValidator(m)
+	v := &validator{v3Model: m}
+
+	for _, opt := range opts {
+		opt(v)
+	}
+
+	// create a new parameter validator
+	v.paramValidator = parameters.NewParameterValidator(m, parameters.WithRegexEngine(v.regexEngine))
+
+	// create aq new request body validator
+	v.requestValidator = requests.NewRequestBodyValidator(m)
 
 	// create a response body validator
-	respBodyValidator := responses.NewResponseBodyValidator(m)
+	v.responseValidator = responses.NewResponseBodyValidator(m, responses.WithRegexEngine(v.regexEngine))
 
-	return &validator{
-		v3Model:           m,
-		requestValidator:  reqBodyValidator,
-		responseValidator: respBodyValidator,
-		paramValidator:    paramValidator,
-	}
+	return v
 }
 
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
@@ -310,6 +321,7 @@ type validator struct {
 	paramValidator    parameters.ParameterValidator
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
+	regexEngine       jsonschema.RegexpEngine
 }
 
 func runValidation(control, doneChan chan struct{},

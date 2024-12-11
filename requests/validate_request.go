@@ -34,7 +34,14 @@ func ValidateRequestSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
+	opts ...Option,
 ) (bool, []*errors.ValidationError) {
+
+	config := configOptions{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
 	var validationErrors []*errors.ValidationError
 
 	var requestBody []byte
@@ -107,6 +114,7 @@ func ValidateRequestSchema(
 	}
 
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(config.regexEngine) // Ensure any configured regex engine is used.
 	compiler.UseLoader(helpers.NewCompilerLoader())
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
 	_ = compiler.AddResource("requestBody.json", decodedSchema)
