@@ -38,13 +38,13 @@ func ValidateResponseSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
-	cfg ...Config,
+	cfg ...Option,
 ) (bool, []*errors.ValidationError) {
 
-	config := Config{} // A Default
-
-	if len(cfg) > 0 {
-		config = cfg[0]
+	// Apply config options
+	config := configOptions{} // Default config
+	for _, opt := range cfg {
+		opt(&config)
 	}
 
 	var validationErrors []*errors.ValidationError
@@ -134,7 +134,7 @@ func ValidateResponseSchema(
 
 	// create a new jsonschema compiler and add in the rendered JSON schema.
 	compiler := jsonschema.NewCompiler()
-	compiler.UseRegexpEngine(config.RegexEngine)
+	compiler.UseRegexpEngine(config.regexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 	fName := fmt.Sprintf("%s.json", helpers.ResponseBodyValidation)
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))

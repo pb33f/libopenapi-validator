@@ -4,8 +4,9 @@
 package parameters
 
 import (
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -66,23 +67,27 @@ type ParameterValidator interface {
 	ValidateSecurityWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 }
 
-type Config struct {
-	RegexEngine jsonschema.RegexpEngine
+type Option func(validator *paramValidator)
+
+func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
+	return func(pv *paramValidator) {
+		pv.regexEngine = engine
+	}
 }
 
 // NewParameterValidator will create a new ParameterValidator from an OpenAPI 3+ document
-func NewParameterValidator(document *v3.Document, cfg ...Config) ParameterValidator {
+func NewParameterValidator(document *v3.Document, opts ...Option) ParameterValidator {
 
-	config := Config{}
+	pv := paramValidator{document: document}
 
-	if len(cfg) > 0 {
-		config = cfg[0]
+	for _, opt := range opts {
+		opt(&pv)
 	}
 
-	return &paramValidator{config, document}
+	return &pv
 }
 
 type paramValidator struct {
-	Config
-	document *v3.Document
+	regexEngine jsonschema.RegexpEngine
+	document    *v3.Document
 }
