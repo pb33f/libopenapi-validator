@@ -63,48 +63,44 @@ type Validator interface {
 	GetResponseBodyValidator() responses.ResponseBodyValidator
 }
 
-// Configuration Holds any Validator configuration overrides.
-type Configuration struct {
-	// Use this regex engine in place of the standard Go (RE2) pattern processor
-	RegexEngine jsonschema.RegexpEngine
+type Option func(*validator)
+
+func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
+	return func(v *validator) {
+		v.regexEngine = engine
+	}
 }
 
 // NewValidator will create a new Validator from an OpenAPI 3+ document
-func NewValidator(document libopenapi.Document, config ...Configuration) (Validator, []error) {
+func NewValidator(document libopenapi.Document, opts ...Option) (Validator, []error) {
 	m, errs := document.BuildV3Model()
 	if errs != nil {
 		return nil, errs
 	}
-	v := NewValidatorFromV3Model(&m.Model, config...)
+	v := NewValidatorFromV3Model(&m.Model, opts...)
 	v.(*validator).document = document
 	return v, nil
 }
 
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
-func NewValidatorFromV3Model(m *v3.Document, config ...Configuration) Validator {
+func NewValidatorFromV3Model(m *v3.Document, opts ...Option) Validator {
 
-	// Assume a default configuration
-	cfg := Configuration{}
+	v := &validator{v3Model: m}
 
-	if len(config) > 0 {
-		cfg = config[0]
+	for _, opt := range opts {
+		opt(v)
 	}
 
 	// create a new parameter validator
-	paramValidator := parameters.NewParameterValidator(m, parameters.Config{RegexEngine: cfg.RegexEngine})
+	v.paramValidator = parameters.NewParameterValidator(m, parameters.WithRegexEngine(v.regexEngine))
 
-	// create a new request body validator
-	reqBodyValidator := requests.NewRequestBodyValidator(m, requests.Config{RegexEngine: cfg.RegexEngine})
+	// create aq new request body validator
+	v.requestValidator = requests.NewRequestBodyValidator(m)
 
 	// create a response body validator
-	respBodyValidator := responses.NewResponseBodyValidator(m, responses.Config{RegexEngine: cfg.RegexEngine})
+	v.responseValidator = responses.NewResponseBodyValidator(m, responses.WithRegexEngine(v.regexEngine))
 
-	return &validator{
-		v3Model:           m,
-		requestValidator:  reqBodyValidator,
-		responseValidator: respBodyValidator,
-		paramValidator:    paramValidator,
-	}
+	return v
 }
 
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
@@ -325,6 +321,7 @@ type validator struct {
 	paramValidator    parameters.ParameterValidator
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
+	regexEngine       jsonschema.RegexpEngine
 }
 
 func runValidation(control, doneChan chan struct{},

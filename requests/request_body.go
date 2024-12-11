@@ -4,9 +4,10 @@
 package requests
 
 import (
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"sync"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -30,20 +31,28 @@ type RequestBodyValidator interface {
 	ValidateRequestBodyWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 }
 
-type Config struct {
-	RegexEngine jsonschema.RegexpEngine
+type configOptions struct {
+	regexEngine jsonschema.RegexpEngine
+}
+
+type Option func(options *configOptions)
+
+func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
+	return func(rbv *configOptions) {
+		rbv.regexEngine = engine
+	}
 }
 
 // NewRequestBodyValidator will create a new RequestBodyValidator from an OpenAPI 3+ document
-func NewRequestBodyValidator(document *v3.Document, cfg ...Config) RequestBodyValidator {
+func NewRequestBodyValidator(document *v3.Document, opt ...Option) RequestBodyValidator {
 
-	config := Config{} // Default
-
-	if len(cfg) > 0 {
-		config = cfg[0]
+	cfg := configOptions{} // Default Options
+	for _, o := range opt {
+		o(&cfg)
 	}
 
-	return &requestBodyValidator{Config: config, document: document, schemaCache: &sync.Map{}}
+	return &requestBodyValidator{configOptions: cfg, document: document, schemaCache: &sync.Map{}}
+
 }
 
 type schemaCache struct {
@@ -53,7 +62,7 @@ type schemaCache struct {
 }
 
 type requestBodyValidator struct {
-	Config
+	configOptions
 	document    *v3.Document
 	schemaCache *sync.Map
 }

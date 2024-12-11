@@ -6,6 +6,7 @@ package validator
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -136,13 +137,24 @@ func TestNewValidator_ValidateDocument(t *testing.T) {
 	assert.Len(t, errs, 0)
 }
 
-func TestNewValidator_WithConfig(t *testing.T) {
+type alwaysMatchesRegex jsonschema.RegexpEngine
 
-	// This needs work.
-	validatorConfig := Configuration{}
+func (dr *alwaysMatchesRegex) MatchString(s string) bool {
+	return true
+}
+
+func (dr *alwaysMatchesRegex) String() string {
+	return ""
+}
+
+func fakeRegexEngine(s string) (jsonschema.Regexp, error) {
+	return (*alwaysMatchesRegex)(nil), nil
+}
+
+func TestNewValidator_WithRegex(t *testing.T) {
 
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
-	v, _ := NewValidator(doc, validatorConfig)
+	v, _ := NewValidator(doc, WithRegexEngine(fakeRegexEngine))
 	require.NotNil(t, v, "Failed to build validator")
 	valid, errs := v.ValidateDocument()
 	assert.True(t, valid)
