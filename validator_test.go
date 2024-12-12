@@ -6,7 +6,6 @@ package validator
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -153,12 +153,16 @@ func fakeRegexEngine(s string) (jsonschema.Regexp, error) {
 
 func TestNewValidator_WithRegex(t *testing.T) {
 
-	doc, _ := libopenapi.NewDocument(petstoreBytes)
-	v, _ := NewValidator(doc, WithRegexEngine(fakeRegexEngine))
+	doc, err := libopenapi.NewDocument(petstoreBytes)
+	require.Nil(t, err, "Failed to load spec")
+
+	v, errs := NewValidator(doc, WithRegexEngine(fakeRegexEngine))
+	require.Empty(t, errs, "Failed to build validator")
 	require.NotNil(t, v, "Failed to build validator")
-	valid, errs := v.ValidateDocument()
+
+	valid, valErrs := v.ValidateDocument()
 	assert.True(t, valid)
-	assert.Len(t, errs, 0)
+	assert.Empty(t, valErrs)
 }
 
 func TestNewValidator_BadDoc(t *testing.T) {

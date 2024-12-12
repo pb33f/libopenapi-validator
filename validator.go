@@ -4,11 +4,11 @@
 package validator
 
 import (
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"net/http"
 	"sync"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -63,8 +63,10 @@ type Validator interface {
 	GetResponseBodyValidator() responses.ResponseBodyValidator
 }
 
+// Option supports the 'Options Pattern' to define the behavior of a Validator
 type Option func(*validator)
 
+// WithRegexEngine allows for a custom regular expression engine to be used during validation.
 func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
 	return func(v *validator) {
 		v.regexEngine = engine
@@ -95,7 +97,7 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...Option) Validator {
 	v.paramValidator = parameters.NewParameterValidator(m, parameters.WithRegexEngine(v.regexEngine))
 
 	// create aq new request body validator
-	v.requestValidator = requests.NewRequestBodyValidator(m)
+	v.requestValidator = requests.NewRequestBodyValidator(m, requests.WithRegexEngine(v.regexEngine))
 
 	// create a response body validator
 	v.responseValidator = responses.NewResponseBodyValidator(m, responses.WithRegexEngine(v.regexEngine))

@@ -7,10 +7,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
-
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/errors"
 )
@@ -35,8 +34,10 @@ type configOptions struct {
 	regexEngine jsonschema.RegexpEngine
 }
 
+// Option supports the 'Options Pattern' to define the behavior of a RequestBodyValidator
 type Option func(options *configOptions)
 
+// WithRegexEngine allows for a custom regular expression engine to be used during validation.
 func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
 	return func(rbv *configOptions) {
 		rbv.regexEngine = engine
