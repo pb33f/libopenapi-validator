@@ -67,8 +67,10 @@ type ParameterValidator interface {
 	ValidateSecurityWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 }
 
+// Option supports the 'Options Pattern' to define the behavior of a ParameterValidator
 type Option func(validator *paramValidator)
 
+// WithRegexEngine allows for a custom regular expression engine to be used during validation.
 func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
 	return func(pv *paramValidator) {
 		pv.regexEngine = engine
