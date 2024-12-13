@@ -39,10 +39,10 @@ func ValidateResponseSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
-	cfg ...config.Option,
+	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
 
-	options := config.NewOptions(cfg...)
+	options := config.NewOptions(opts...)
 
 	var validationErrors []*errors.ValidationError
 
