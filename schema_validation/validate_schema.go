@@ -24,6 +24,7 @@ import (
 
 	_ "embed"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -47,43 +48,25 @@ type SchemaValidator interface {
 	ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*liberrors.ValidationError)
 }
 
-// Option supports the 'Options Pattern' to define the behavior of a SchemaValidator
-type Option func(*config)
-
-// WithRegexEngine allows for a custom regular expression engine to be used during validation.
-func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
-	return func(c *config) {
-		c.regexEngine = engine
-	}
-}
-
-type config struct {
-	regexEngine jsonschema.RegexpEngine
-}
-
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 type schemaValidator struct {
-	config
-	logger *slog.Logger
-	lock   sync.Mutex
+	options *config.ValidationOptions
+	logger  *slog.Logger
+	lock    sync.Mutex
 }
 
 // NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
-func NewSchemaValidatorWithLogger(logger *slog.Logger, opts ...Option) SchemaValidator {
+func NewSchemaValidatorWithLogger(logger *slog.Logger, opts ...config.Option) SchemaValidator {
 
-	cfg := config{}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
+	options := config.NewOptions(opts...)
 
-	// Build a validator
-	return &schemaValidator{config: cfg, logger: logger, lock: sync.Mutex{}}
+	return &schemaValidator{options: options, logger: logger, lock: sync.Mutex{}}
 
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
-func NewSchemaValidator(opts ...Option) SchemaValidator {
+func NewSchemaValidator(opts ...config.Option) SchemaValidator {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelError,
 	}))
@@ -148,7 +131,7 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 
 	}
 	compiler := jsonschema.NewCompiler()
-	compiler.UseRegexpEngine(s.regexEngine)
+	compiler.UseRegexpEngine(s.options.RegexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))

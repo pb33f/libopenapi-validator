@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 )
 
@@ -31,28 +31,12 @@ type ResponseBodyValidator interface {
 	ValidateResponseBodyWithPathItem(request *http.Request, response *http.Response, pathItem *v3.PathItem, pathFound string) (bool, []*errors.ValidationError)
 }
 
-type Option func(validator *configOptions)
-
-func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
-	return func(v *configOptions) {
-		v.regexEngine = engine
-	}
-}
-
-type configOptions struct {
-	regexEngine jsonschema.RegexpEngine
-}
-
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
-func NewResponseBodyValidator(document *v3.Document, opts ...Option) ResponseBodyValidator {
+func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) ResponseBodyValidator {
 
-	cfg := configOptions{} // Default Config
+	options := config.NewOptions(opts...)
 
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-
-	return &responseBodyValidator{configOptions: cfg, document: document, schemaCache: &sync.Map{}}
+	return &responseBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
 
 }
 
@@ -63,7 +47,7 @@ type schemaCache struct {
 }
 
 type responseBodyValidator struct {
-	configOptions
+	options     *config.ValidationOptions
 	document    *v3.Document
 	schemaCache *sync.Map
 }

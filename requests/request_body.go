@@ -9,8 +9,8 @@ import (
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 )
 
@@ -30,29 +30,12 @@ type RequestBodyValidator interface {
 	ValidateRequestBodyWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 }
 
-type configOptions struct {
-	regexEngine jsonschema.RegexpEngine
-}
-
-// Option supports the 'Options Pattern' to define the behavior of a RequestBodyValidator
-type Option func(options *configOptions)
-
-// WithRegexEngine allows for a custom regular expression engine to be used during validation.
-func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
-	return func(rbv *configOptions) {
-		rbv.regexEngine = engine
-	}
-}
-
 // NewRequestBodyValidator will create a new RequestBodyValidator from an OpenAPI 3+ document
-func NewRequestBodyValidator(document *v3.Document, opt ...Option) RequestBodyValidator {
+func NewRequestBodyValidator(document *v3.Document, opts ...config.Option) RequestBodyValidator {
 
-	cfg := configOptions{} // Default Options
-	for _, o := range opt {
-		o(&cfg)
-	}
+	options := config.NewOptions(opts...)
 
-	return &requestBodyValidator{configOptions: cfg, document: document, schemaCache: &sync.Map{}}
+	return &requestBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
 
 }
 
@@ -63,7 +46,7 @@ type schemaCache struct {
 }
 
 type requestBodyValidator struct {
-	configOptions
+	options     *config.ValidationOptions
 	document    *v3.Document
 	schemaCache *sync.Map
 }

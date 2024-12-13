@@ -15,6 +15,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
@@ -156,7 +157,7 @@ func (v *responseBodyValidator) checkResponseSchema(
 			}
 
 			// render the schema, to be used for validation
-			valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, WithRegexEngine(v.regexEngine))
+			valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
 			if !valid {
 				validationErrors = append(validationErrors, vErrs...)
 			}
