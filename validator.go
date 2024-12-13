@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	"github.com/pb33f/libopenapi-validator/paths"
@@ -63,18 +63,8 @@ type Validator interface {
 	GetResponseBodyValidator() responses.ResponseBodyValidator
 }
 
-// Option supports the 'Options Pattern' to define the behavior of a Validator
-type Option func(*validator)
-
-// WithRegexEngine allows for a custom regular expression engine to be used during validation.
-func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
-	return func(v *validator) {
-		v.regexEngine = engine
-	}
-}
-
 // NewValidator will create a new Validator from an OpenAPI 3+ document
-func NewValidator(document libopenapi.Document, opts ...Option) (Validator, []error) {
+func NewValidator(document libopenapi.Document, opts ...config.Option) (Validator, []error) {
 	m, errs := document.BuildV3Model()
 	if errs != nil {
 		return nil, errs
@@ -85,22 +75,20 @@ func NewValidator(document libopenapi.Document, opts ...Option) (Validator, []er
 }
 
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
-func NewValidatorFromV3Model(m *v3.Document, opts ...Option) Validator {
+func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 
-	v := &validator{v3Model: m}
+	options := config.NewOptions(opts...)
 
-	for _, opt := range opts {
-		opt(v)
-	}
+	v := &validator{options: options, v3Model: m}
 
 	// create a new parameter validator
-	v.paramValidator = parameters.NewParameterValidator(m, parameters.WithRegexEngine(v.regexEngine))
+	v.paramValidator = parameters.NewParameterValidator(m, opts...)
 
 	// create aq new request body validator
-	v.requestValidator = requests.NewRequestBodyValidator(m, requests.WithRegexEngine(v.regexEngine))
+	v.requestValidator = requests.NewRequestBodyValidator(m, opts...)
 
 	// create a response body validator
-	v.responseValidator = responses.NewResponseBodyValidator(m, responses.WithRegexEngine(v.regexEngine))
+	v.responseValidator = responses.NewResponseBodyValidator(m, opts...)
 
 	return v
 }
@@ -318,12 +306,12 @@ func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, p
 }
 
 type validator struct {
+	options           *config.ValidationOptions
 	v3Model           *v3.Document
 	document          libopenapi.Document
 	paramValidator    parameters.ParameterValidator
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
-	regexEngine       jsonschema.RegexpEngine
 }
 
 func runValidation(control, doneChan chan struct{},

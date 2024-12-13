@@ -13,6 +13,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
@@ -109,7 +110,7 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	}
 
 	// render the schema, to be used for validation
-	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, WithRegexEngine(v.regexEngine))
+	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 

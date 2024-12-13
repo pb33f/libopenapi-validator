@@ -19,6 +19,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
@@ -156,7 +157,7 @@ func TestNewValidator_WithRegex(t *testing.T) {
 	doc, err := libopenapi.NewDocument(petstoreBytes)
 	require.Nil(t, err, "Failed to load spec")
 
-	v, errs := NewValidator(doc, WithRegexEngine(fakeRegexEngine))
+	v, errs := NewValidator(doc, config.WithRegexEngine(fakeRegexEngine))
 	require.Empty(t, errs, "Failed to build validator")
 	require.NotNil(t, v, "Failed to build validator")
 

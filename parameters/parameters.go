@@ -6,10 +6,9 @@ package parameters
 import (
 	"net/http"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
-
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 )
 
@@ -67,29 +66,16 @@ type ParameterValidator interface {
 	ValidateSecurityWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 }
 
-// Option supports the 'Options Pattern' to define the behavior of a ParameterValidator
-type Option func(validator *paramValidator)
-
-// WithRegexEngine allows for a custom regular expression engine to be used during validation.
-func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
-	return func(pv *paramValidator) {
-		pv.regexEngine = engine
-	}
-}
-
 // NewParameterValidator will create a new ParameterValidator from an OpenAPI 3+ document
-func NewParameterValidator(document *v3.Document, opts ...Option) ParameterValidator {
+func NewParameterValidator(document *v3.Document, opts ...config.Option) ParameterValidator {
 
-	pv := paramValidator{document: document}
+	options := config.NewOptions(opts...)
 
-	for _, opt := range opts {
-		opt(&pv)
-	}
+	return &paramValidator{options: options, document: document}
 
-	return &pv
 }
 
 type paramValidator struct {
-	regexEngine jsonschema.RegexpEngine
-	document    *v3.Document
+	options  *config.ValidationOptions
+	document *v3.Document
 }
