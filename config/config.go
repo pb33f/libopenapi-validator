@@ -12,8 +12,8 @@ type ValidationOptions struct {
 // Option Enables an 'Options pattern' approach
 type Option func(*ValidationOptions)
 
-// NewOptions creates a new ValidationOptions instance with default values.
-func NewOptions(opts ...Option) *ValidationOptions {
+// NewValidationOptions creates a new ValidationOptions instance with default values.
+func NewValidationOptions(opts ...Option) *ValidationOptions {
 
 	// Create the set of default values
 	o := &ValidationOptions{}

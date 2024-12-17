@@ -23,7 +23,7 @@ import (
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
 func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bool, []*liberrors.ValidationError) {
 
-	options := config.NewOptions(opts...)
+	options := config.NewValidationOptions(opts...)
 
 	info := doc.GetSpecInfo()
 	loadedSchema := info.APISchema

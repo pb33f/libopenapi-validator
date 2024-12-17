@@ -34,7 +34,7 @@ type ResponseBodyValidator interface {
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
 func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) ResponseBodyValidator {
 
-	options := config.NewOptions(opts...)
+	options := config.NewValidationOptions(opts...)
 
 	return &responseBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
 

@@ -42,7 +42,7 @@ func ValidateResponseSchema(
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
 
-	options := config.NewOptions(opts...)
+	options := config.NewValidationOptions(opts...)
 
 	var validationErrors []*errors.ValidationError
 

@@ -38,7 +38,7 @@ func ValidateRequestSchema(
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
 
-	options := config.NewOptions()
+	options := config.NewValidationOptions()
 
 	var validationErrors []*errors.ValidationError
 
