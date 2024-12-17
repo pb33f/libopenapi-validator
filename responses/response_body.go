@@ -11,6 +11,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 )
 
@@ -31,8 +32,12 @@ type ResponseBodyValidator interface {
 }
 
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
-func NewResponseBodyValidator(document *v3.Document) ResponseBodyValidator {
-	return &responseBodyValidator{document: document, schemaCache: &sync.Map{}}
+func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) ResponseBodyValidator {
+
+	options := config.NewValidationOptions(opts...)
+
+	return &responseBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
+
 }
 
 type schemaCache struct {
@@ -42,6 +47,7 @@ type schemaCache struct {
 }
 
 type responseBodyValidator struct {
+	options     *config.ValidationOptions
 	document    *v3.Document
 	schemaCache *sync.Map
 }

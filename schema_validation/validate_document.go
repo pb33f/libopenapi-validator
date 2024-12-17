@@ -14,19 +14,24 @@ import (
 	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
-func ValidateOpenAPIDocument(doc libopenapi.Document) (bool, []*liberrors.ValidationError) {
+func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bool, []*liberrors.ValidationError) {
+
+	options := config.NewValidationOptions(opts...)
+
 	info := doc.GetSpecInfo()
 	loadedSchema := info.APISchema
 	var validationErrors []*liberrors.ValidationError
 	decodedDocument := *info.SpecJSON
 
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(options.RegexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(loadedSchema)))

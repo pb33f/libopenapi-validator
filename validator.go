@@ -11,6 +11,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	"github.com/pb33f/libopenapi-validator/paths"
@@ -63,33 +64,33 @@ type Validator interface {
 }
 
 // NewValidator will create a new Validator from an OpenAPI 3+ document
-func NewValidator(document libopenapi.Document) (Validator, []error) {
+func NewValidator(document libopenapi.Document, opts ...config.Option) (Validator, []error) {
 	m, errs := document.BuildV3Model()
 	if errs != nil {
 		return nil, errs
 	}
-	v := NewValidatorFromV3Model(&m.Model)
+	v := NewValidatorFromV3Model(&m.Model, opts...)
 	v.(*validator).document = document
 	return v, nil
 }
 
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
-func NewValidatorFromV3Model(m *v3.Document) Validator {
-	// create a new parameter validator
-	paramValidator := parameters.NewParameterValidator(m)
+func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 
-	// create a new request body validator
-	reqBodyValidator := requests.NewRequestBodyValidator(m)
+	options := config.NewValidationOptions(opts...)
+
+	v := &validator{options: options, v3Model: m}
+
+	// create a new parameter validator
+	v.paramValidator = parameters.NewParameterValidator(m, opts...)
+
+	// create aq new request body validator
+	v.requestValidator = requests.NewRequestBodyValidator(m, opts...)
 
 	// create a response body validator
-	respBodyValidator := responses.NewResponseBodyValidator(m)
+	v.responseValidator = responses.NewResponseBodyValidator(m, opts...)
 
-	return &validator{
-		v3Model:           m,
-		requestValidator:  reqBodyValidator,
-		responseValidator: respBodyValidator,
-		paramValidator:    paramValidator,
-	}
+	return v
 }
 
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
@@ -305,6 +306,7 @@ func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, p
 }
 
 type validator struct {
+	options           *config.ValidationOptions
 	v3Model           *v3.Document
 	document          libopenapi.Document
 	paramValidator    parameters.ParameterValidator
