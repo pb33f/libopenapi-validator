@@ -41,7 +41,6 @@ func ValidateResponseSchema(
 	jsonSchema []byte,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
-
 	options := config.NewValidationOptions(opts...)
 
 	var validationErrors []*errors.ValidationError

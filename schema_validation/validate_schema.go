@@ -58,11 +58,9 @@ type schemaValidator struct {
 
 // NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
 func NewSchemaValidatorWithLogger(logger *slog.Logger, opts ...config.Option) SchemaValidator {
-
 	options := config.NewValidationOptions(opts...)
 
 	return &schemaValidator{options: options, logger: logger, lock: sync.Mutex{}}
-
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
