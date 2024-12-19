@@ -20,6 +20,7 @@ import (
 	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
@@ -34,7 +35,10 @@ func ValidateRequestSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
+	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
+	options := config.NewValidationOptions(opts...)
+
 	var validationErrors []*errors.ValidationError
 
 	var requestBody []byte
@@ -107,6 +111,7 @@ func ValidateRequestSchema(
 	}
 
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(options.RegexEngine) // Ensure any configured regex engine is used.
 	compiler.UseLoader(helpers.NewCompilerLoader())
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
 	_ = compiler.AddResource("requestBody.json", decodedSchema)

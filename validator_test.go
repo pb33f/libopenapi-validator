@@ -13,11 +13,13 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
@@ -134,6 +136,33 @@ func TestNewValidator_ValidateDocument(t *testing.T) {
 	valid, errs := v.ValidateDocument()
 	assert.True(t, valid)
 	assert.Len(t, errs, 0)
+}
+
+type alwaysMatchesRegex jsonschema.RegexpEngine
+
+func (dr *alwaysMatchesRegex) MatchString(s string) bool {
+	return true
+}
+
+func (dr *alwaysMatchesRegex) String() string {
+	return ""
+}
+
+func fakeRegexEngine(s string) (jsonschema.Regexp, error) {
+	return (*alwaysMatchesRegex)(nil), nil
+}
+
+func TestNewValidator_WithRegex(t *testing.T) {
+	doc, err := libopenapi.NewDocument(petstoreBytes)
+	require.Nil(t, err, "Failed to load spec")
+
+	v, errs := NewValidator(doc, config.WithRegexEngine(fakeRegexEngine))
+	require.Empty(t, errs, "Failed to build validator")
+	require.NotNil(t, v, "Failed to build validator")
+
+	valid, valErrs := v.ValidateDocument()
+	assert.True(t, valid)
+	assert.Empty(t, valErrs)
 }
 
 func TestNewValidator_BadDoc(t *testing.T) {

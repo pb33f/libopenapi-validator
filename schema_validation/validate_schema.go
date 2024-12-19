@@ -24,6 +24,7 @@ import (
 
 	_ "embed"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -50,21 +51,24 @@ type SchemaValidator interface {
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 type schemaValidator struct {
-	logger *slog.Logger
-	lock   sync.Mutex
+	options *config.ValidationOptions
+	logger  *slog.Logger
+	lock    sync.Mutex
 }
 
 // NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
-func NewSchemaValidatorWithLogger(logger *slog.Logger) SchemaValidator {
-	return &schemaValidator{logger: logger, lock: sync.Mutex{}}
+func NewSchemaValidatorWithLogger(logger *slog.Logger, opts ...config.Option) SchemaValidator {
+	options := config.NewValidationOptions(opts...)
+
+	return &schemaValidator{options: options, logger: logger, lock: sync.Mutex{}}
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
-func NewSchemaValidator() SchemaValidator {
+func NewSchemaValidator(opts ...config.Option) SchemaValidator {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelError,
 	}))
-	return NewSchemaValidatorWithLogger(logger)
+	return NewSchemaValidatorWithLogger(logger, opts...)
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError) {
@@ -125,6 +129,7 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(s.options.RegexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))

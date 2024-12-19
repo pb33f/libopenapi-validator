@@ -20,6 +20,7 @@ import (
 	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
@@ -38,7 +39,10 @@ func ValidateResponseSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
+	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
+	options := config.NewValidationOptions(opts...)
+
 	var validationErrors []*errors.ValidationError
 
 	if response == nil || response.Body == nil {
@@ -126,6 +130,7 @@ func ValidateResponseSchema(
 
 	// create a new jsonschema compiler and add in the rendered JSON schema.
 	compiler := jsonschema.NewCompiler()
+	compiler.UseRegexpEngine(options.RegexEngine)
 	compiler.UseLoader(helpers.NewCompilerLoader())
 	fName := fmt.Sprintf("%s.json", helpers.ResponseBodyValidation)
 	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
