@@ -4,8 +4,8 @@
 package helpers
 
 import (
+	"mime"
 	"net/http"
-	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 )
@@ -38,23 +38,8 @@ func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
 // of the request.The second (optional) argument is the charset of the request. The third (optional)
 // argument is the boundary of the type (only used with forms really).
 func ExtractContentType(contentType string) (string, string, string) {
-	var charset, boundary string
-	if strings.ContainsRune(contentType, ';') {
-		segs := strings.Split(contentType, SemiColon)
-		contentType = strings.TrimSpace(segs[0])
-		for _, v := range segs[1:] {
-			kv := strings.Split(v, Equals)
-			if len(kv) == 2 {
-				if strings.TrimSpace(strings.ToLower(kv[0])) == Charset {
-					charset = strings.TrimSpace(kv[1])
-				}
-				if strings.TrimSpace(strings.ToLower(kv[0])) == Boundary {
-					boundary = strings.TrimSpace(kv[1])
-				}
-			}
-		}
-	} else {
-		contentType = strings.TrimSpace(contentType)
-	}
-	return contentType, charset, boundary
+	// mime.ParseMediaType: "If there is an error parsing the optional parameter,
+	// the media type will be returned along with the error ErrInvalidMediaParameter."
+	ct, params, _ := mime.ParseMediaType(contentType)
+	return ct, params["charset"], params["boundary"]
 }
