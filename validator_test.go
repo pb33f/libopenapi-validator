@@ -153,7 +153,6 @@ func fakeRegexEngine(s string) (jsonschema.Regexp, error) {
 }
 
 func TestNewValidator_WithRegex(t *testing.T) {
-
 	doc, err := libopenapi.NewDocument(petstoreBytes)
 	require.Nil(t, err, "Failed to load spec")
 

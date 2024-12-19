@@ -14,7 +14,6 @@ type Option func(*ValidationOptions)
 
 // NewValidationOptions creates a new ValidationOptions instance with default values.
 func NewValidationOptions(opts ...Option) *ValidationOptions {
-
 	// Create the set of default values
 	o := &ValidationOptions{}
 

@@ -68,11 +68,9 @@ type ParameterValidator interface {
 
 // NewParameterValidator will create a new ParameterValidator from an OpenAPI 3+ document
 func NewParameterValidator(document *v3.Document, opts ...config.Option) ParameterValidator {
-
 	options := config.NewValidationOptions(opts...)
 
 	return &paramValidator{options: options, document: document}
-
 }
 
 type paramValidator struct {

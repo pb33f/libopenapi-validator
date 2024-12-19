@@ -76,7 +76,6 @@ func NewValidator(document libopenapi.Document, opts ...config.Option) (Validato
 
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
 func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
-
 	options := config.NewValidationOptions(opts...)
 
 	v := &validator{options: options, v3Model: m}
