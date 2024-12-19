@@ -4,6 +4,7 @@
 package helpers
 
 import (
+	"mime"
 	"net/http"
 	"testing"
 
@@ -87,6 +88,27 @@ func TestExtractContentType(t *testing.T) {
 	// Invalid content type (no key-value pair for charset/boundary)
 	contentType, charset, boundary = ExtractContentType("application/xml; charset; boundary")
 	require.Equal(t, "application/xml", contentType)
+	require.Empty(t, charset)
+	require.Empty(t, boundary)
+
+	// Content type with custom parameter
+	contentType, charset, boundary = ExtractContentType("text/html; version=2")
+	require.Equal(t, "text/html", contentType)
+	require.Empty(t, charset)
+	require.Empty(t, boundary)
+
+	// Content type with custom parameter, charset, and boundary
+	contentType, charset, boundary = ExtractContentType("text/html; charset=UTF-8; version=2; boundary=myBoundary")
+	require.Equal(t, "text/html", contentType)
+	require.Equal(t, "UTF-8", charset)
+	require.Equal(t, "myBoundary", boundary)
+
+	// mime.ParseMediaType returns an error, but ExtractContentType still returns the content type.
+	const ct = "text/plain;;"
+	_, _, err := mime.ParseMediaType(ct)
+	require.ErrorIs(t, err, mime.ErrInvalidMediaParameter)
+	contentType, charset, boundary = ExtractContentType(ct)
+	require.Equal(t, "text/plain", contentType)
 	require.Empty(t, charset)
 	require.Empty(t, boundary)
 }
