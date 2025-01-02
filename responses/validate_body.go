@@ -5,7 +5,6 @@ package responses
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/pb33f/libopenapi/utils"
+	"gopkg.in/yaml.v3"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -175,10 +175,10 @@ func (v *responseBodyValidator) checkResponseSchema(
 			}
 
 			if len(renderedInline) > 0 && len(renderedJSON) > 0 && schema != nil {
-			// render the schema, to be used for validation
-			valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
-			if !valid {
-				validationErrors = append(validationErrors, vErrs...)
+				// render the schema, to be used for validation
+				valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
+				if !valid {
+					validationErrors = append(validationErrors, vErrs...)
 				}
 			}
 		}
