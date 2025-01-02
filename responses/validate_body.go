@@ -5,6 +5,7 @@ package responses
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"net/http"
 	"strconv"
 	"strings"
@@ -146,20 +147,39 @@ func (v *responseBodyValidator) checkResponseSchema(
 
 				// render the schema inline and perform the intensive work of rendering and converting
 				// this is only performed once per schema and cached in the validator.
-				schema = mediaType.Schema.Schema()
-				renderedInline, _ = schema.RenderInline()
-				renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-				v.schemaCache.Store(hash, &schemaCache{
-					schema:         schema,
-					renderedInline: renderedInline,
-					renderedJSON:   renderedJSON,
-				})
+				schemaP := mediaType.Schema
+				marshalled, mErr := schemaP.MarshalYAMLInline()
+
+				if mErr != nil {
+					validationErrors = append(validationErrors, &errors.ValidationError{
+						Reason:            mErr.Error(),
+						Message:           fmt.Sprintf("unable to marshal schema for %s", contentType),
+						ValidationType:    helpers.ResponseBodyValidation,
+						ValidationSubType: helpers.Schema,
+						SpecLine:          mediaType.Schema.GetSchemaKeyNode().Line,
+						SpecCol:           mediaType.Schema.GetSchemaKeyNode().Column,
+						RequestPath:       request.URL.Path,
+						RequestMethod:     request.Method,
+						HowToFix:          "ensure schema is valid and does not contain circular references",
+					})
+				} else {
+					schema = schemaP.Schema()
+					renderedInline, _ = yaml.Marshal(marshalled)
+					renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
+					v.schemaCache.Store(hash, &schemaCache{
+						schema:         schema,
+						renderedInline: renderedInline,
+						renderedJSON:   renderedJSON,
+					})
+				}
 			}
 
+			if len(renderedInline) > 0 && len(renderedJSON) > 0 && schema != nil {
 			// render the schema, to be used for validation
 			valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
 			if !valid {
 				validationErrors = append(validationErrors, vErrs...)
+				}
 			}
 		}
 	}
