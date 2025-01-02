@@ -140,9 +140,12 @@ func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam, sch *base.Sch
 			}
 			// check if schema has additional properties defined as an array
 			if sch != nil && sch.AdditionalProperties != nil &&
-				sch.AdditionalProperties.IsA() &&
-				slices.Contains(sch.AdditionalProperties.A.Schema().Type, Array) {
-				props[v.Property] = rawValues
+				sch.AdditionalProperties.IsA() {
+				s := sch.AdditionalProperties.A.Schema()
+				if s != nil &&
+					slices.Contains(s.Type, Array) {
+					props[v.Property] = rawValues
+				}
 			}
 
 			if len(props) == 0 {
