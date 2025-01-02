@@ -6,9 +6,13 @@ package validator
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -1538,4 +1542,151 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/107
+func TestNewValidator_TestCircularRefsInValidation_Request(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+info:
+  title: Panic at response validation
+  version: 1.0.0
+paths:
+  /operations:
+    delete:
+      description: Delete operations
+      responses:
+        default:
+          description: Any response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`
+
+	document, err := libopenapi.NewDocument([]byte(spec))
+	if err != nil {
+		panic(fmt.Sprintf("failed to create new document: %v\n", err))
+	}
+
+	model, errs := document.BuildV3Model()
+	circ := model.Index.GetCircularReferences()
+	fmt.Println("Circular references: ", len(circ))
+
+	if len(errs) > 0 {
+		for i := range errs {
+			fmt.Printf("model error: %e\n", errs[i])
+		}
+		panic(fmt.Sprintf("failed to create v3 model from document: %d errors reported", len(errs)))
+	}
+
+	fmt.Println("Successfully parsed OpenAPI spec")
+
+	oapiValidator, errs := NewValidator(document)
+	if errs != nil {
+		panic(fmt.Sprintf("failed to create validator: %v", errs))
+	}
+	if ok, errs := oapiValidator.ValidateDocument(); !ok {
+		panic(fmt.Sprintf("document validation errors: %v", errs))
+	}
+
+	req := &http.Request{
+		Method: http.MethodDelete,
+		URL: &url.URL{
+			Path: "/operations",
+		},
+	}
+	res := &http.Response{
+		StatusCode: http.StatusOK,
+		Header: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		Body: io.NopCloser(strings.NewReader(`{"code":"abc","details":[{"code":"def"}]}`)),
+	}
+	if ok, errs := oapiValidator.ValidateHttpResponse(req, res); !ok {
+		assert.Equal(t, 1, len(errs))
+		assert.Equal(t, "cannot render circular reference: #/components/schemas/Error", errs[0].Reason)
+
+	}
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/107
+func TestNewValidator_TestCircularRefsInValidation_Response(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+info:
+  title: Panic at response validation
+  version: 1.0.0
+paths:
+  /operations:
+    delete:
+      description: Delete operations
+      responses:
+        default:
+          description: Any response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`
+
+	document, err := libopenapi.NewDocument([]byte(spec))
+	if err != nil {
+		panic(fmt.Sprintf("failed to create new document: %v\n", err))
+	}
+
+	model, errs := document.BuildV3Model()
+	circ := model.Index.GetCircularReferences()
+	fmt.Println("Circular references: ", len(circ))
+
+	if len(errs) > 0 {
+		for i := range errs {
+			fmt.Printf("model error: %e\n", errs[i])
+		}
+		panic(fmt.Sprintf("failed to create v3 model from document: %d errors reported", len(errs)))
+	}
+
+	fmt.Println("Successfully parsed OpenAPI spec")
+
+	oapiValidator, errs := NewValidator(document)
+	if errs != nil {
+		panic(fmt.Sprintf("failed to create validator: %v", errs))
+	}
+	if ok, errs := oapiValidator.ValidateDocument(); !ok {
+		panic(fmt.Sprintf("document validation errors: %v", errs))
+	}
+
+	req := &http.Request{
+		Method: http.MethodDelete,
+		URL: &url.URL{
+			Path: "/operations",
+		},
+	}
+	if ok, errs := oapiValidator.ValidateHttpRequest(req); !ok {
+		assert.Equal(t, 1, len(errs))
+		assert.Equal(t, "cannot render circular reference: #/components/schemas/Error", errs[0].Reason)
+
+	}
 }
