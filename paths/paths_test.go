@@ -677,7 +677,6 @@ paths:
 }
 
 func TestNewValidator_FindPathWithEncodedArg(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 paths:
   /something/{string_contains_encoded}:
