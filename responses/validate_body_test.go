@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -1299,6 +1300,69 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/107
+// https://github.com/pb33f/libopenapi-validator/issues/103
+func TestNewValidator_TestCircularRefsInValidation_Response(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Panic at response validation
+  version: 1.0.0
+paths:
+  /operations:
+    delete:
+      description: Delete operations
+      responses:
+        default:
+          description: Any response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	req := &http.Request{
+		Method: http.MethodDelete,
+		URL: &url.URL{
+			Path: "/operations",
+		},
+	}
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(nil)
+	}
+
+	// fire the request
+	handler(res, req)
+
+	// record response
+	response := res.Result()
+
+	valid, errors := v.ValidateResponseBody(req, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "cannot render circular reference: #/components/schemas/Error", errors[0].Reason)
 }
 
 type errorReader struct{}
