@@ -1545,6 +1545,7 @@ paths:
 }
 
 // https://github.com/pb33f/libopenapi-validator/issues/107
+// https://github.com/pb33f/libopenapi-validator/issues/103
 func TestNewValidator_TestCircularRefsInValidation_Request(t *testing.T) {
 
 	spec := `openapi: 3.1.0
@@ -1622,6 +1623,7 @@ components:
 }
 
 // https://github.com/pb33f/libopenapi-validator/issues/107
+// https://github.com/pb33f/libopenapi-validator/issues/103
 func TestNewValidator_TestCircularRefsInValidation_Response(t *testing.T) {
 
 	spec := `openapi: 3.1.0
