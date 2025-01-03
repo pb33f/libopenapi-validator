@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -667,6 +668,110 @@ paths:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamValidDateFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=2024-12-25", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamInvalidDateFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=12/25/2024", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+}
+
+func TestNewValidator_QueryParamValidDateTimeFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=2024-12-25T13:42:42Z", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamInvalidDateTimeFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=2024-12-25", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
 }
 
 func TestNewValidator_QueryParamValidTypeArrayString(t *testing.T) {

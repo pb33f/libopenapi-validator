@@ -139,6 +139,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 										p.Name,
 										helpers.ParameterValidation,
 										helpers.ParameterValidationPath,
+										v.options,
 									)...)
 
 							case helpers.Integer, helpers.Number:
@@ -161,6 +162,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 									p.Name,
 									helpers.ParameterValidation,
 									helpers.ParameterValidationPath,
+									v.options,
 								)...)
 
 							case helpers.Boolean:
