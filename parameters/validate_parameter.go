@@ -18,6 +18,7 @@ import (
 
 	stdError "errors"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -30,8 +31,9 @@ func ValidateSingleParameterSchema(
 	name string,
 	validationType string,
 	subValType string,
+	o *config.ValidationOptions,
 ) (validationErrors []*errors.ValidationError) {
-	jsch := compileSchema(name, buildJsonRender(schema))
+	jsch := helpers.NewCompiledSchema(name, buildJsonRender(schema), o)
 
 	scErrs := jsch.Validate(rawObject)
 	var werras *jsonschema.ValidationError
@@ -39,16 +41,6 @@ func ValidateSingleParameterSchema(
 		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType)
 	}
 	return validationErrors
-}
-
-// compileSchema create a new json schema compiler and add the schema to it.
-func compileSchema(name string, jsonSchema []byte) *jsonschema.Schema {
-	compiler := jsonschema.NewCompiler()
-	compiler.UseLoader(helpers.NewCompilerLoader())
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema))) // decode the schema into a json blob
-	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), decodedSchema)
-	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
-	return jsch
 }
 
 // buildJsonRender build a JSON render of the schema.

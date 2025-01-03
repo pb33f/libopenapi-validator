@@ -252,5 +252,6 @@ func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, 
 		parameter.Name,
 		helpers.ParameterValidation,
 		helpers.ParameterValidationQuery,
+		v.options,
 	)
 }
