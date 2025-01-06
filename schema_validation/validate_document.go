@@ -6,7 +6,6 @@ package schema_validation
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -29,15 +28,10 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 	var validationErrors []*liberrors.ValidationError
 	decodedDocument := *info.SpecJSON
 
-	compiler := jsonschema.NewCompiler()
-	compiler.UseRegexpEngine(options.RegexEngine)
-	compiler.UseLoader(helpers.NewCompilerLoader())
+	// Compile the JSON Schema
+	jsch, _ := helpers.NewCompiledSchema("schema", []byte(loadedSchema), options)
 
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(loadedSchema)))
-
-	_ = compiler.AddResource("schema.json", decodedSchema)
-	jsch, _ := compiler.Compile("schema.json")
-
+	// Validate the document
 	scErrs := jsch.Validate(decodedDocument)
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure

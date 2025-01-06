@@ -24,7 +24,10 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 
 	// Apply any supplied overrides
 	for _, opt := range opts {
-		opt(o)
+		// Sanity
+		if opt != nil {
+			opt(o)
+		}
 	}
 
 	// Done

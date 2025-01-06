@@ -2701,7 +2701,7 @@ paths:
 	}
 
 	errs := ValidateParameterSchema(s, rawObject, "cake", "burger", "lemons",
-		"pizza", "rice", "herbs")
+		"pizza", "rice", "herbs", nil)
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "lemons 'pizza' is defined as an object, "+
@@ -2945,7 +2945,7 @@ paths:
 	}
 
 	errs := ValidateParameterSchema(s, rawObject, "cake", "burger", "lemons",
-		"pizza", "rice", "herbs")
+		"pizza", "rice", "herbs", nil)
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "lemons 'pizza' is defined as an object, "+

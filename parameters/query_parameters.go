@@ -173,7 +173,7 @@ doneLooking:
 										"The query parameter",
 										params[p].Name,
 										helpers.ParameterValidation,
-										helpers.ParameterValidationQuery)...)
+										helpers.ParameterValidationQuery, v.options)...)
 								if len(validationErrors) > numErrors {
 									// we've already added an error for this, so we can skip the rest of the values
 									break skipValues
@@ -185,7 +185,7 @@ doneLooking:
 								// only check if items is a schema, not a boolean
 								if sch.Items != nil && sch.Items.IsA() {
 									validationErrors = append(validationErrors,
-										ValidateQueryArray(sch, params[p], ef, contentWrapped)...)
+										ValidateQueryArray(sch, params[p], ef, contentWrapped, v.options)...)
 								}
 							}
 						}
@@ -209,7 +209,7 @@ doneLooking:
 								"The query parameter (which is an array)",
 								params[p].Name,
 								helpers.ParameterValidation,
-								helpers.ParameterValidationQuery)...)
+								helpers.ParameterValidationQuery, v.options)...)
 						break doneLooking
 					}
 				}

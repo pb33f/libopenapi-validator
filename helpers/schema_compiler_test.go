@@ -3,8 +3,9 @@ package helpers
 import (
 	"testing"
 
-	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pb33f/libopenapi-validator/config"
 )
 
 // A few simple JSON Schemas
