@@ -223,7 +223,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 											"The path parameter",
 											p.Name,
 											helpers.ParameterValidation,
-											helpers.ParameterValidationPath)...)
+											helpers.ParameterValidationPath, v.options)...)
 								}
 
 							case helpers.Array:

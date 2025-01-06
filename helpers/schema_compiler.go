@@ -11,6 +11,11 @@ import (
 
 // ConfigureCompiler configures a JSON Schema compiler with the desired behavior.
 func ConfigureCompiler(c *jsonschema.Compiler, o *config.ValidationOptions) {
+	// Sanity
+	if o == nil {
+		return
+	}
+
 	// nil is the default so this is OK.
 	c.UseRegexpEngine(o.RegexEngine)
 
@@ -38,18 +43,32 @@ func NewCompilerWithOptions(o *config.ValidationOptions) *jsonschema.Compiler {
 }
 
 // NewCompiledSchema establishes a programmatic representation of a JSON Schema document that is used for validation.
-func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptions) *jsonschema.Schema {
+func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptions) (*jsonschema.Schema, error) {
+	// Fake-Up a resource name for the schema
+	resourceName := fmt.Sprintf("%s.json", name)
+
 	// Establish a compiler with the desired configuration
 	compiler := NewCompilerWithOptions(o)
 	compiler.UseLoader(NewCompilerLoader())
 
 	// Decode the JSON Schema into a JSON blob.
-	decodedSchema, _ := jsonschema.UnmarshalJSON(bytes.NewReader(jsonSchema))
-	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), decodedSchema)
+	decodedSchema, err := jsonschema.UnmarshalJSON(bytes.NewReader(jsonSchema))
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON schema: %w", err)
+	}
+
+	// Give our schema to the compiler.
+	err = compiler.AddResource(resourceName, decodedSchema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add resource to schema compiler: %w", err)
+	}
 
 	// Try to compile it.
-	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
+	jsch, err := compiler.Compile(resourceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile JSON schema: %w", err)
+	}
 
 	// Done.
-	return jsch
+	return jsch, nil
 }

@@ -115,7 +115,7 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 									"The header parameter",
 									p.Name,
 									helpers.ParameterValidation,
-									helpers.ParameterValidationQuery)...)
+									helpers.ParameterValidationQuery, v.options)...)
 						}
 
 					case helpers.Array:

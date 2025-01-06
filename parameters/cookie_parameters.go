@@ -93,7 +93,8 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 											"The cookie parameter",
 											p.Name,
 											helpers.ParameterValidation,
-											helpers.ParameterValidationQuery)...)
+											helpers.ParameterValidationQuery,
+											v.options)...)
 								}
 							}
 						case helpers.Array:
