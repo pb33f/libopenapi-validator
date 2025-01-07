@@ -34,7 +34,7 @@ const objectSchema = `{
 func Test_SchemaWithNilOptions(t *testing.T) {
 	jsch, err := NewCompiledSchema("test", []byte(stringSchema), nil)
 
-	require.Nil(t, err, "Failed to compile Schema: %v", err)
+	require.Nil(t, err, "Failed to compile Schema")
 	require.NotNil(t, jsch, "Did not return a compiled schema")
 }
 
@@ -42,7 +42,7 @@ func Test_SchemaWithDefaultOptions(t *testing.T) {
 	valOptions := config.NewValidationOptions()
 	jsch, err := NewCompiledSchema("test", []byte(stringSchema), valOptions)
 
-	require.Nil(t, err, "Failed to compile Schema: %v", err)
+	require.Nil(t, err, "Failed to compile Schema")
 	require.NotNil(t, jsch, "Did not return a compiled schema")
 }
 
@@ -51,7 +51,7 @@ func Test_SchemaWithOptions(t *testing.T) {
 
 	jsch, err := NewCompiledSchema("test", []byte(stringSchema), valOptions)
 
-	require.Nil(t, err, "Failed to compile Schema: %v", err)
+	require.Nil(t, err, "Failed to compile Schema")
 	require.NotNil(t, jsch, "Did not return a compiled schema")
 }
 
@@ -59,7 +59,7 @@ func Test_ObjectSchema(t *testing.T) {
 	valOptions := config.NewValidationOptions()
 	jsch, err := NewCompiledSchema("test", []byte(objectSchema), valOptions)
 
-	require.Nil(t, err, "Failed to compile Schema: %v", err)
+	require.Nil(t, err, "Failed to compile Schema")
 	require.NotNil(t, jsch, "Did not return a compiled schema")
 }
 
