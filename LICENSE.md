@@ -1,8 +1,6 @@
 MIT License
 
-libopenapi-validator
-
-Copyright (c) 2023 Princess Beef Heavy Industries, LLC & Dave Shanley
+Copyright (c) 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
