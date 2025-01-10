@@ -693,7 +693,7 @@ paths:
 
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
-	assert.Len(t, errors, 0)
+	assert.Empty(t, errors)
 }
 
 func TestNewValidator_QueryParamInvalidDateFormat(t *testing.T) {
@@ -745,7 +745,7 @@ paths:
 
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
-	assert.Len(t, errors, 0)
+	assert.Empty(t, errors)
 }
 
 func TestNewValidator_QueryParamInvalidDateTimeFormat(t *testing.T) {

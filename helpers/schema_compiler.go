@@ -11,8 +11,8 @@ import (
 
 // ConfigureCompiler configures a JSON Schema compiler with the desired behavior.
 func ConfigureCompiler(c *jsonschema.Compiler, o *config.ValidationOptions) {
-	// Sanity
 	if o == nil {
+		// Sanity
 		return
 	}
 
