@@ -73,7 +73,7 @@ func Test_ValidJSONSchemaWithInvalidContent(t *testing.T) {
 
 	jsch, err := NewCompiledSchema("test", []byte(badSchema), nil)
 
-	assert.NoError(t, err, "Expected an error to be thrown")
+	assert.Error(t, err, "Expected an error to be thrown")
 	assert.Nil(t, jsch, "invalid schema compiled!")
 }
 
@@ -87,7 +87,7 @@ func Test_MalformedSONSchema(t *testing.T) {
 
 	jsch, err := NewCompiledSchema("test", []byte(badSchema), nil)
 
-	assert.NoError(t, err, "Expected an error to be thrown")
+	assert.Error(t, err, "Expected an error to be thrown")
 	assert.Nil(t, jsch, "invalid schema compiled!")
 }
 
@@ -108,6 +108,6 @@ func Test_ValidJSONSchemaWithIncompleteContent(t *testing.T) {
 
 	jsch, err := NewCompiledSchema("test", []byte(incompleteSchema), nil)
 
-	assert.NoError(t, err, "Expected an error to be thrown")
+	assert.Error(t, err, "Expected an error to be thrown")
 	assert.Nil(t, jsch, "invalid schema compiled!")
 }
