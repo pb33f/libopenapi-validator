@@ -32,8 +32,14 @@ func ValidateSingleParameterSchema(
 	subValType string,
 	o *config.ValidationOptions,
 ) (validationErrors []*errors.ValidationError) {
+	// Get the JSON Schema for the parameter definition.
+	jsonSchema, err := buildJsonRender(schema)
+	if err != nil {
+		return
+	}
+
 	// Attempt to compile the JSON Schema
-	jsch, err := helpers.NewCompiledSchema(name, buildJsonRender(schema), o)
+	jsch, err := helpers.NewCompiledSchema(name, jsonSchema, o)
 	if err != nil {
 		return
 	}
@@ -48,10 +54,18 @@ func ValidateSingleParameterSchema(
 }
 
 // buildJsonRender build a JSON render of the schema.
-func buildJsonRender(schema *base.Schema) []byte {
-	renderedSchema, _ := schema.Render()
-	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
-	return jsonSchema
+func buildJsonRender(schema *base.Schema) ([]byte, error) {
+	if schema == nil {
+		// Sanity Check
+		return nil, stdError.New("buildJSONRender nil pointer")
+	}
+
+	renderedSchema, err := schema.Render()
+	if err != nil {
+		return nil, err
+	}
+
+	return utils.ConvertYAMLtoJSON(renderedSchema)
 }
 
 // ValidateParameterSchema will validate a parameter against a raw object, or a blob of json/yaml.
