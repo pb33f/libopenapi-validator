@@ -58,8 +58,7 @@ func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptio
 	}
 
 	// Give our schema to the compiler.
-	err = compiler.AddResource(resourceName, decodedSchema)
-	if err != nil {
+	if err = compiler.AddResource(resourceName, decodedSchema); err != nil {
 		return nil, fmt.Errorf("failed to add resource to schema compiler: %w", err)
 	}
 
