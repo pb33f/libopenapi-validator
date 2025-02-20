@@ -162,7 +162,15 @@ func ValidateQueryArray(
 		// for each type defined in the item's schema, check the item
 		for _, itemType := range itemsSchema.Type {
 			switch itemType {
-			case helpers.Integer, helpers.Number:
+			case helpers.Integer:
+				if _, err := strconv.ParseInt(item, 10, 64); err != nil {
+					validationErrors = append(validationErrors,
+						errors.IncorrectQueryParamArrayInteger(param, item, sch, itemsSchema))
+					break
+				}
+				// will it blend?
+				checkEnum(item)
+			case helpers.Number:
 				if _, err := strconv.ParseFloat(item, 64); err != nil {
 					validationErrors = append(validationErrors,
 						errors.IncorrectQueryParamArrayNumber(param, item, sch, itemsSchema))
