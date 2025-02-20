@@ -119,7 +119,15 @@ doneLooking:
 
 							case helpers.String:
 								validationErrors = v.validateSimpleParam(sch, ef, ef, params[p])
-							case helpers.Integer, helpers.Number:
+							case helpers.Integer:
+								efF, err := strconv.ParseInt(ef, 10, 64)
+								if err != nil {
+									validationErrors = append(validationErrors,
+										errors.InvalidQueryParamInteger(params[p], ef, sch))
+									break
+								}
+								validationErrors = v.validateSimpleParam(sch, ef, efF, params[p])
+							case helpers.Number:
 								efF, err := strconv.ParseFloat(ef, 64)
 								if err != nil {
 									validationErrors = append(validationErrors,
