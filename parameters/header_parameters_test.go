@@ -71,6 +71,32 @@ paths:
 	assert.Equal(t, "", errors[0].SpecPath)
 }
 
+func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeInteger(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+	request.Header.Set("coffeecups", "two") // headers are case-insensitive
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+	assert.Equal(t, "Header parameter 'coffeeCups' is not a valid integer", errors[0].Message)
+}
+
 func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeNumber(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
@@ -154,7 +180,7 @@ paths:
 	assert.Equal(t, "Header parameter 'coffeeCups' cannot be decoded", errors[0].Message)
 }
 
-func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectNumber(t *testing.T) {
+func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectInteger(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -167,7 +193,7 @@ paths:
             type: object
             properties:
               milk:
-                type: number
+                type: integer
               sugar:
                 type: boolean`
 
@@ -182,10 +208,10 @@ paths:
 
 	assert.False(t, valid)
 	assert.Equal(t, 1, len(errors))
-	assert.Equal(t, "got boolean, want number", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "got boolean, want integer", errors[0].SchemaValidationErrors[0].Reason)
 }
 
-func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectBoolean(t *testing.T) {
+func TestNewValidator_HeaderParamDefaultEncoding_InvalidParamTypeObjectNumber(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -308,7 +334,7 @@ paths:
 	assert.Len(t, errors, 0)
 }
 
-func TestNewValidator_HeaderParamNonDefaultEncoding_InvalidParamTypeObject(t *testing.T) {
+func TestNewValidator_HeaderParamNonDefaultEncoding_InvalidParamTypeObjectNumber(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:
@@ -338,6 +364,38 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "got boolean, want number", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+func TestNewValidator_HeaderParamNonDefaultEncoding_InvalidParamTypeObjectInteger(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          explode: true
+          schema:
+            type: object
+            properties:
+              milk:
+                type: integer
+              sugar:
+                type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+	request.Header.Set("coffeecups", "milk=true,sugar=true") // default encoding.
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "got boolean, want integer", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeArrayString(t *testing.T) {
@@ -380,6 +438,33 @@ paths:
             type: array
             items:
               type: number`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+	request.Header.Set("coffeecups", "1.22,2.33,3.44,4.55,5.66") // default encoding.
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamNonDefaultEncoding_ValidParamTypeArrayInteger(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: array
+            items:
+              type: integer`
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
@@ -556,6 +641,34 @@ paths:
 }
 
 func TestNewValidator_HeaderParamNumberInvalidEnum(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /vending/drinks:
+    get:
+      parameters:
+        - name: coffeeCups
+          in: header
+          required: true
+          schema:
+            type: number
+            enum: [1.2,2.3,99.8]`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/vending/drinks", nil)
+	request.Header.Set("coffeecups", "1200.3") // that's a lot of cups dude, we only have one dishwasher.
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Instead of '1200.3', "+
+		"use one of the allowed values: '1.2, 2.3, 99.8'", errors[0].HowToFix)
+}
+
+func TestNewValidator_HeaderParamIntegerInvalidEnum(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /vending/drinks:

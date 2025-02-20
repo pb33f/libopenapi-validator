@@ -207,6 +207,22 @@ func IncorrectCookieParamArrayBoolean(
 	}
 }
 
+func IncorrectQueryParamArrayInteger(
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query array parameter '%s' is not a valid integer", param.Name),
+		Reason: fmt.Sprintf("The query parameter (which is an array) '%s' is defined as being an integer, "+
+			"however the value '%s' is not a valid integer", param.Name, item),
+		SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+		SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+		Context:  itemsSchema,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, item),
+	}
+}
+
 func IncorrectQueryParamArrayNumber(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
 ) *ValidationError {
@@ -264,6 +280,20 @@ func IncorrectQueryParamBool(param *v3.Parameter, ef string, sch *base.Schema) *
 		SpecCol:  param.GoLow().Schema.KeyNode.Column,
 		Context:  sch,
 		HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
+	}
+}
+
+func InvalidQueryParamInteger(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query parameter '%s' is not a valid integer", param.Name),
+		Reason: fmt.Sprintf("The query parameter '%s' is defined as being an integer, "+
+			"however the value '%s' is not a valid integer", param.Name, ef),
+		SpecLine: param.GoLow().Schema.KeyNode.Line,
+		SpecCol:  param.GoLow().Schema.KeyNode.Column,
+		Context:  sch,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, ef),
 	}
 }
 
@@ -335,6 +365,20 @@ func IncorrectReservedValues(param *v3.Parameter, ef string, sch *base.Schema) *
 	}
 }
 
+func InvalidHeaderParamInteger(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationHeader,
+		Message:           fmt.Sprintf("Header parameter '%s' is not a valid integer", param.Name),
+		Reason: fmt.Sprintf("The header parameter '%s' is defined as being an integer, "+
+			"however the value '%s' is not a valid integer", param.Name, ef),
+		SpecLine: param.GoLow().Schema.KeyNode.Line,
+		SpecCol:  param.GoLow().Schema.KeyNode.Column,
+		Context:  sch,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, ef),
+	}
+}
+
 func InvalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -346,6 +390,20 @@ func InvalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema) 
 		SpecCol:  param.GoLow().Schema.KeyNode.Column,
 		Context:  sch,
 		HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, ef),
+	}
+}
+
+func InvalidCookieParamInteger(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationCookie,
+		Message:           fmt.Sprintf("Cookie parameter '%s' is not a valid integer", param.Name),
+		Reason: fmt.Sprintf("The cookie parameter '%s' is defined as being an integer, "+
+			"however the value '%s' is not a valid integer", param.Name, ef),
+		SpecLine: param.GoLow().Schema.KeyNode.Line,
+		SpecCol:  param.GoLow().Schema.KeyNode.Column,
+		Context:  sch,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, ef),
 	}
 }
 
@@ -475,6 +533,20 @@ func IncorrectPathParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *V
 	}
 }
 
+func IncorrectPathParamInteger(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationPath,
+		Message:           fmt.Sprintf("Path parameter '%s' is not a valid integer", param.Name),
+		Reason: fmt.Sprintf("The path parameter '%s' is defined as being an integer, "+
+			"however the value '%s' is not a valid integer", param.Name, item),
+		SpecLine: param.GoLow().Schema.KeyNode.Line,
+		SpecCol:  param.GoLow().Schema.KeyNode.Column,
+		Context:  sch,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, item),
+	}
+}
+
 func IncorrectPathParamNumber(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -498,6 +570,22 @@ func IncorrectPathParamArrayNumber(
 		Message:           fmt.Sprintf("Path array parameter '%s' is not a valid number", param.Name),
 		Reason: fmt.Sprintf("The path parameter (which is an array) '%s' is defined as being a number, "+
 			"however the value '%s' is not a valid number", param.Name, item),
+		SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+		SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+		Context:  itemsSchema,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, item),
+	}
+}
+
+func IncorrectPathParamArrayInteger(
+	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
+) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationPath,
+		Message:           fmt.Sprintf("Path array parameter '%s' is not a valid integer", param.Name),
+		Reason: fmt.Sprintf("The path parameter (which is an array) '%s' is defined as being an integer, "+
+			"however the value '%s' is not a valid integer", param.Name, item),
 		SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
 		SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
 		Context:  itemsSchema,

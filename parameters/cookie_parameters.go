@@ -56,7 +56,27 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 
 					for _, ty := range pType {
 						switch ty {
-						case helpers.Integer, helpers.Number:
+						case helpers.Integer:
+							if _, err := strconv.ParseInt(cookie.Value, 10, 64); err != nil {
+								validationErrors = append(validationErrors,
+									errors.InvalidCookieParamInteger(p, strings.ToLower(cookie.Value), sch))
+								break
+							}
+							// check if enum is in range
+							if sch.Enum != nil {
+								matchFound := false
+								for _, enumVal := range sch.Enum {
+									if strings.TrimSpace(cookie.Value) == fmt.Sprint(enumVal.Value) {
+										matchFound = true
+										break
+									}
+								}
+								if !matchFound {
+									validationErrors = append(validationErrors,
+										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+								}
+							}
+						case helpers.Number:
 							if _, err := strconv.ParseFloat(cookie.Value, 64); err != nil {
 								validationErrors = append(validationErrors,
 									errors.InvalidCookieParamNumber(p, strings.ToLower(cookie.Value), sch))

@@ -1147,7 +1147,7 @@ func TestNewValidator_PetStore_PetGet200_PathNotFound(t *testing.T) {
 	assert.False(t, valid)
 	assert.Len(t, errors, 2)
 	assert.Equal(t, "API Key api_key not found in header", errors[0].Message)
-	assert.Equal(t, "Path parameter 'petId' is not a valid number", errors[1].Message)
+	assert.Equal(t, "Path parameter 'petId' is not a valid integer", errors[1].Message)
 }
 
 func TestNewValidator_PetStore_PetGet200(t *testing.T) {

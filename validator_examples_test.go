@@ -84,7 +84,7 @@ func ExampleNewValidator_validateHttpRequest() {
 		}
 	}
 	// Output: Type: security, Failure: API Key api_key not found in header
-	// Type: parameter, Failure: Path parameter 'petId' is not a valid number
+	// Type: parameter, Failure: Path parameter 'petId' is not a valid integer
 }
 
 func ExampleNewValidator_validateHttpRequestSync() {
@@ -120,7 +120,7 @@ func ExampleNewValidator_validateHttpRequestSync() {
 			fmt.Printf("Type: %s, Failure: %s\n", e.ValidationType, e.Message)
 		}
 	}
-	// Type: parameter, Failure: Path parameter 'petId' is not a valid number
+	// Type: parameter, Failure: Path parameter 'petId' is not a valid integer
 	// Output: Type: security, Failure: API Key api_key not found in header
 }
 

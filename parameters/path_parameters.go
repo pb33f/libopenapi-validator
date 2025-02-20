@@ -158,7 +158,30 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 										v.options,
 									)...)
 
-							case helpers.Integer, helpers.Number:
+							case helpers.Integer:
+								// simple use case is already handled in find param.
+								rawParamValue, paramValueParsed, err := v.resolveInteger(sch, p, isLabel, isMatrix, paramValue)
+								if err != nil {
+									validationErrors = append(validationErrors, err...)
+									break
+								}
+								// check if the param is within the enum
+								if sch.Enum != nil {
+									enumCheck(rawParamValue)
+									break
+								}
+								validationErrors = append(validationErrors, ValidateSingleParameterSchema(
+									sch,
+									paramValueParsed,
+									"Path parameter",
+									"The path parameter",
+									p.Name,
+									helpers.ParameterValidation,
+									helpers.ParameterValidationPath,
+									v.options,
+								)...)
+
+							case helpers.Number:
 								// simple use case is already handled in find param.
 								rawParamValue, paramValueParsed, err := v.resolveNumber(sch, p, isLabel, isMatrix, paramValue)
 								if err != nil {
@@ -183,7 +206,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 							case helpers.Boolean:
 								if isLabel && p.Style == helpers.LabelStyle {
-									if _, err := strconv.ParseFloat(paramValue[1:], 64); err != nil {
+									if _, err := strconv.ParseBool(paramValue[1:]); err != nil {
 										validationErrors = append(validationErrors,
 											errors.IncorrectPathParamBool(p, paramValue[1:], sch))
 									}
@@ -270,7 +293,14 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 											}
 										}
 										switch iSch.Type[n] {
-										case helpers.Integer, helpers.Number:
+										case helpers.Integer:
+											for pv := range arrayValues {
+												if _, err := strconv.ParseInt(arrayValues[pv], 10, 64); err != nil {
+													validationErrors = append(validationErrors,
+														errors.IncorrectPathParamArrayInteger(p, arrayValues[pv], sch, iSch))
+												}
+											}
+										case helpers.Number:
 											for pv := range arrayValues {
 												if _, err := strconv.ParseFloat(arrayValues[pv], 64); err != nil {
 													validationErrors = append(validationErrors,
@@ -333,7 +363,31 @@ func (v *paramValidator) resolveNumber(sch *base.Schema, p *v3.Parameter, isLabe
 	}
 	paramValueParsed, err := strconv.ParseFloat(paramValue, 64)
 	if err != nil {
-		return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue[1:], sch)}
+		return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue, sch)}
+	}
+	return paramValue, paramValueParsed, nil
+}
+
+func (v *paramValidator) resolveInteger(sch *base.Schema, p *v3.Parameter, isLabel bool, isMatrix bool, paramValue string) (string, int64, []*errors.ValidationError) {
+	if isLabel && p.Style == helpers.LabelStyle {
+		paramValueParsed, err := strconv.ParseInt(paramValue[1:], 10, 64)
+		if err != nil {
+			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue[1:], sch)}
+		}
+		return paramValue[1:], paramValueParsed, nil
+	}
+	if isMatrix && p.Style == helpers.MatrixStyle {
+		// strip off the colon and the parameter name
+		paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+		paramValueParsed, err := strconv.ParseInt(paramValue, 10, 64)
+		if err != nil {
+			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue[1:], sch)}
+		}
+		return paramValue, paramValueParsed, nil
+	}
+	paramValueParsed, err := strconv.ParseInt(paramValue, 10, 64)
+	if err != nil {
+		return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue, sch)}
 	}
 	return paramValue, paramValueParsed, nil
 }
