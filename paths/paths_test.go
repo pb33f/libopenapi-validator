@@ -695,3 +695,22 @@ paths:
 	assert.Equal(t, 0, len(errs), "Errors found: %v", errs)
 	assert.NotNil(t, pathItem)
 }
+
+func TestNewValidator_ODataFormattedOpenAPISpecs(t *testing.T) {
+
+	// load a doc
+	b, _ := os.ReadFile("../test_specs/odata_spec.json")
+	doc, _ := libopenapi.NewDocument(b)
+
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
+
+	pathItem, _, _ := FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='dummy',ValidityEndDate=datetime'1492041600000')", nil)
+
+	pathItem, _, _ = FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+}
