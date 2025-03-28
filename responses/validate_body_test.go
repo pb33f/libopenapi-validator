@@ -532,7 +532,9 @@ paths:
 	response := &http.Response{
 		Header:     http.Header{},
 		StatusCode: http.StatusOK,
-		Body:       nil, // invalid response body
+		// The http Client and Transport guarantee that Body is always non-nil
+		// and will be set to [http.NoBody] if no body is present.
+		Body: http.NoBody,
 	}
 	response.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 

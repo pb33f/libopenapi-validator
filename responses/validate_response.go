@@ -45,7 +45,7 @@ func ValidateResponseSchema(
 
 	var validationErrors []*errors.ValidationError
 
-	if response == nil || response.Body == nil {
+	if response == nil || response.Body == http.NoBody {
 		// cannot decode the response body, so it's not valid
 		violation := &errors.SchemaValidationFailure{
 			Reason:          "response is empty",
