@@ -105,7 +105,11 @@ func (v *validator) GetResponseBodyValidator() responses.ResponseBodyValidator {
 }
 
 func (v *validator) ValidateDocument() (bool, []*errors.ValidationError) {
-	return schema_validation.ValidateOpenAPIDocument(v.document)
+	var validationOpts []config.Option
+	if v.options != nil {
+		validationOpts = append(validationOpts, config.WithRegexEngine(v.options.RegexEngine))
+	}
+	return schema_validation.ValidateOpenAPIDocument(v.document, validationOpts...)
 }
 
 func (v *validator) ValidateHttpResponse(
