@@ -698,9 +698,34 @@ paths:
 
 func TestNewValidator_ODataFormattedOpenAPISpecs(t *testing.T) {
 
-	// load a doc
-	b, _ := os.ReadFile("../test_specs/odata_spec.json")
-	doc, _ := libopenapi.NewDocument(b)
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity}'):
+    parameters:
+    - description: 'key: Entity'
+      in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+  /orders(RelationshipNumber='{RelationshipNumber}',ValidityEndDate=datetime'{ValidityEndDate}'):
+    parameters:
+    - name: RelationshipNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+    - name: ValidityEndDate
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, _ := doc.BuildV3Model()
 
@@ -708,9 +733,17 @@ func TestNewValidator_ODataFormattedOpenAPISpecs(t *testing.T) {
 
 	pathItem, _, _ := FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='1234',ValidityEndDate=datetime'1492041600000')", nil)
+
+	pathItem, _, _ = FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
 
 	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='dummy',ValidityEndDate=datetime'1492041600000')", nil)
 
 	pathItem, _, _ = FindPath(request, &m.Model)
 	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
 }
