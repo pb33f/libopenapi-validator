@@ -154,7 +154,7 @@ func TestResponseCodeNotFound(t *testing.T) {
 	require.Equal(t, helpers.ResponseBodyValidation, err.ValidationType)
 	require.Equal(t, helpers.ResponseBodyResponseCode, err.ValidationSubType)
 	require.Contains(t, err.Message, "response code '404' does not exist")
-	require.Contains(t, err.Reason, "The reponse code '404' of the DELETE request submitted has not been defined")
+	require.Contains(t, err.Reason, "The response code '404' of the DELETE request submitted has not been defined")
 	require.Equal(t, 22, err.SpecLine)
 	require.Equal(t, 56, err.SpecCol)
 	require.Equal(t, HowToFixInvalidResponseCode, err.HowToFix)

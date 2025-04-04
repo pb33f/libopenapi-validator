@@ -64,7 +64,7 @@ func ResponseCodeNotFound(op *v3.Operation, request *http.Request, code int) *Va
 		ValidationSubType: helpers.ResponseBodyResponseCode,
 		Message: fmt.Sprintf("%s operation request response code '%d' does not exist",
 			request.Method, code),
-		Reason: fmt.Sprintf("The reponse code '%d' of the %s request submitted has not "+
+		Reason: fmt.Sprintf("The response code '%d' of the %s request submitted has not "+
 			"been defined, it's an unknown type", code, request.Method),
 		SpecLine: op.GoLow().Responses.KeyNode.Line,
 		SpecCol:  op.GoLow().Responses.KeyNode.Column,

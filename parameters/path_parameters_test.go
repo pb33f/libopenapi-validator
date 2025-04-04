@@ -1416,7 +1416,7 @@ paths:
 	assert.Len(t, errors, 0)
 }
 
-func TestNewValidator_MandatorydPathSegmentEmpty(t *testing.T) {
+func TestNewValidator_MandatoryPathSegmentEmpty(t *testing.T) {
 	spec := `openapi: 3.1.0
 servers:
 - url: https://api.pb33f.io
