@@ -48,7 +48,7 @@ func TestValidateDocument_Invalid31(t *testing.T) {
 	assert.Len(t, errors[0].SchemaValidationErrors, 6)
 }
 
-func TestValidateSchema_ValidateLicenseIndentifier(t *testing.T) {
+func TestValidateSchema_ValidateLicenseIdentifier(t *testing.T) {
 	spec := `openapi: 3.1.0
 info:
   version: 1.0.0

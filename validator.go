@@ -30,7 +30,7 @@ type Validator interface {
 	// ValidateHttpRequest will validate an *http.Request object against an OpenAPI 3+ document.
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError)
-	// ValidateHttpRequestSync will validate an *http.Request object against an OpenAPI 3+ document syncronously and without spawning any goroutines.
+	// ValidateHttpRequestSync will validate an *http.Request object against an OpenAPI 3+ document synchronously and without spawning any goroutines.
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError)
 
@@ -38,12 +38,12 @@ type Validator interface {
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 
-	// ValidateHttpRequestSyncWithPathItem will validate an *http.Request object against an OpenAPI 3+ document syncronously and without spawning any goroutines.
+	// ValidateHttpRequestSyncWithPathItem will validate an *http.Request object against an OpenAPI 3+ document synchronously and without spawning any goroutines.
 	// The path, query, cookie and header parameters and request body are validated.
 	ValidateHttpRequestSyncWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 
 	// ValidateHttpResponse will an *http.Response object against an OpenAPI 3+ document.
-	// The response body is validated. The request is only used to extract the correct reponse from the spec.
+	// The response body is validated. The request is only used to extract the correct response from the spec.
 	ValidateHttpResponse(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
 
 	// ValidateHttpRequestResponse will validate both the *http.Request and *http.Response objects against an OpenAPI 3+ document.
