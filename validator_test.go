@@ -16,14 +16,15 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
-	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
@@ -142,25 +143,30 @@ func TestNewValidator_ValidateDocument(t *testing.T) {
 	assert.Len(t, errs, 0)
 }
 
-type alwaysMatchesRegex jsonschema.RegexpEngine
+type dlclarkRegexp regexp2.Regexp
 
-func (dr *alwaysMatchesRegex) MatchString(s string) bool {
-	return true
+func (re *dlclarkRegexp) MatchString(s string) bool {
+	matched, err := (*regexp2.Regexp)(re).MatchString(s)
+	return err == nil && matched
 }
 
-func (dr *alwaysMatchesRegex) String() string {
-	return ""
+func (re *dlclarkRegexp) String() string {
+	return (*regexp2.Regexp)(re).String()
 }
 
-func fakeRegexEngine(s string) (jsonschema.Regexp, error) {
-	return (*alwaysMatchesRegex)(nil), nil
+func dlclarkCompile(s string) (jsonschema.Regexp, error) {
+	re, err := regexp2.Compile(s, regexp2.ECMAScript)
+	if err != nil {
+		return nil, err
+	}
+	return (*dlclarkRegexp)(re), nil
 }
 
 func TestNewValidator_WithRegex(t *testing.T) {
 	doc, err := libopenapi.NewDocument(petstoreBytes)
 	require.Nil(t, err, "Failed to load spec")
 
-	v, errs := NewValidator(doc, config.WithRegexEngine(fakeRegexEngine))
+	v, errs := NewValidator(doc, config.WithRegexEngine(dlclarkCompile))
 	require.Empty(t, errs, "Failed to build validator")
 	require.NotNil(t, v, "Failed to build validator")
 
