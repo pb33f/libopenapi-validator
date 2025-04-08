@@ -1445,7 +1445,6 @@ paths:
 }
 
 func TestNewValidator_ODataFormattedOpenAPISpecs(t *testing.T) {
-
 	spec := `openapi: 3.0.0
 paths:
   /entities('{Entity}'):
@@ -1498,5 +1497,4 @@ paths:
 	valid, errors = v.ValidatePathParams(request)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-
 }

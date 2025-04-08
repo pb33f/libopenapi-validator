@@ -697,7 +697,6 @@ paths:
 }
 
 func TestNewValidator_ODataFormattedOpenAPISpecs(t *testing.T) {
-
 	spec := `openapi: 3.0.0
 paths:
   /entities('{Entity}'):

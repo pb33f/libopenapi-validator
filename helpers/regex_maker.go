@@ -8,7 +8,6 @@ import (
 )
 
 func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
-
 	// Check if it is well-formed.
 	idxs, errBraces := BraceIndices(tpl)
 	if errBraces != nil {
