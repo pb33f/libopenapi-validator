@@ -8,6 +8,9 @@ import (
 	"sync"
 
 	"github.com/pb33f/libopenapi"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/parameters"
@@ -15,7 +18,6 @@ import (
 	"github.com/pb33f/libopenapi-validator/requests"
 	"github.com/pb33f/libopenapi-validator/responses"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // Validator provides a coarse grained interface for validating an OpenAPI 3+ documents.
