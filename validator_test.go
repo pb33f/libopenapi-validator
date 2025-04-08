@@ -18,12 +18,14 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/config"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func TestNewValidator(t *testing.T) {
