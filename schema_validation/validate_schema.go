@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -128,13 +127,9 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 		}
 
 	}
-	compiler := jsonschema.NewCompiler()
-	compiler.UseRegexpEngine(s.options.RegexEngine)
-	compiler.UseLoader(helpers.NewCompilerLoader())
 
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
-	_ = compiler.AddResource("schema.json", decodedSchema)
-	jsch, err := compiler.Compile("schema.json")
+	// Build the compiled JSON Schema
+	jsch, err := helpers.NewCompiledSchema("schema", jsonSchema, s.options)
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 

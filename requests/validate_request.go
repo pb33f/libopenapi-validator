@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -37,7 +36,7 @@ func ValidateRequestSchema(
 	jsonSchema []byte,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
-	options := config.NewValidationOptions(opts...)
+	validationOptions := config.NewValidationOptions(opts...)
 
 	var validationErrors []*errors.ValidationError
 
@@ -110,12 +109,8 @@ func ValidateRequestSchema(
 		return false, validationErrors
 	}
 
-	compiler := jsonschema.NewCompiler()
-	compiler.UseRegexpEngine(options.RegexEngine) // Ensure any configured regex engine is used.
-	compiler.UseLoader(helpers.NewCompilerLoader())
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
-	_ = compiler.AddResource("requestBody.json", decodedSchema)
-	jsch, err := compiler.Compile("requestBody.json")
+	// Attempt to compile the JSON schema
+	jsch, err := helpers.NewCompiledSchema("requestBody", jsonSchema, validationOptions)
 	if err != nil {
 		validationErrors = append(validationErrors, &errors.ValidationError{
 			ValidationType:    helpers.RequestBodyValidation,

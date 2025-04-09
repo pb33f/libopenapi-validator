@@ -12,6 +12,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -98,7 +99,7 @@ func ValidateHeaderArray(
 
 // ValidateQueryArray will validate a query parameter that is an array
 func ValidateQueryArray(
-	sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool,
+	sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool, validationOptions *config.ValidationOptions,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
@@ -174,7 +175,7 @@ func ValidateQueryArray(
 						"The query parameter (which is an array)",
 						param.Name,
 						helpers.ParameterValidation,
-						helpers.ParameterValidationQuery)...)
+						helpers.ParameterValidationQuery, validationOptions)...)
 
 			case helpers.String:
 

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
@@ -18,6 +17,7 @@ import (
 
 	stdError "errors"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -30,9 +30,21 @@ func ValidateSingleParameterSchema(
 	name string,
 	validationType string,
 	subValType string,
+	o *config.ValidationOptions,
 ) (validationErrors []*errors.ValidationError) {
-	jsch := compileSchema(name, buildJsonRender(schema))
+	// Get the JSON Schema for the parameter definition.
+	jsonSchema, err := buildJsonRender(schema)
+	if err != nil {
+		return
+	}
 
+	// Attempt to compile the JSON Schema
+	jsch, err := helpers.NewCompiledSchema(name, jsonSchema, o)
+	if err != nil {
+		return
+	}
+
+	// Validate the object and report any errors.
 	scErrs := jsch.Validate(rawObject)
 	var werras *jsonschema.ValidationError
 	if stdError.As(scErrs, &werras) {
@@ -41,21 +53,19 @@ func ValidateSingleParameterSchema(
 	return validationErrors
 }
 
-// compileSchema create a new json schema compiler and add the schema to it.
-func compileSchema(name string, jsonSchema []byte) *jsonschema.Schema {
-	compiler := jsonschema.NewCompiler()
-	compiler.UseLoader(helpers.NewCompilerLoader())
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema))) // decode the schema into a json blob
-	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), decodedSchema)
-	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
-	return jsch
-}
-
 // buildJsonRender build a JSON render of the schema.
-func buildJsonRender(schema *base.Schema) []byte {
-	renderedSchema, _ := schema.Render()
-	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
-	return jsonSchema
+func buildJsonRender(schema *base.Schema) ([]byte, error) {
+	if schema == nil {
+		// Sanity Check
+		return nil, stdError.New("buildJSONRender nil pointer")
+	}
+
+	renderedSchema, err := schema.Render()
+	if err != nil {
+		return nil, err
+	}
+
+	return utils.ConvertYAMLtoJSON(renderedSchema)
 }
 
 // ValidateParameterSchema will validate a parameter against a raw object, or a blob of json/yaml.
@@ -78,6 +88,7 @@ func ValidateParameterSchema(
 	name,
 	validationType,
 	subValType string,
+	validationOptions *config.ValidationOptions,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 
@@ -108,11 +119,7 @@ func ValidateParameterSchema(
 		validEncoding = true
 	}
 	// 3. create a new json schema compiler and add the schema to it
-	compiler := jsonschema.NewCompiler()
-
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
-	_ = compiler.AddResource(fmt.Sprintf("%s.json", name), decodedSchema)
-	jsch, _ := compiler.Compile(fmt.Sprintf("%s.json", name))
+	jsch, _ := helpers.NewCompiledSchema(name, jsonSchema, validationOptions)
 
 	// 4. validate the object against the schema
 	var scErrs error

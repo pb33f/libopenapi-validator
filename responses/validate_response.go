@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -129,13 +128,7 @@ func ValidateResponseSchema(
 	}
 
 	// create a new jsonschema compiler and add in the rendered JSON schema.
-	compiler := jsonschema.NewCompiler()
-	compiler.UseRegexpEngine(options.RegexEngine)
-	compiler.UseLoader(helpers.NewCompilerLoader())
-	fName := fmt.Sprintf("%s.json", helpers.ResponseBodyValidation)
-	decodedSchema, _ := jsonschema.UnmarshalJSON(strings.NewReader(string(jsonSchema)))
-	_ = compiler.AddResource(fName, decodedSchema)
-	jsch, _ := compiler.Compile(fName)
+	jsch, _ := helpers.NewCompiledSchema(helpers.ResponseBodyValidation, jsonSchema, options)
 
 	// validate the object against the schema
 	scErrs := jsch.Validate(decodedObj)
