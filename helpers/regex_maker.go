@@ -37,7 +37,7 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 
 		// Name or pattern can't be empty.
 		if name == "" || patt == "" {
-			return nil, fmt.Errorf("mux: missing name or pattern in %q", tpl[idxs[i]:end])
+			return nil, fmt.Errorf("missing name or pattern in %q", tpl[idxs[i]:end])
 		}
 
 		// Build the regexp pattern.
@@ -62,7 +62,7 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 
 	// Check for capturing groups which used to work in older versions
 	if reg.NumSubexp() != len(idxs)/2 {
-		return nil, fmt.Errorf(fmt.Sprintf("route %s contains capture groups in its regexp. ", template) + "Only non-capturing groups are accepted: e.g. (?:pattern) instead of (pattern)")
+		return nil, fmt.Errorf("route %s contains capture groups in its regexp. Only non-capturing groups are accepted: e.g. (?:pattern) instead of (pattern)", template)
 	}
 
 	// Done!
@@ -82,12 +82,12 @@ func BraceIndices(s string) ([]int, error) {
 			if level--; level == 0 {
 				idxs = append(idxs, idx, i+1)
 			} else if level < 0 {
-				return nil, fmt.Errorf("mux: unbalanced braces in %q", s)
+				return nil, fmt.Errorf("unbalanced braces in %q", s)
 			}
 		}
 	}
 	if level != 0 {
-		return nil, fmt.Errorf("mux: unbalanced braces in %q", s)
+		return nil, fmt.Errorf("unbalanced braces in %q", s)
 	}
 	return idxs, nil
 }
