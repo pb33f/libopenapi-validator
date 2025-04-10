@@ -385,6 +385,74 @@ paths:
 	assert.NotNil(t, errors)
 }
 
+func TestMewValidator_QueryParamMultiStringField(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [cod, halibut]
+        - name: dishy
+          in: query
+          required: true
+          schema:
+            type: string
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.Nil(t, err)
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=doc&dishy=halibut", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.NotNil(t, errors)
+}
+
+func TestMewValidator_QueryParamMultiNumberField(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /a/fishy/on/a/dishy:
+    get:
+      parameters:
+        - name: fishy
+          in: query
+          required: true
+          schema:
+            type: number
+            enum: [1, 99]
+        - name: dishy
+          in: query
+          required: true
+          schema:
+            type: number
+      operationId: locateFishy
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.Nil(t, err)
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=10&dishy=10", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.NotNil(t, errors)
+}
+
 func TestNewValidator_QueryParamWrongTypeNumber(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
