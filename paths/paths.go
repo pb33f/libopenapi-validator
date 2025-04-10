@@ -195,7 +195,11 @@ func comparePaths(mapped, requested, basePaths []string) bool {
 	var imploded []string
 	for i, seg := range mapped {
 		s := seg
-		if strings.Contains(seg, "{") {
+		r, err := helpers.GetRegexForPath(seg)
+		if err != nil {
+			return false
+		}
+		if r.MatchString(requested[i]) {
 			s = requested[i]
 		}
 		imploded = append(imploded, s)

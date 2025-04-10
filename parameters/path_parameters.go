@@ -6,6 +6,7 @@ package parameters
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -54,14 +55,34 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 				if pathSegments[x] == "" { // skip empty segments
 					continue
 				}
-				i := strings.IndexRune(pathSegments[x], '{')
-				if i > -1 {
+
+				r, err := helpers.GetRegexForPath(pathSegments[x])
+				if err != nil {
+					continue
+				}
+
+				re := regexp.MustCompile(r.String())
+				matches := re.FindStringSubmatch(submittedSegments[x])
+				matches = matches[1:]
+
+				// Check if it is well-formed.
+				idxs, errBraces := helpers.BraceIndices(pathSegments[x])
+				if errBraces != nil {
+					continue
+				}
+
+				idx := 0
+
+				for _, match := range matches {
+
 					isMatrix := false
 					isLabel := false
 					// isExplode := false
 					isSimple := true
-					paramTemplate := pathSegments[x][i+1 : len(pathSegments[x])-1]
+					paramTemplate := pathSegments[x][idxs[idx]+1 : idxs[idx+1]-1]
+					idx += 2 // move to the next brace pair
 					paramName := paramTemplate
+
 					// check for an asterisk on the end of the parameter (explode)
 					if strings.HasSuffix(paramTemplate, helpers.Asterisk) {
 						// isExplode = true
@@ -83,12 +104,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 						continue
 					}
 
-					paramValue := ""
-
-					// extract the parameter value from the path.
-					if x < len(submittedSegments) {
-						paramValue = submittedSegments[x]
-					}
+					paramValue := match
 
 					if paramValue == "" {
 						// Mandatory path parameter cannot be empty

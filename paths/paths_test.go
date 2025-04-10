@@ -695,3 +695,77 @@ paths:
 	assert.Equal(t, 0, len(errs), "Errors found: %v", errs)
 	assert.NotNil(t, pathItem)
 }
+
+func TestNewValidator_ODataFormattedOpenAPISpecs(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity}'):
+    parameters:
+    - description: 'key: Entity'
+      in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+  /orders(RelationshipNumber='{RelationshipNumber}',ValidityEndDate=datetime'{ValidityEndDate}'):
+    parameters:
+    - name: RelationshipNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+    - name: ValidityEndDate
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
+
+	pathItem, _, _ := FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='1234',ValidityEndDate=datetime'1492041600000')", nil)
+
+	pathItem, _, _ = FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='dummy',ValidityEndDate=datetime'1492041600000')", nil)
+
+	pathItem, _, _ = FindPath(request, &m.Model)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+}
+
+func TestNewValidator_ODataFormattedOpenAPISpecs_Error(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity'):
+    parameters:
+    - in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+	assert.NotEmpty(t, errs)
+}
