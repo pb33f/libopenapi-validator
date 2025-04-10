@@ -28,6 +28,29 @@ A validation module for [libopenapi](https://github.com/pb33f/libopenapi).
 go get github.com/pb33f/libopenapi-validator
 ```
 
+## Validate OpenAPI Document
+
+```bash
+go run github.com/pb33f/libopenapi-validator/cmd/validate@latest [--regexengine] <file>
+```
+🔍 Example: Use a custom regex engine/flag (e.g., ecmascript)
+```bash
+go run github.com/pb33f/libopenapi-validator/cmd/validate@latest --regexengine=ecmascript <file>
+```
+🔧 Supported **--regexengine** flags/values (ℹ️ Default: re2)
+- none
+- ignorecase
+- multiline
+- explicitcapture
+- compiled
+- singleline
+- ignorepatternwhitespace
+- righttoleft
+- debug
+- ecmascript
+- re2
+- unicode
+
 ## Documentation
 
 - [The structure of the validator](https://pb33f.io/libopenapi/validation/#the-structure-of-the-validator)
