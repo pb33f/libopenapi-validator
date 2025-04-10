@@ -1498,3 +1498,55 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 }
+
+func TestNewValidator_ODataFormattedOpenAPISpecs_Error(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity'):
+    parameters:
+    - in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
+
+	valid, errors := v.ValidatePathParams(request)
+	assert.False(t, valid)
+	assert.NotEmpty(t, errors)
+}
+
+func TestNewValidator_ODataFormattedOpenAPISpecs_ErrorEmptyParameter(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity}'):
+    parameters:
+    - in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('')", nil)
+
+	valid, errors := v.ValidatePathParams(request)
+	assert.False(t, valid)
+	assert.NotEmpty(t, errors)
+}

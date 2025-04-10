@@ -18,7 +18,7 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 	template := tpl
 
 	// Now let's parse it.
-	defaultPattern := "[^/]+"
+	defaultPattern := "[^/]*"
 
 	pattern := bytes.NewBufferString("^")
 	var end int

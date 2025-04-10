@@ -15,7 +15,7 @@ func TestGetRegexForPath(t *testing.T) {
 			name:     "well-formed template with default pattern",
 			tpl:      "/orders/{id}",
 			wantErr:  false,
-			wantExpr: "^/orders/([^/]+)$",
+			wantExpr: "^/orders/([^/]*)$",
 		},
 		{
 			name:     "well-formed template with custom pattern",
@@ -47,13 +47,13 @@ func TestGetRegexForPath(t *testing.T) {
 			name:     "template with multiple variables",
 			tpl:      "/orders/{id:[0-9]+}/items/{itemId}",
 			wantErr:  false,
-			wantExpr: "^/orders/([0-9]+)/items/([^/]+)$",
+			wantExpr: "^/orders/([0-9]+)/items/([^/]*)$",
 		},
 		{
 			name:     "OData formatted URL with single quotes",
 			tpl:      "/entities('{id}')",
 			wantErr:  false,
-			wantExpr: "^/entities\\('([^/]+)'\\)$",
+			wantExpr: "^/entities\\('([^/]*)'\\)$",
 		},
 		{
 			name:     "OData formatted URL with custom pattern",

@@ -746,3 +746,26 @@ paths:
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 }
+
+func TestNewValidator_ODataFormattedOpenAPISpecs_Error(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity'):
+    parameters:
+    - in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
+
+	_, errs, _ := FindPath(request, &m.Model)
+	assert.NotEmpty(t, errs)
+}
