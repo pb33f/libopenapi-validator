@@ -118,7 +118,7 @@ doneLooking:
 							switch ty {
 
 							case helpers.String:
-								validationErrors = v.validateSimpleParam(sch, ef, ef, params[p])
+								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, ef, params[p])...)
 							case helpers.Integer, helpers.Number:
 								efF, err := strconv.ParseFloat(ef, 64)
 								if err != nil {
@@ -126,7 +126,7 @@ doneLooking:
 										errors.InvalidQueryParamNumber(params[p], ef, sch))
 									break
 								}
-								validationErrors = v.validateSimpleParam(sch, ef, efF, params[p])
+								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, efF, params[p])...)
 							case helpers.Boolean:
 								if _, err := strconv.ParseBool(ef); err != nil {
 									validationErrors = append(validationErrors,
