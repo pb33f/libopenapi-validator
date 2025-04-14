@@ -66,6 +66,26 @@ var (
 If not specified, the default libopenapi regex engine is "re2"".`)
 )
 
+// main is the entry point for validating an OpenAPI Specification (OAS) document.
+// It uses the libopenapi-validator library to check if the provided OAS document
+// conforms to the OpenAPI specification.
+//
+// This tool accepts a single input file (YAML or JSON) and provides an optional
+// `--regexengine` flag to customize the regex engine used during validation.
+// This is useful for cases where the spec uses regex patterns that require engines
+// like ECMAScript or RE2.
+//
+// Supported regex options include:
+//   - Engines: re2 (default), ecmascript
+//   - Flags:  ignorecase, multiline, explicitcapture, compiled, singleline,
+//     ignorepatternwhitespace, righttoleft, debug, unicode
+//
+// Example usage:
+//
+//	go run main.go --regexengine=ecmascript ./my-api-spec.yaml
+//
+// If validation passes, the tool logs a success message.
+// If the document is invalid or there is a processing error, it logs details and exits non-zero.
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Usage: validate [OPTIONS] <file>
