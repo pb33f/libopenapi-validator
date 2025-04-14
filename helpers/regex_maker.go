@@ -7,6 +7,31 @@ import (
 	"strings"
 )
 
+// GetRegexForPath returns a compiled regular expression for the given path template.
+//
+// This function takes a path template string `tpl` and generates a regular expression
+// that matches the structure of the template. The template can include placeholders
+// enclosed in braces `{}` with optional custom patterns.
+//
+// Placeholders in the template can be defined as:
+//   - `{name}`: Matches any sequence of characters except '/'
+//   - `{name:pattern}`: Matches the specified custom pattern
+//
+// The function ensures that the template is well-formed, with balanced and properly
+// nested braces. If the template is invalid, an error is returned.
+//
+// Parameters:
+//   - tpl: The path template string to convert into a regular expression.
+//
+// Returns:
+//   - *regexp.Regexp: A compiled regular expression that matches the template.
+//   - error: An error if the template is invalid or the regular expression cannot be compiled.
+//
+// Example:
+//
+//	regex, err := GetRegexForPath("/orders/{id:[0-9]+}/items/{itemId}")
+//	// regex: ^/orders/([0-9]+)/items/([^/]+)$
+//	// err: nil
 func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 	// Check if it is well-formed.
 	idxs, errBraces := BraceIndices(tpl)
@@ -69,6 +94,27 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 	return reg, nil
 }
 
+// BraceIndices returns the indices of the opening and closing braces in a string.
+//
+// It scans the input string `s` and identifies the positions of matching pairs
+// of braces ('{' and '}'). The function ensures that the braces are balanced
+// and properly nested.
+//
+// If the braces are unbalanced or improperly nested, an error is returned.
+//
+// Parameters:
+//   - s: The input string to scan for braces.
+//
+// Returns:
+//   - []int: A slice of integers where each pair of indices represents the
+//     start and end positions of a matching pair of braces.
+//   - error: An error if the braces are unbalanced or improperly nested.
+//
+// Example:
+//
+//	indices, err := BraceIndices("/orders/{id}/items/{itemId}")
+//	// indices: [8, 12, 19, 26]
+//	// err: nil
 func BraceIndices(s string) ([]int, error) {
 	var level, idx int
 	var idxs []int
