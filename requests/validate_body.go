@@ -64,8 +64,7 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	}
 
 	// extract the media type from the content type header.
-	ct, _, _ := helpers.ExtractContentType(contentType)
-	mediaType, ok := operation.RequestBody.Content.Get(ct)
+	mediaType, ok := v.extractContentType(contentType, operation)
 	if !ok {
 		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, pathValue)}
 	}
@@ -115,4 +114,21 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 
 	return validationSucceeded, validationErrors
+}
+
+func (v *requestBodyValidator) extractContentType(contentType string, operation *v3.Operation) (*v3.MediaType, bool) {
+	ct, _, _ := helpers.ExtractContentType(contentType)
+	mediaType, ok := operation.RequestBody.Content.Get(ct)
+	if ok {
+		return mediaType, true
+	}
+	ctMediaRange := strings.SplitN(ct, "/", 2)
+	for s, mediaTypeValue := range operation.RequestBody.Content.FromOldest() {
+		opMediaRange := strings.SplitN(s, "/", 2)
+		if (opMediaRange[0] == "*" || opMediaRange[0] == ctMediaRange[0]) &&
+			(opMediaRange[1] == "*" || opMediaRange[1] == ctMediaRange[1]) {
+			return mediaTypeValue, true
+		}
+	}
+	return nil, false
 }
