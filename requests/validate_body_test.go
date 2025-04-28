@@ -12,6 +12,7 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/paths"
 )
@@ -46,6 +47,140 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_MediaRangeContentType_Wildcard_end(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
+        content:
+          thomas/*:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "thomas/tank-engine") // wtf kinda content type is this?
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_MediaRangeContentType_Wildcards(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
+        content:
+          "*/*":
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "thomas/tank-engine") // wtf kinda content type is this?
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_InvalidBasicSchema_MediaRangeContentType_Wildcard_Required(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: false
+        content:
+          "*/json":
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	// mix up the primitives to fire two schema violations.
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "foo/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	// double-tap to hit the cache
+	_, _ = v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
 }
 
 func TestValidateBody_UnknownContentType(t *testing.T) {
