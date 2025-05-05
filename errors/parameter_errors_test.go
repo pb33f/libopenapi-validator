@@ -367,6 +367,25 @@ func createMockLowBaseSchemaForNumberArray() *lowbase.Schema {
 	return itemsSchema
 }
 
+func TestIncorrectQueryParamArrayInteger(t *testing.T) {
+	// Create mock parameter and schemas
+	param := createMockParameterForNumberArray()
+	baseSchema := createMockLowBaseSchemaForNumberArray()
+	s := base.NewSchema(baseSchema)
+	itemsSchema := base.NewSchema(baseSchema.Items.Value.A.Schema())
+
+	// Call the function with an invalid number value in the array
+	err := IncorrectQueryParamArrayInteger(param, "notNumber", s, itemsSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query array parameter 'testQueryParam' is not a valid integer")
+	require.Contains(t, err.Reason, "the value 'notNumber' is not a valid integer")
+	require.Contains(t, err.HowToFix, "notNumber")
+}
+
 func TestIncorrectQueryParamArrayNumber(t *testing.T) {
 	// Create mock parameter and schemas
 	param := createMockParameterForNumberArray()
@@ -568,6 +587,22 @@ func TestInvalidQueryParamNumber(t *testing.T) {
 	require.Contains(t, err.HowToFix, "notNumber")
 }
 
+func TestInvalidQueryParamInteger(t *testing.T) {
+	param := createMockParameter()
+	baseSchema := createMockLowBaseSchema()
+
+	// Call the function with an invalid number value
+	err := InvalidQueryParamInteger(param, "notNumber", base.NewSchema(baseSchema))
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query parameter 'testQueryParam' is not a valid integer")
+	require.Contains(t, err.Reason, "the value 'notNumber' is not a valid integer")
+	require.Contains(t, err.HowToFix, "notNumber")
+}
+
 func TestIncorrectQueryParamEnum(t *testing.T) {
 	enum := `enum: [fish, crab, lobster]`
 	var n yaml.Node
@@ -645,6 +680,29 @@ func TestIncorrectReservedValues(t *testing.T) {
 	require.Contains(t, err.HowToFix, "borked%3A%3A%3F%5E%26%2A")
 }
 
+func TestInvalidHeaderParamInteger(t *testing.T) {
+	enum := `name: blip`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "bunny"
+
+	err := InvalidHeaderParamInteger(param, "bunmy", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationHeader, err.ValidationSubType)
+	require.Contains(t, err.Message, "Header parameter 'bunny' is not a valid integer")
+	require.Contains(t, err.Reason, "The header parameter 'bunny' is defined as being an integer")
+	require.Contains(t, err.HowToFix, "bunmy")
+}
+
 func TestInvalidHeaderParamNumber(t *testing.T) {
 	enum := `name: blip`
 	var n yaml.Node
@@ -688,6 +746,29 @@ func TestInvalidCookieParamNumber(t *testing.T) {
 	require.Equal(t, helpers.ParameterValidationCookie, err.ValidationSubType)
 	require.Contains(t, err.Message, "Cookie parameter 'cookies' is not a valid number")
 	require.Contains(t, err.Reason, "The cookie parameter 'cookies' is defined as being a number")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestInvalidCookieParamInteger(t *testing.T) {
+	enum := `name: blip`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(enum), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Name = "cookies"
+
+	err := InvalidCookieParamInteger(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationCookie, err.ValidationSubType)
+	require.Contains(t, err.Message, "Cookie parameter 'cookies' is not a valid integer")
+	require.Contains(t, err.Reason, "The cookie parameter 'cookies' is defined as being an integer")
 	require.Contains(t, err.HowToFix, "milky")
 }
 
@@ -900,6 +981,31 @@ func TestIncorrectPathParamNumber(t *testing.T) {
 	require.Contains(t, err.HowToFix, "milky")
 }
 
+func TestIncorrectPathParamInteger(t *testing.T) {
+	items := `items:
+  type: integer`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := IncorrectPathParamInteger(param, "milky", highSchema)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path parameter 'testQueryParam' is not a valid integer")
+	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' is defined as being an integer")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
 func TestIncorrectPathParamArrayNumber(t *testing.T) {
 	items := `items:
   type: number`
@@ -923,6 +1029,32 @@ func TestIncorrectPathParamArrayNumber(t *testing.T) {
 	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
 	require.Contains(t, err.Message, "Path array parameter 'bubbles' is not a valid number")
 	require.Contains(t, err.Reason, "The path parameter (which is an array) 'bubbles' is defined as being a number")
+	require.Contains(t, err.HowToFix, "milky")
+}
+
+func TestIncorrectPathParamArrayInteger(t *testing.T) {
+	items := `items:
+  type: integer`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	highSchema.GoLow().Items.Value.A.Schema()
+
+	param := createMockParameter()
+	param.Name = "bubbles"
+
+	err := IncorrectPathParamArrayInteger(param, "milky", highSchema, nil)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
+	require.Contains(t, err.Message, "Path array parameter 'bubbles' is not a valid integer")
+	require.Contains(t, err.Reason, "The path parameter (which is an array) 'bubbles' is defined as being an integer")
 	require.Contains(t, err.HowToFix, "milky")
 }
 
