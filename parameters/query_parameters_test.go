@@ -969,6 +969,37 @@ paths:
 		"however the value 'haddock' is not a valid number", errors[1].Reason)
 }
 
+func TestNewValidator_QueryParamValidEnumStringType(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         schema:
+           type: array
+           items:
+             type: string
+             enum: [cod, haddock]
+     operationId: locateFishy
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/a/fishy/on/a/dishy?fishy=cod,haddock", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+
+	assert.Len(t, errors, 0)
+}
+
 func TestNewValidator_QueryParamValidExplodedType(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
