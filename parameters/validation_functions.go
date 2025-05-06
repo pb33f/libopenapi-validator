@@ -127,14 +127,14 @@ func ValidateQueryArray(
 	}
 
 	// check if the param is within an enum
-	checkEnum := func(enumCheck, item string) {
+	checkEnum := func(item string) {
 		// check if the array param is within an enum
 		if sch.Items.IsA() {
 			itemsSch := sch.Items.A.Schema()
 			if itemsSch.Enum != nil {
 				matchFound := false
 				for _, enumVal := range itemsSch.Enum {
-					if strings.TrimSpace(enumCheck) == fmt.Sprint(enumVal.Value) {
+					if strings.TrimSpace(item) == fmt.Sprint(enumVal.Value) {
 						matchFound = true
 						break
 					}
@@ -159,7 +159,7 @@ func ValidateQueryArray(
 					break
 				}
 				// will it blend?
-				checkEnum(ef, item)
+				checkEnum(item)
 
 			case helpers.Boolean:
 				if _, err := strconv.ParseBool(item); err != nil {
@@ -180,7 +180,7 @@ func ValidateQueryArray(
 			case helpers.String:
 
 				// will it float?
-				checkEnum(ef, item)
+				checkEnum(item)
 			}
 		}
 	}
