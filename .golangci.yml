@@ -5,7 +5,7 @@ linters:
   enable:
     # Format
     - "gofumpt" # Gofumpt checks whether code was gofumpt-ed. Which is a superset of gofmt that handles some cases that gofmt missed.
-    - "gci" # Gci controls Go package import order and makes it always deterministic.
+    # - "gci" # Gci controls Go package import order and makes it always deterministic.
     - "asciicheck" # Checks that all code identifiers does not have non-ASCII symbols in the name.
     - "bidichk" # Checks for dangerous unicode character sequences.
     # Error
@@ -17,11 +17,11 @@ linters:
     - "staticcheck"
     - "unused"
 linters-settings:
-  gci:
-    sections:
-      - standard
-      - default
-      - localmodule
-      - blank
-      - dot
-      - alias
+#  gci:
+#    sections:
+#      - standard
+#      - default
+#      - localmodule
+#      - blank
+#      - dot
+#      - alias
