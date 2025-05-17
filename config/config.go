@@ -33,6 +33,15 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 	return o
 }
 
+// WithExistingOpts returns an Option that will copy the values from the supplied ValidationOptions instance
+func WithExistingOpts(options *ValidationOptions) Option {
+	return func(o *ValidationOptions) {
+		o.RegexEngine = options.RegexEngine
+		o.FormatAssertions = options.FormatAssertions
+		o.ContentAssertions = options.ContentAssertions
+	}
+}
+
 // WithRegexEngine Assigns a custom regular-expression engine to be used during validation.
 func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
 	return func(o *ValidationOptions) {
