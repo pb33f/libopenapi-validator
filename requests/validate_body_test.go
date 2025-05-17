@@ -7,11 +7,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pb33f/libopenapi-validator/config"
 	"net/http"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
