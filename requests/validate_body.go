@@ -108,8 +108,7 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 		})
 	}
 
-	// render the schema, to be used for validation
-	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
+	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, config.WithExistingOpts(v.options))
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 

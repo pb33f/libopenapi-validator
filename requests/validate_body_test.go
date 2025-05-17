@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/pb33f/libopenapi-validator/config"
 	"net/http"
 	"testing"
 
@@ -1443,4 +1444,53 @@ func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {
 	assert.False(t, isSuccess)
 	assert.Len(t, valErrs, 1)
 	assert.Equal(t, "PUT request body is empty for '/path1'", valErrs[0].Message)
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/144
+func TestValidateBody_InvalidSchema_EnsureOptionsPassthrough(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schema_validation/V1_UserRequest' 
+components:
+  schema_validation:
+    V1_UserRequest:
+            type: object
+            properties:
+                email:
+                    type: string
+                    format: email
+                    minLength: 1
+                    maxLength: 320`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model, config.WithFormatAssertions())
+
+	items := make(map[string]interface{})
+	items["email"] = "test"
+
+	bodyBytes, _ := json.Marshal(items)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "'test' is not valid email: missing @", errors[0].SchemaValidationErrors[0].Reason)
 }
