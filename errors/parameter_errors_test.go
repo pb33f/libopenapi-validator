@@ -976,3 +976,81 @@ func TestPathParameterMissing(t *testing.T) {
 	require.Contains(t, err.Reason, "The path parameter 'testQueryParam' is defined as being required")
 	require.Contains(t, err.HowToFix, "Ensure the value has been set")
 }
+
+func TestPathParameterMaxItems(t *testing.T) {
+	items := `maxItems: 5
+items:
+  type: string`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := IncorrectParamArrayMaxNumItems(param, param.Schema.Schema(), 10, 25)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query array parameter 'testQueryParam' has too many items")
+	require.Contains(t, err.Reason, "The query parameter (which is an array) 'testQueryParam' has a maximum item length of 10, however the request provided 25 items")
+	require.Contains(t, err.HowToFix, "Reduce the number of items in the array to 10 or less")
+}
+
+func TestPathParameterMinItems(t *testing.T) {
+	items := `minItems: 5
+items:
+  type: string`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := IncorrectParamArrayMinNumItems(param, param.Schema.Schema(), 10, 5)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query array parameter 'testQueryParam' does not have enough items")
+	require.Contains(t, err.Reason, "The query parameter (which is an array) 'testQueryParam' has a minimum items length of 10, however the request provided 5 items")
+	require.Contains(t, err.HowToFix, "Increase the number of items in the array to 10 or more")
+}
+
+func TestPathParameterUniqueItems(t *testing.T) {
+	items := `uniqueItems: true
+items:
+  type: string`
+	var n yaml.Node
+	_ = yaml.Unmarshal([]byte(items), &n)
+
+	schemaProxy := &lowbase.SchemaProxy{}
+	require.NoError(t, schemaProxy.Build(context.Background(), n.Content[0], n.Content[0], nil))
+
+	highSchema := base.NewSchema(schemaProxy.Schema())
+	param := createMockParameter()
+	param.Schema = base.CreateSchemaProxy(highSchema)
+	param.GoLow().Schema.KeyNode = &yaml.Node{}
+
+	err := IncorrectParamArrayUniqueItems(param, param.Schema.Schema(), "fish, cake")
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Contains(t, err.Message, "Query array parameter 'testQueryParam' contains non-unique items")
+	require.Contains(t, err.Reason, "The query parameter (which is an array) 'testQueryParam' contains the following duplicates: 'fish, cake'")
+	require.Contains(t, err.HowToFix, "Ensure the array values are all unique")
+}
