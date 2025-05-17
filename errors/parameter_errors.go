@@ -150,8 +150,7 @@ func IncorrectQueryParamArrayBoolean(
 	}
 }
 
-func IncorrectParamArrayMaxNumItems(
-	param *v3.Parameter, sch *base.Schema, expected, actual int64) *ValidationError {
+func IncorrectParamArrayMaxNumItems(param *v3.Parameter, sch *base.Schema, expected, actual int64) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationQuery,
@@ -165,8 +164,7 @@ func IncorrectParamArrayMaxNumItems(
 	}
 }
 
-func IncorrectParamArrayMinNumItems(
-	param *v3.Parameter, sch *base.Schema, expected, actual int64) *ValidationError {
+func IncorrectParamArrayMinNumItems(param *v3.Parameter, sch *base.Schema, expected, actual int64) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationQuery,
@@ -180,8 +178,7 @@ func IncorrectParamArrayMinNumItems(
 	}
 }
 
-func IncorrectParamArrayUniqueItems(
-	param *v3.Parameter, sch *base.Schema, duplicates string) *ValidationError {
+func IncorrectParamArrayUniqueItems(param *v3.Parameter, sch *base.Schema, duplicates string) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
 		ValidationSubType: helpers.ParameterValidationQuery,

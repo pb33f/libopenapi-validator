@@ -21,6 +21,10 @@ import (
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
+const rx = `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
+
+var rxRxp = regexp.MustCompile(rx)
+
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
 	pathItem, errs, foundPath := paths.FindPath(request, v.document)
 	if len(errs) > 0 {
@@ -28,9 +32,6 @@ func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*er
 	}
 	return v.ValidateQueryParamsWithPathItem(request, pathItem, foundPath)
 }
-
-var rx = `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
-var rxRxp = regexp.MustCompile(rx)
 
 func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	if pathItem == nil {
