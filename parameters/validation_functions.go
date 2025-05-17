@@ -148,9 +148,20 @@ func ValidateQueryArray(
 	}
 
 	// now check each item in the array
+	seen := make(map[string]struct{})
+	uniqueItems := true
+	var duplicates []string
 	for _, item := range items {
+
+		if _, exists := seen[item]; exists {
+			uniqueItems = false
+			duplicates = append(duplicates, item)
+		}
+		seen[item] = struct{}{}
+
 		// for each type defined in the item's schema, check the item
 		for _, itemType := range itemsSchema.Type {
+
 			switch itemType {
 			case helpers.Integer, helpers.Number:
 				if _, err := strconv.ParseFloat(item, 64); err != nil {
@@ -182,6 +193,29 @@ func ValidateQueryArray(
 				// will it float?
 				checkEnum(item)
 			}
+		}
+	}
+
+	// check for min and max items
+	if sch.MaxItems != nil {
+		if len(items) > int(*sch.MaxItems) {
+			validationErrors = append(validationErrors,
+				errors.IncorrectParamArrayMaxNumItems(param, sch, *sch.MaxItems, int64(len(items))))
+		}
+	}
+
+	if sch.MinItems != nil {
+		if len(items) < int(*sch.MinItems) {
+			validationErrors = append(validationErrors,
+				errors.IncorrectParamArrayMinNumItems(param, sch, *sch.MinItems, int64(len(items))))
+		}
+	}
+
+	// check for unique items
+	if sch.UniqueItems != nil {
+		if *sch.UniqueItems && !uniqueItems {
+			validationErrors = append(validationErrors,
+				errors.IncorrectParamArrayUniqueItems(param, sch, strings.Join(duplicates, ", ")))
 		}
 	}
 	return validationErrors

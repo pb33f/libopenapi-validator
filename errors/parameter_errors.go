@@ -150,6 +150,50 @@ func IncorrectQueryParamArrayBoolean(
 	}
 }
 
+func IncorrectParamArrayMaxNumItems(
+	param *v3.Parameter, sch *base.Schema, expected, actual int64) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query array parameter '%s' has too many items", param.Name),
+		Reason: fmt.Sprintf("The query parameter (which is an array) '%s' has a maximum item length of %d, "+
+			"however the request provided %d items", param.Name, expected, actual),
+		SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+		SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+		Context:  sch,
+		HowToFix: fmt.Sprintf(HowToFixInvalidMaxItems, expected),
+	}
+}
+
+func IncorrectParamArrayMinNumItems(
+	param *v3.Parameter, sch *base.Schema, expected, actual int64) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query array parameter '%s' does not have enough items", param.Name),
+		Reason: fmt.Sprintf("The query parameter (which is an array) '%s' has a minimum items length of %d, "+
+			"however the request provided %d items", param.Name, expected, actual),
+		SpecLine: sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+		SpecCol:  sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+		Context:  sch,
+		HowToFix: fmt.Sprintf(HowToFixInvalidMinItems, expected),
+	}
+}
+
+func IncorrectParamArrayUniqueItems(
+	param *v3.Parameter, sch *base.Schema, duplicates string) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query array parameter '%s' contains non-unique items", param.Name),
+		Reason:            fmt.Sprintf("The query parameter (which is an array) '%s' contains the following duplicates: '%s'", param.Name, duplicates),
+		SpecLine:          sch.Items.A.GoLow().Schema().Type.KeyNode.Line,
+		SpecCol:           sch.Items.A.GoLow().Schema().Type.KeyNode.Column,
+		Context:           sch,
+		HowToFix:          "Ensure the array values are all unique",
+	}
+}
+
 func IncorrectCookieParamArrayBoolean(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema,
 ) *ValidationError {
