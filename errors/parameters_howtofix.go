@@ -26,4 +26,6 @@ const (
 	HowToFixMissingValue               = "Ensure the value has been set"
 	HowToFixPath                       = "Check the path is correct, and check that the correct HTTP method has been used (e.g. GET, POST, PUT, DELETE)"
 	HowToFixPathMethod                 = "Add the missing operation to the contract for the path"
+	HowToFixInvalidMaxItems            = "Reduce the number of items in the array to %d or less"
+	HowToFixInvalidMinItems            = "Increase the number of items in the array to %d or more"
 )

@@ -4,7 +4,9 @@
 package parameters
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -3029,4 +3031,159 @@ components:
 	valid, errors := v.ValidateQueryParams(request)
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/140
+func TestNewValidator_CheckQueryParamsMaxItems(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: ID List API
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      parameters:
+        - name: id
+          in: query
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: integer
+            maxItems: 10
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid input`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, err := doc.BuildV3Model()
+	assert.Len(t, err, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	// Helper to build a request
+	makeRequest := func(ids []int) *http.Request {
+		values := make([]string, len(ids))
+		for i, id := range ids {
+			values[i] = fmt.Sprintf("%d", id)
+		}
+		req, _ := http.NewRequest(http.MethodGet, "/items?id="+strings.Join(values, ","), nil)
+		return req
+	}
+
+	// Test invalid case (12 items)
+	invalidReq := makeRequest([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+
+	valid, errors := v.ValidateQueryParams(invalidReq)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Reason, "The query parameter (which is an array) 'id' has a maximum item length of 10, however the request provided 12 items")
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/140
+func TestNewValidator_CheckQueryParamsMinItems(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: ID List API
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      parameters:
+        - name: id
+          in: query
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: integer
+            minItems: 10
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid input`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, err := doc.BuildV3Model()
+	assert.Len(t, err, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	// Helper to build a request
+	makeRequest := func(ids []int) *http.Request {
+		values := make([]string, len(ids))
+		for i, id := range ids {
+			values[i] = fmt.Sprintf("%d", id)
+		}
+		req, _ := http.NewRequest(http.MethodGet, "/items?id="+strings.Join(values, ","), nil)
+		return req
+	}
+
+	// Test invalid case (12 items)
+	invalidReq := makeRequest([]int{1, 2, 3})
+
+	valid, errors := v.ValidateQueryParams(invalidReq)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Reason, "The query parameter (which is an array) 'id' has a minimum items length of 10, however the request provided 3 items")
+}
+
+func TestNewValidator_CheckQueryParamsUniqueItems(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: ID List API
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      parameters:
+        - name: id
+          in: query
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+            uniqueItems: true
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid input`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, err := doc.BuildV3Model()
+	assert.Len(t, err, 0)
+
+	v := NewParameterValidator(&m.Model)
+
+	// Helper to build a request
+	makeRequest := func(ids []string) *http.Request {
+		values := make([]string, len(ids))
+		for i, id := range ids {
+			values[i] = fmt.Sprintf("%s", id)
+		}
+		req, _ := http.NewRequest(http.MethodGet, "/items?id="+strings.Join(values, ","), nil)
+		return req
+	}
+
+	// Test invalid case (12 items)
+	invalidReq := makeRequest([]string{"cake", "cake", "meat", "potatoes", "eggs", "meat"})
+
+	valid, errors := v.ValidateQueryParams(invalidReq)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Reason, "The query parameter (which is an array) 'id' contains the following duplicates: 'cake, meat'")
 }

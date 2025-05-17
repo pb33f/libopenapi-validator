@@ -5,7 +5,7 @@ package schema_validation
 
 import (
 	"github.com/pb33f/libopenapi/utils"
-	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
+	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,8 +26,8 @@ func LocateSchemaPropertyNodeByJSONPath(doc *yaml.Node, JSONPath string) *yaml.N
 		if path == "" {
 			doneChan <- true
 		}
-		yamlPath, _ := yamlpath.NewPath(path)
-		locatedNodes, _ := yamlPath.Find(doc)
+		jsonPath, _ := jsonpath.NewPath(path)
+		locatedNodes := jsonPath.Query(doc)
 		if len(locatedNodes) > 0 {
 			locatedNode = locatedNodes[0]
 		}

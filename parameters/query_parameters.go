@@ -29,6 +29,9 @@ func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*er
 	return v.ValidateQueryParamsWithPathItem(request, pathItem, foundPath)
 }
 
+var rx = `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
+var rxRxp = regexp.MustCompile(rx)
+
 func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
@@ -107,9 +110,7 @@ doneLooking:
 						//  :/?#[]@!$&'()*+,;=
 						// to be present as they are, without being URLEncoded.
 						if !params[p].AllowReserved {
-							rx := `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
-							regexp.MustCompile(rx)
-							if regexp.MustCompile(rx).MatchString(ef) && params[p].IsExploded() {
+							if rxRxp.MatchString(ef) && params[p].IsExploded() {
 								validationErrors = append(validationErrors,
 									errors.IncorrectReservedValues(params[p], ef, sch))
 							}
