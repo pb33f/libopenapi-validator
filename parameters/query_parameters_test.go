@@ -3172,9 +3172,7 @@ paths:
 	// Helper to build a request
 	makeRequest := func(ids []string) *http.Request {
 		values := make([]string, len(ids))
-		for i, id := range ids {
-			values[i] = fmt.Sprintf("%s", id)
-		}
+		copy(values, ids)
 		req, _ := http.NewRequest(http.MethodGet, "/items?id="+strings.Join(values, ","), nil)
 		return req
 	}

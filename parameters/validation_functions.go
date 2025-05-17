@@ -161,7 +161,6 @@ func ValidateQueryArray(
 
 		// for each type defined in the item's schema, check the item
 		for _, itemType := range itemsSchema.Type {
-
 			switch itemType {
 			case helpers.Integer, helpers.Number:
 				if _, err := strconv.ParseFloat(item, 64); err != nil {
