@@ -5,14 +5,15 @@ package helpers
 
 import (
 	"fmt"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"strings"
 	"unicode"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // ExtractJSONPathFromValidationError traverses and processes a ValidationError to construct a JSONPath string representation of its instance location.
 func ExtractJSONPathFromValidationError(e *jsonschema.ValidationError) string {
-	if e.Causes != nil && len(e.Causes) > 0 {
+	if len(e.Causes) > 0 {
 		for _, cause := range e.Causes {
 			ExtractJSONPathFromValidationError(cause)
 		}

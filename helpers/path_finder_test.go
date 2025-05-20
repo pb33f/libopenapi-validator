@@ -4,9 +4,10 @@
 package helpers
 
 import (
+	"testing"
+
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestDiveIntoValidationError(t *testing.T) {
