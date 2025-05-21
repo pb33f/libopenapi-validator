@@ -61,6 +61,9 @@ type Validator interface {
 
 	// GetResponseBodyValidator will return a parameters.ResponseBodyValidator instance used to validate response bodies
 	GetResponseBodyValidator() responses.ResponseBodyValidator
+
+	// SetDocument will set the OpenAPI 3+ document to be validated
+	SetDocument(document libopenapi.Document)
 }
 
 // NewValidator will create a new Validator from an OpenAPI 3+ document
@@ -92,6 +95,10 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	return v
 }
 
+func (v *validator) SetDocument(document libopenapi.Document) {
+	v.document = document
+}
+
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
 	return v.paramValidator
 }
@@ -105,6 +112,17 @@ func (v *validator) GetResponseBodyValidator() responses.ResponseBodyValidator {
 }
 
 func (v *validator) ValidateDocument() (bool, []*errors.ValidationError) {
+	if v.document == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    "document",
+			ValidationSubType: "missing",
+			Message:           "Document is not set",
+			Reason:            "The document cannot be validated as it is not set",
+			SpecLine:          1,
+			SpecCol:           1,
+			HowToFix:          "Set the document via `SetDocument` before validating",
+		}}
+	}
 	var validationOpts []config.Option
 	if v.options != nil {
 		validationOpts = append(validationOpts, config.WithRegexEngine(v.options.RegexEngine))

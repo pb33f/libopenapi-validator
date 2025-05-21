@@ -1696,3 +1696,59 @@ components:
 
 	}
 }
+
+// https://github.com/pb33f/libopenapi-validator/issues/86
+func TestNewValidator_HaveYourModelAndEatIt(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Panic at response validation
+  version: 1.0.0
+paths:
+  /operations:
+    delete:
+      description: Delete operations
+      responses:
+        default:
+          description: Any response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`
+
+	document, err := libopenapi.NewDocument([]byte(spec))
+
+	if err != nil {
+		panic(fmt.Sprintf("failed to create new document: %v\n", err))
+	}
+
+	model, errs := document.BuildV3Model()
+
+	if errs != nil {
+		panic(fmt.Sprintf("failed to create v3 model from document: %d errors reported", len(errs)))
+	}
+
+	v := NewValidatorFromV3Model(&model.Model)
+
+	valid, vErrs := v.ValidateDocument()
+	assert.False(t, valid)
+	assert.Len(t, vErrs, 1)
+	assert.Equal(t, "The document cannot be validated as it is not set", vErrs[0].Reason)
+
+	v.SetDocument(document)
+
+	valid, vErrs = v.ValidateDocument()
+	assert.True(t, valid)
+	assert.Len(t, vErrs, 0)
+}
