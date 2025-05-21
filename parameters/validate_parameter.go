@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
@@ -212,17 +214,64 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 		schemaValidationErrors = append(schemaValidationErrors, fail)
 	}
 	schemaType := "undefined"
+	line := 0
+	col := 0
 	if len(schema.Type) > 0 {
 		schemaType = schema.Type[0]
+		line = schema.GoLow().Type.KeyNode.Line
+		col = schema.GoLow().Type.KeyNode.Column
+	} else {
+		var sTypes []string
+		seen := make(map[string]struct{})
+		extractTypes := func(s *base.SchemaProxy) {
+			pSch := s.Schema()
+			if pSch != nil {
+				for _, typ := range pSch.Type {
+					if _, ok := seen[typ]; !ok {
+						sTypes = append(sTypes, typ)
+						seen[typ] = struct{}{}
+					}
+				}
+			}
+		}
+		processPoly := func(schemas []*base.SchemaProxy, wg *sync.WaitGroup) {
+			if len(schemas) > 0 {
+				for _, s := range schemas {
+					extractTypes(s)
+				}
+			}
+			wg.Done()
+		}
+
+		// check if there is polymorphism going on here.
+		if len(schema.AnyOf) > 0 || len(schema.AllOf) > 0 || len(schema.OneOf) > 0 {
+
+			wg := sync.WaitGroup{}
+			wg.Add(3)
+			go processPoly(schema.AnyOf, &wg)
+			go processPoly(schema.AllOf, &wg)
+			go processPoly(schema.OneOf, &wg)
+			wg.Wait()
+
+			sep := "or"
+			if len(schema.AllOf) > 0 {
+				sep = "and a"
+			}
+			schemaType = strings.Join(sTypes, fmt.Sprintf(" %s ", sep))
+		}
+
+		line = schema.GoLow().RootNode.Line
+		col = schema.GoLow().RootNode.Column
 	}
+
 	validationErrors = append(validationErrors, &errors.ValidationError{
 		ValidationType:    validationType,
 		ValidationSubType: subValType,
 		Message:           fmt.Sprintf("%s '%s' failed to validate", entity, name),
 		Reason: fmt.Sprintf("%s '%s' is defined as an %s, "+
 			"however it failed to pass a schema validation", reasonEntity, name, schemaType),
-		SpecLine:               schema.GoLow().Type.KeyNode.Line,
-		SpecCol:                schema.GoLow().Type.KeyNode.Column,
+		SpecLine:               line,
+		SpecCol:                col,
 		SchemaValidationErrors: schemaValidationErrors,
 		HowToFix:               errors.HowToFixInvalidSchema,
 	})
