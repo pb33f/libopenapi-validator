@@ -5,6 +5,7 @@ package parameters
 
 import (
 	"fmt"
+	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 	"net/http"
 	"strconv"
 	"strings"
@@ -144,6 +145,14 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 							}
 						}
 					}
+				}
+				if len(pType) == 0 {
+					// validate schema as there is no type information.
+					validationErrors = append(validationErrors, ValidateSingleParameterSchema(sch,
+						param,
+						p.Name,
+						lowbase.SchemaLabel, p.Name, helpers.ParameterValidation, helpers.ParameterValidationHeader, v.options)...)
+
 				}
 			} else {
 				if p.Required != nil && *p.Required {
