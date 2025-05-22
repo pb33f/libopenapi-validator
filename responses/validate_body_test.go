@@ -1414,7 +1414,6 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Missing required header", errors[0].Message)
 	assert.Equal(t, "Required header 'chicken-nuggets' was not found in response", errors[0].Reason)
-
 }
 
 type errorReader struct{}
