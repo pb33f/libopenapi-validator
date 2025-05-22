@@ -1,10 +1,11 @@
 package parameters
 
 import (
-	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,6 @@ func Test_ForceCompilerError(t *testing.T) {
 }
 
 func TestHeaderSchemaNoType(t *testing.T) {
-
 	bytes := []byte(`{
   "openapi": "3.0.0",
   "info": {
@@ -90,7 +90,7 @@ func TestHeaderSchemaNoType(t *testing.T) {
 
 	v3Model.Model.Servers = nil
 	// render the document back to bytes and reload the model.
-	_, doc, v3Model, errs = doc.RenderAndReload()
+	_, _, v3Model, _ = doc.RenderAndReload()
 
 	validator := NewParameterValidator(&v3Model.Model)
 
@@ -102,11 +102,9 @@ func TestHeaderSchemaNoType(t *testing.T) {
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "got string, want boolean", valErrs[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "got string, want integer", valErrs[0].SchemaValidationErrors[1].Reason)
-
 }
 
 func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
-
 	bytes := []byte(`{
   "openapi": "3.0.0",
   "info": {
@@ -183,7 +181,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 
 	v3Model.Model.Servers = nil
 	// render the document back to bytes and reload the model.
-	_, doc, v3Model, errs = doc.RenderAndReload()
+	_, _, v3Model, _ = doc.RenderAndReload()
 
 	validator := NewParameterValidator(&v3Model.Model)
 

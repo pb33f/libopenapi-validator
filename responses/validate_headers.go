@@ -5,14 +5,14 @@ package responses
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
-
-	"net/http"
-	"strings"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
@@ -73,12 +73,10 @@ func ValidateResponseHeaders(
 		if header.model.Schema != nil {
 			schema := header.model.Schema.Schema()
 			if schema != nil && header.model.Required {
-
 				for _, headerValue := range header.value {
 					validationErrors = append(validationErrors,
 						parameters.ValidateParameterSchema(schema, nil, headerValue, "header",
 							"response header", h, helpers.ResponseBodyValidation, lowv3.HeadersLabel, options)...)
-
 				}
 			}
 		}

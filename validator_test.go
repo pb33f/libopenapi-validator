@@ -1728,7 +1728,6 @@ components:
             $ref: '#/components/schemas/Error'`
 
 	document, err := libopenapi.NewDocument([]byte(spec))
-
 	if err != nil {
 		panic(fmt.Sprintf("failed to create new document: %v\n", err))
 	}

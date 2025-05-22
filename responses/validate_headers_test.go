@@ -4,11 +4,12 @@
 package responses
 
 import (
-	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/pb33f/libopenapi"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateResponseHeaders(t *testing.T) {
@@ -81,5 +82,4 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, errors[0].Message, "header 'chicken-nuggets' failed to validate")
 	assert.Equal(t, errors[0].Reason, "response header 'chicken-nuggets' is defined as an integer, however it failed to pass a schema validation")
-
 }
