@@ -58,8 +58,8 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, errors[0].Message, "Missing required model")
-	assert.Equal(t, errors[0].Reason, "Required model 'chicken-nuggets' was not found in response")
+	assert.Equal(t, errors[0].Message, "Missing required header")
+	assert.Equal(t, errors[0].Reason, "Required header 'chicken-nuggets' was not found in response")
 
 	res = httptest.NewRecorder()
 	handler = func(w http.ResponseWriter, r *http.Request) {
