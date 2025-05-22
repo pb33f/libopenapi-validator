@@ -61,7 +61,28 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 
 				for _, ty := range pType {
 					switch ty {
-					case helpers.Integer, helpers.Number:
+					case helpers.Integer:
+						if _, err := strconv.ParseInt(param, 10, 64); err != nil {
+							validationErrors = append(validationErrors,
+								errors.InvalidHeaderParamInteger(p, strings.ToLower(param), sch))
+							break
+						}
+						// check if the param is within the enum
+						if sch.Enum != nil {
+							matchFound := false
+							for _, enumVal := range sch.Enum {
+								if strings.TrimSpace(param) == fmt.Sprint(enumVal.Value) {
+									matchFound = true
+									break
+								}
+							}
+							if !matchFound {
+								validationErrors = append(validationErrors,
+									errors.IncorrectCookieParamEnum(p, strings.ToLower(param), sch))
+							}
+						}
+
+					case helpers.Number:
 						if _, err := strconv.ParseFloat(param, 64); err != nil {
 							validationErrors = append(validationErrors,
 								errors.InvalidHeaderParamNumber(p, strings.ToLower(param), sch))
