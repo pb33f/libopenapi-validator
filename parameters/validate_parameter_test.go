@@ -1,6 +1,8 @@
 package parameters
 
 import (
+	"github.com/pb33f/libopenapi-validator/helpers"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"net/http"
 	"testing"
 
@@ -191,4 +193,87 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 	assert.Len(t, valErrs, 1)
 	assert.Equal(t, "schema 'apiKey' is defined as an boolean and a integer, however it failed to pass a schema validation", valErrs[0].Reason)
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 3)
+}
+
+func TestHeaderSchemaStringNoJSON(t *testing.T) {
+	bytes := []byte(`{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API Spec With Mandatory Header",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api-endpoint": {
+      "get": {
+        "summary": "Restricted API Endpoint",
+        
+        "responses": {
+          "200": {
+            "description": "Successful response",
+             "headers": { 
+               "chicken-nuggets": {
+				"required": true,
+				"schema": {
+				  "oneOf": [
+					{
+					  "type": "boolean"
+					},
+					{
+					  "type": "integer"
+					}
+				  ],
+				}
+			  }
+			},
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyHeader": {
+        "type": "apiKey",
+        "name": "apiKey",
+        "in": "header"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyHeader": []
+    }
+  ]
+}`)
+
+	doc, err := libopenapi.NewDocument(bytes)
+	if err != nil {
+		t.Fatalf("error while creating open api spec document: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", "/api-endpoint", nil)
+	if err != nil {
+		t.Fatalf("error while creating request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("apiKey", "headerValue")
+
+	v3Model, errs := doc.BuildV3Model()
+	if len(errs) > 0 {
+		t.Fatalf("error while building v3 model: %v", errs)
+	}
+
+	v3Model.Model.Servers = nil
+	// render the document back to bytes and reload the model.
+	_, _, v3Model, _ = doc.RenderAndReload()
+
+	headers := v3Model.Model.Paths.PathItems.GetOrZero("/api-endpoint").Get.Responses.Codes.GetOrZero("200").Headers
+	headerSchema := headers.GetOrZero("chicken-nuggets").Schema.Schema()
+
+	headerErrors := ValidateParameterSchema(headerSchema, nil, "bubbles", "header",
+		"response header", "chicken-nuggets", helpers.ResponseBodyValidation, lowv3.HeadersLabel, nil)
+
+	assert.Len(t, headerErrors, 1)
+	assert.Equal(t, "response header 'chicken-nuggets' is defined as an boolean or integer, however it failed to pass a schema validation", headerErrors[0].Reason)
 }
