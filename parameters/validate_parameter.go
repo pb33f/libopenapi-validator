@@ -117,7 +117,10 @@ func ValidateParameterSchema(
 		}
 	} else {
 		decodedString, _ := url.QueryUnescape(rawBlob)
-		_ = json.Unmarshal([]byte(decodedString), &decodedObj)
+		err := json.Unmarshal([]byte(decodedString), &decodedObj)
+		if err != nil {
+			decodedObj = rawBlob
+		}
 		validEncoding = true
 	}
 	// 3. create a new json schema compiler and add the schema to it
@@ -178,8 +181,8 @@ func ValidateParameterSchema(
 					Message:           fmt.Sprintf("%s '%s' cannot be decoded", entity, name),
 					Reason: fmt.Sprintf("%s '%s' is defined as an object, "+
 						"however it failed to be decoded as an object", reasonEntity, name),
-					SpecLine: schema.GoLow().Type.KeyNode.Line,
-					SpecCol:  schema.GoLow().Type.KeyNode.Column,
+					SpecLine: schema.GoLow().RootNode.Line,
+					SpecCol:  schema.GoLow().RootNode.Column,
 					HowToFix: errors.HowToFixDecodingError,
 				})
 			}

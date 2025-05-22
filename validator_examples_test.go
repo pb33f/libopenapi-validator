@@ -261,3 +261,123 @@ func ExampleNewValidator_validateHttpResponse() {
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
 	// Schema Error: got string, want integer, Line: 19, Col: 27
 }
+
+func ExampleNewValidator_testResponseHeaders() {
+	// 1. Load the OpenAPI 3+ spec into a byte array
+	petstore := []byte(`openapi: "3.0.0"
+info:
+  title: Healthcheck
+  version: '0.1.0'
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          headers:
+            chicken-nuggets:
+              description: chicken nuggets response
+              required: true
+              schema:
+                type: integer
+          description: pet response`)
+
+	// 2. Create a new OpenAPI document using libopenapi
+	document, docErrs := libopenapi.NewDocument(petstore)
+
+	if docErrs != nil {
+		panic(docErrs)
+	}
+
+	// 3. Create a new validator
+	docValidator, validatorErrs := NewValidator(document)
+
+	if validatorErrs != nil {
+		panic(validatorErrs)
+	}
+
+	// 6. Create a new *http.Request (normally, this would be where the host application will pass in the request)
+	request, _ := http.NewRequest(http.MethodGet, "/health", nil)
+
+	// 7. Simulate a request/response, in this case the contract returns a 200 with an array of pets.
+	// Normally, this would be where the host application would pass in the response.
+	recorder := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		// set return content type.
+		w.Header().Set("Chicken-Nuggets", "I am a chicken nugget, and not an integer")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(nil)
+	}
+
+	// simulate request/response
+	handler(recorder, request)
+
+	// 7. Validate the response only
+	valid, validationErrs := docValidator.ValidateHttpResponse(request, recorder.Result())
+
+	if !valid {
+		for _, e := range validationErrs {
+			// 5. Handle the error
+			fmt.Printf("Type: %s, Failure: %s\n", e.ValidationType, e.Message)
+		}
+	}
+	// Output: Type: response, Failure: header 'chicken-nuggets' failed to validate
+}
+
+func ExampleNewValidator_responseHeaderNotRequired() {
+	// 1. Load the OpenAPI 3+ spec into a byte array
+	petstore := []byte(`openapi: "3.0.0"
+info:
+  title: Healthcheck
+  version: '0.1.0'
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          headers:
+            chicken-nuggets:
+              description: chicken nuggets response
+              required: false
+              schema:
+                type: integer
+          description: pet response`)
+
+	// 2. Create a new OpenAPI document using libopenapi
+	document, docErrs := libopenapi.NewDocument(petstore)
+
+	if docErrs != nil {
+		panic(docErrs)
+	}
+
+	// 3. Create a new validator
+	docValidator, validatorErrs := NewValidator(document)
+
+	if validatorErrs != nil {
+		panic(validatorErrs)
+	}
+
+	// 6. Create a new *http.Request (normally, this would be where the host application will pass in the request)
+	request, _ := http.NewRequest(http.MethodGet, "/health", nil)
+
+	// 7. Simulate a request/response, in this case the contract returns a 200 with an array of pets.
+	// Normally, this would be where the host application would pass in the response.
+	recorder := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		// set return content type.
+		w.Header().Set("Chicken-Nuggets", "I am a chicken nugget, and not an integer")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(nil)
+	}
+
+	// simulate request/response
+	handler(recorder, request)
+
+	// 7. Validate the response only
+	valid, _ := docValidator.ValidateHttpResponse(request, recorder.Result())
+
+	if !valid {
+		panic("the header is not required, it should not fail")
+	}
+	fmt.Println("Header is not required, validation passed")
+	// Output: Header is not required, validation passed
+}

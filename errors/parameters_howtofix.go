@@ -28,4 +28,5 @@ const (
 	HowToFixPathMethod                 = "Add the missing operation to the contract for the path"
 	HowToFixInvalidMaxItems            = "Reduce the number of items in the array to %d or less"
 	HowToFixInvalidMinItems            = "Increase the number of items in the array to %d or more"
+	HowToFixMissingHeader              = "Make sure the service responding sets the required headers with this response code"
 )
