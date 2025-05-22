@@ -1,10 +1,11 @@
 package parameters
 
 import (
-	"github.com/pb33f/libopenapi-validator/helpers"
-	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"net/http"
 	"testing"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
