@@ -5,10 +5,11 @@ package parameters
 
 import (
 	"fmt"
-	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 	"net/http"
 	"strconv"
 	"strings"
+
+	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 
@@ -152,7 +153,6 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 						param,
 						p.Name,
 						lowbase.SchemaLabel, p.Name, helpers.ParameterValidation, helpers.ParameterValidationHeader, v.options)...)
-
 				}
 			} else {
 				if p.Required != nil && *p.Required {
