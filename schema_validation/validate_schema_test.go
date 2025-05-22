@@ -730,3 +730,53 @@ paths:
 	assert.True(t, valid)
 	assert.Empty(t, errors)
 }
+
+// https://github.com/pb33f/libopenapi/issues/415
+func TestValidateSchema_v3_1_DependentSchemas_NotValid(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fishCake:
+                  type: object
+                  properties:
+                    bones:
+                      type: boolean
+                  dependentSchemas:
+                    fishCake:
+                      type: object
+                      properties:
+                        cream:
+                          type: number
+                          format: double
+                      required:
+                        - cream`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	exp := `{
+  "fishCake": {
+    "bones": true,
+  }
+  "cream": 2.5
+}`
+
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
+
+	// create a schema validator
+	v := NewSchemaValidator()
+
+	// validate!
+	valid, errors := v.ValidateSchemaString(sch.Schema(), exp)
+
+	assert.False(t, valid)
+	assert.NotEmpty(t, errors)
+}
