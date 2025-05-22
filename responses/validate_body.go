@@ -90,6 +90,7 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 		if operation.Responses.Default != nil && operation.Responses.Default.Content != nil {
 			// check content type has been defined in the contract
 			if mediaType, ok := operation.Responses.Default.Content.Get(mediaTypeSting); ok {
+				foundResponse = operation.Responses.Default
 				validationErrors = append(validationErrors,
 					v.checkResponseSchema(request, response, contentType, mediaType)...)
 			} else {
@@ -105,6 +106,15 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 			// no default, no code match, nothing!
 			validationErrors = append(validationErrors,
 				errors.ResponseCodeNotFound(operation, request, httpCode))
+		}
+	}
+
+	if foundResponse != nil {
+		// check for headers in the response
+		if foundResponse.Headers != nil {
+			if ok, herrs := ValidateResponseHeaders(request, response, foundResponse.Headers); !ok {
+				validationErrors = append(validationErrors, herrs...)
+			}
 		}
 	}
 
