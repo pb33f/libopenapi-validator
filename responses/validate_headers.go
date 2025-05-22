@@ -56,8 +56,8 @@ func ValidateResponseHeaders(
 				validationErrors = append(validationErrors, &errors.ValidationError{
 					ValidationType:    helpers.ResponseBodyValidation,
 					ValidationSubType: helpers.ParameterValidationHeader,
-					Message:           "Missing required model",
-					Reason:            fmt.Sprintf("Required model '%s' was not found in response", name),
+					Message:           "Missing required header",
+					Reason:            fmt.Sprintf("Required header '%s' was not found in response", name),
 					SpecLine:          header.GoLow().KeyNode.Line,
 					SpecCol:           header.GoLow().KeyNode.Column,
 					HowToFix:          errors.HowToFixMissingHeader,

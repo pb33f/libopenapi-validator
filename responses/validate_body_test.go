@@ -1367,6 +1367,56 @@ components:
 	assert.Equal(t, "cannot render circular reference: #/components/schemas/Error", errors[0].Reason)
 }
 
+func TestValidateBody_CheckHeader(t *testing.T) {
+	spec := `openapi: "3.0.0"
+info:
+  title: Healthcheck
+  version: '0.1.0'
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          headers:
+            chicken-nuggets:
+              description: chicken nuggets response
+              required: true
+              schema:
+                type: integer
+          description: pet response`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/health", nil)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(nil)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Missing required header", errors[0].Message)
+	assert.Equal(t, "Required header 'chicken-nuggets' was not found in response", errors[0].Reason)
+
+}
+
 type errorReader struct{}
 
 func (er *errorReader) Read(p []byte) (n int, err error) {
