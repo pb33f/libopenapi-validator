@@ -6,6 +6,7 @@ package errors
 const (
 	HowToFixReservedValues string = "parameter values need to URL Encoded to ensure reserved " +
 		"values are correctly encoded, for example: '%s'"
+	HowToFixParamInvalidInteger                     string = "Convert the value '%s' into an integer"
 	HowToFixParamInvalidNumber                      string = "Convert the value '%s' into a number"
 	HowToFixParamInvalidString                      string = "Convert the value '%s' into a string (cannot start with a number, or be a floating point)"
 	HowToFixParamInvalidBoolean                     string = "Convert the value '%s' into a true/false value"
