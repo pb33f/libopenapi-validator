@@ -4,6 +4,7 @@
 package schema_validation
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -17,6 +18,13 @@ import (
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
+
+func normalizeJSON(data any) any {
+	d, _ := json.Marshal(data)
+	var normalized any
+	_ = json.Unmarshal(d, &normalized)
+	return normalized
+}
 
 // ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
@@ -32,7 +40,7 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 	jsch, _ := helpers.NewCompiledSchema("schema", []byte(loadedSchema), options)
 
 	// Validate the document
-	scErrs := jsch.Validate(decodedDocument)
+	scErrs := jsch.Validate(normalizeJSON(decodedDocument))
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 
