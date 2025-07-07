@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/dlclark/regexp2 v1.11.5
-	github.com/pb33f/libopenapi v0.22.2
+	github.com/pb33f/libopenapi v0.23.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/speakeasy-api/jsonpath v0.6.2
 	github.com/stretchr/testify v1.10.0
