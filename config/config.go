@@ -9,6 +9,7 @@ type ValidationOptions struct {
 	RegexEngine       jsonschema.RegexpEngine
 	FormatAssertions  bool
 	ContentAssertions bool
+	Formats           map[string]func(v any) error
 }
 
 // Option Enables an 'Options pattern' approach
@@ -39,6 +40,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 		o.RegexEngine = options.RegexEngine
 		o.FormatAssertions = options.FormatAssertions
 		o.ContentAssertions = options.ContentAssertions
+		o.Formats = options.Formats
 	}
 }
 
@@ -60,5 +62,18 @@ func WithFormatAssertions() Option {
 func WithContentAssertions() Option {
 	return func(o *ValidationOptions) {
 		o.ContentAssertions = true
+	}
+}
+
+// WithCustomFormat adds custom formats and their validators that checks for custom 'format' assertions
+// When you add different validators with the same name, they will be overridden,
+// and only the last registration will take effect.
+func WithCustomFormat(name string, validator func(v any) error) Option {
+	return func(o *ValidationOptions) {
+		if o.Formats == nil {
+			o.Formats = make(map[string]func(v any) error)
+		}
+
+		o.Formats[name] = validator
 	}
 }

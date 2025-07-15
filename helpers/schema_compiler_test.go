@@ -1,7 +1,9 @@
 package helpers
 
 import (
+	"fmt"
 	"testing"
+	"unicode"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +24,11 @@ const objectSchema = `{
   "properties" : {
      "name" : {
 	    "type": "string",
+        "description": "The given name of the fish"
+     },
+	"name" : {
+	    "type": "string",
+		"format": "capital",
         "description": "The given name of the fish"
      },
      "species" : {
@@ -47,7 +54,28 @@ func Test_SchemaWithDefaultOptions(t *testing.T) {
 }
 
 func Test_SchemaWithOptions(t *testing.T) {
-	valOptions := config.NewValidationOptions(config.WithFormatAssertions(), config.WithContentAssertions())
+	valOptions := config.NewValidationOptions(
+		config.WithFormatAssertions(),
+		config.WithContentAssertions(),
+		config.WithCustomFormat("capital", func(v any) error {
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("expected string")
+			}
+
+			if s == "" {
+				return nil
+			}
+
+			r := []rune(s)[0]
+
+			if !unicode.IsUpper(r) {
+				return fmt.Errorf("expected first latter to be uppercase")
+			}
+
+			return nil
+		}),
+	)
 
 	jsch, err := NewCompiledSchema("test", []byte(stringSchema), valOptions)
 
