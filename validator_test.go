@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode"
 
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
@@ -173,6 +174,212 @@ func TestNewValidator_WithRegex(t *testing.T) {
 	valid, valErrs := v.ValidateDocument()
 	assert.True(t, valid)
 	assert.Empty(t, valErrs)
+}
+
+func TestNewValidator_WithCustomFormat_NoErrors(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  format: capital
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err, "Failed to load spec")
+	require.NotNil(t, doc, "Failed to load spec")
+
+	v, errs := NewValidator(
+		doc,
+		config.WithFormatAssertions(),
+		config.WithCustomFormat("capital", func(v any) error {
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("expected string")
+			}
+
+			if s == "" {
+				return nil
+			}
+
+			r := []rune(s)[0]
+
+			if !unicode.IsUpper(r) {
+				return fmt.Errorf("expected first latter to be uppercase")
+			}
+
+			return nil
+		}),
+	)
+	require.Empty(t, errs, "Failed to build validator")
+	require.NotNil(t, v, "Failed to build validator")
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateHttpRequest(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_WithCustomFormat_FormatError(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  format: capital
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err, "Failed to load spec")
+	require.NotNil(t, doc, "Failed to load spec")
+
+	v, errs := NewValidator(
+		doc,
+		config.WithFormatAssertions(),
+		config.WithCustomFormat("capital", func(v any) error {
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("expected string")
+			}
+
+			if s == "" {
+				return nil
+			}
+
+			r := []rune(s)[0]
+
+			if !unicode.IsUpper(r) {
+				return fmt.Errorf("expected first latter to be uppercase")
+			}
+
+			return nil
+		}),
+	)
+	require.Empty(t, errs, "Failed to build validator")
+	require.NotNil(t, v, "Failed to build validator")
+
+	v.GetRequestBodyValidator()
+
+	body := map[string]interface{}{
+		"name":       "big mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateHttpRequest(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
+	require.Len(t, errors[0].SchemaValidationErrors, 1)
+	require.NotNil(t, errors[0].SchemaValidationErrors[0])
+	assert.Equal(t, "/properties/name/format", errors[0].SchemaValidationErrors[0].Location)
+	assert.Equal(t, "'big mac' is not valid capital: expected first latter to be uppercase", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+func TestNewValidator_WithCustomFormat_NoErrorsWhenFormatAssertionDisabled(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  format: capital
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err, "Failed to load spec")
+	require.NotNil(t, doc, "Failed to load spec")
+
+	v, errs := NewValidator(
+		doc,
+		config.WithCustomFormat("capital", func(v any) error {
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("expected string")
+			}
+
+			if s == "" {
+				return nil
+			}
+
+			r := []rune(s)[0]
+
+			if !unicode.IsUpper(r) {
+				return fmt.Errorf("expected first latter to be uppercase")
+			}
+
+			return nil
+		}),
+	)
+	require.Empty(t, errs, "Failed to build validator")
+	require.NotNil(t, v, "Failed to build validator")
+
+	v.GetRequestBodyValidator()
+
+	body := map[string]interface{}{
+		"name":       "big mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateHttpRequest(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 func TestNewValidator_BadDoc(t *testing.T) {
