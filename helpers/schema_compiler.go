@@ -28,6 +28,14 @@ func ConfigureCompiler(c *jsonschema.Compiler, o *config.ValidationOptions) {
 	if o.ContentAssertions {
 		c.AssertContent()
 	}
+
+	// Register custom formats
+	for n, v := range o.Formats {
+		c.RegisterFormat(&jsonschema.Format{
+			Name:     n,
+			Validate: v,
+		})
+	}
 }
 
 // NewCompilerWithOptions mints a new JSON schema compiler with custom configuration.
