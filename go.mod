@@ -7,7 +7,7 @@ require (
 	github.com/pb33f/libopenapi v0.22.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/speakeasy-api/jsonpath v0.6.2
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/text v0.25.0
 	gopkg.in/yaml.v3 v3.0.1
 )
