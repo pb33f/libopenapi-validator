@@ -84,6 +84,9 @@ type ValidationError struct {
 	// RequestMethod is the HTTP method of the request
 	RequestMethod string `json:"requestMethod" yaml:"requestMethod"`
 
+	// ParameterName is the name of the parameter that failed validation (for parameter validation errors)
+	ParameterName string `json:"parameterName,omitempty" yaml:"parameterName,omitempty"`
+
 	// SchemaValidationErrors is a slice of SchemaValidationFailure objects that describe the validation errors
 	// This is only populated whe the validation type is against a schema.
 	SchemaValidationErrors []*SchemaValidationFailure `json:"validationErrors,omitempty" yaml:"validationErrors,omitempty"`

@@ -258,11 +258,69 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 	assert.Len(t, valErrs, 1)
 	assert.Equal(t, "Query parameter 'email_param' failed to validate", valErrs[0].Message)
 
+	// verify ParameterName is populated for easy programmatic access
+	assert.Equal(t, "email_param", valErrs[0].ParameterName)
+
 	// verify unified error format - SchemaValidationErrors should be populated
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 1)
 	assert.Contains(t, valErrs[0].SchemaValidationErrors[0].Reason, "is not valid email")
 	assert.Equal(t, "/format", valErrs[0].SchemaValidationErrors[0].Location)
 	assert.NotEmpty(t, valErrs[0].SchemaValidationErrors[0].ReferenceSchema)
+}
+
+// TestParameterNameFieldPopulation tests that ParameterName field is consistently populated
+// for both basic validation errors and JSONSchema validation errors  
+func TestParameterNameFieldPopulation(t *testing.T) {
+	bytes := []byte(`{
+  "openapi": "3.0.0", 
+  "info": {
+    "title": "Parameter Name Test",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/test": {
+      "get": {
+        "parameters": [
+          {
+            "name": "integer_param",
+            "in": "query", 
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	doc, err := libopenapi.NewDocument(bytes)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", "/test?integer_param=not_a_number", nil)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	validator := NewParameterValidator(&v3Model.Model)
+	isSuccess, valErrs := validator.ValidateQueryParams(req)
+
+	assert.False(t, isSuccess)
+	assert.Len(t, valErrs, 1)
+	
+	// verify ParameterName is populated for basic type validation errors
+	assert.Equal(t, "integer_param", valErrs[0].ParameterName)
+	assert.Equal(t, "Query parameter 'integer_param' is not a valid integer", valErrs[0].Message)
+	
+	// basic type errors should NOT have SchemaValidationErrors (no JSONSchema validation occurred)
+	assert.Empty(t, valErrs[0].SchemaValidationErrors)
 }
 
 func TestHeaderSchemaStringNoJSON(t *testing.T) {

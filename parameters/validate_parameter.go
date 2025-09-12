@@ -268,13 +268,14 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 	}
 
 	validationErrors = append(validationErrors, &errors.ValidationError{
-		ValidationType:    validationType,
-		ValidationSubType: subValType,
-		Message:           fmt.Sprintf("%s '%s' failed to validate", entity, name),
+		ValidationType:         validationType,
+		ValidationSubType:      subValType,
+		Message:                fmt.Sprintf("%s '%s' failed to validate", entity, name),
 		Reason: fmt.Sprintf("%s '%s' is defined as an %s, "+
 			"however it failed to pass a schema validation", reasonEntity, name, schemaType),
 		SpecLine:               line,
 		SpecCol:                col,
+		ParameterName:          name,
 		SchemaValidationErrors: schemaValidationErrors,
 		HowToFix:               errors.HowToFixInvalidSchema,
 	})
