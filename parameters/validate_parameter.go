@@ -124,7 +124,29 @@ func ValidateParameterSchema(
 		validEncoding = true
 	}
 	// 3. create a new json schema compiler and add the schema to it
-	jsch, _ := helpers.NewCompiledSchema(name, jsonSchema, validationOptions)
+	jsch, err := helpers.NewCompiledSchema(name, jsonSchema, validationOptions)
+	if err != nil {
+		// schema compilation failed, return validation error instead of panicking
+		violation := &errors.SchemaValidationFailure{
+			Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
+			Location:        "schema compilation",
+			ReferenceSchema: string(jsonSchema),
+		}
+		validationErrors = append(validationErrors, &errors.ValidationError{
+			ValidationType:    validationType,
+			ValidationSubType: subValType,
+			Message:           fmt.Sprintf("%s '%s' failed schema compilation", entity, name),
+			Reason: fmt.Sprintf("%s '%s' schema compilation failed: %s",
+				reasonEntity, name, err.Error()),
+			SpecLine:               1,
+			SpecCol:                0,
+			ParameterName:          name,
+			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+			HowToFix:               "check the parameter schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+			Context:                string(jsonSchema),
+		})
+		return validationErrors
+	}
 
 	// 4. validate the object against the schema
 	var scErrs error

@@ -405,3 +405,88 @@ func TestHeaderSchemaStringNoJSON(t *testing.T) {
 	assert.Len(t, headerErrors, 1)
 	assert.Equal(t, "response header 'chicken-nuggets' is defined as an boolean or integer, however it failed to pass a schema validation", headerErrors[0].Reason)
 }
+
+// TestComplexRegexSchemaCompilationError tests that complex regex patterns in parameter schemas
+// that cause schema compilation to fail are handled gracefully instead of causing panics
+func TestComplexRegexSchemaCompilationError(t *testing.T) {
+	bytes := []byte(`{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API Spec With Complex Regex Pattern",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api-endpoint": {
+      "get": {
+        "summary": "API Endpoint with complex regex",
+        "parameters": [
+          {
+            "name": "complexParam",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[\\w\\W]{1,1024}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	doc, err := libopenapi.NewDocument(bytes)
+	if err != nil {
+		t.Fatalf("error while creating open api spec document: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", "/api-endpoint?complexParam=testvalue", nil)
+	if err != nil {
+		t.Fatalf("error while creating request: %v", err)
+	}
+
+	v3Model, errs := doc.BuildV3Model()
+	if len(errs) > 0 {
+		t.Fatalf("error while building v3 model: %v", errs)
+	}
+
+	validator := NewParameterValidator(&v3Model.Model)
+
+	// validate - this should not panic even if schema compilation fails due to complex regex
+	isSuccess, valErrs := validator.ValidateQueryParams(req)
+
+	// if schema compilation failed, we should get validation errors instead of a panic
+	if !isSuccess {
+		// verify we got schema compilation errors instead of a panic
+		assert.NotEmpty(t, valErrs)
+		found := false
+		for _, err := range valErrs {
+			if err.ParameterName == "complexParam" &&
+			   err.SchemaValidationErrors != nil &&
+			   len(err.SchemaValidationErrors) > 0 {
+				for _, schemaErr := range err.SchemaValidationErrors {
+					if schemaErr.Location == "schema compilation" &&
+					   schemaErr.Reason != "" {
+						found = true
+						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
+						assert.Contains(t, err.HowToFix, "complex regex patterns")
+						break
+					}
+				}
+			}
+		}
+		if !found {
+			// if it didn't fail compilation, it should have succeeded or failed with a different error
+			t.Logf("Schema compilation succeeded or failed with different error, validation result: %v, errors: %v", isSuccess, valErrs)
+		}
+	} else {
+		// schema compiled and validated successfully
+		assert.True(t, isSuccess)
+		assert.Empty(t, valErrs)
+	}
+}

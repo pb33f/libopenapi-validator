@@ -37,7 +37,27 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 	decodedDocument := *info.SpecJSON
 
 	// Compile the JSON Schema
-	jsch, _ := helpers.NewCompiledSchema("schema", []byte(loadedSchema), options)
+	jsch, err := helpers.NewCompiledSchema("schema", []byte(loadedSchema), options)
+	if err != nil {
+		// schema compilation failed, return validation error instead of panicking
+		violation := &liberrors.SchemaValidationFailure{
+			Reason:          fmt.Sprintf("failed to compile OpenAPI schema: %s", err.Error()),
+			Location:        "schema compilation",
+			ReferenceSchema: loadedSchema,
+		}
+		validationErrors = append(validationErrors, &liberrors.ValidationError{
+			ValidationType:    "schema",
+			ValidationSubType: "compilation",
+			Message:           "OpenAPI document schema compilation failed",
+			Reason: fmt.Sprintf("The OpenAPI schema failed to compile: %s", err.Error()),
+			SpecLine:               1,
+			SpecCol:                0,
+			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
+			HowToFix:               "check the OpenAPI schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+			Context:                loadedSchema,
+		})
+		return false, validationErrors
+	}
 
 	// Validate the document
 	scErrs := jsch.Validate(normalizeJSON(decodedDocument))

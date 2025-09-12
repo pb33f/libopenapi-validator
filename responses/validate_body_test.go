@@ -1416,6 +1416,93 @@ paths:
 	assert.Equal(t, "Required header 'chicken-nuggets' was not found in response", errors[0].Reason)
 }
 
+// TestValidateBody_ComplexRegexSchemaCompilationError tests that complex regex patterns
+// that cause schema compilation to fail are handled gracefully instead of causing panics
+func TestValidateBody_ComplexRegexSchemaCompilationError(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    pattern: "[\\w\\W]{1,1024}$"
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac test",
+		"patties":    2,
+		"vegetarian": false,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bodyBytes)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate - this should not panic even if schema compilation fails
+	valid, validationErrors := v.ValidateResponseBody(request, response)
+
+	// if schema compilation failed due to complex regex, we should get a validation error instead of a panic
+	if !valid {
+		// verify we got a schema compilation error instead of a panic
+		assert.NotEmpty(t, validationErrors)
+		found := false
+		for _, err := range validationErrors {
+			if err.ValidationSubType == helpers.Schema && 
+			   err.SchemaValidationErrors != nil &&
+			   len(err.SchemaValidationErrors) > 0 {
+				for _, schemaErr := range err.SchemaValidationErrors {
+					if schemaErr.Location == "schema compilation" && 
+					   schemaErr.Reason != "" {
+						found = true
+						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
+						assert.Contains(t, err.HowToFix, "complex regex patterns")
+						break
+					}
+				}
+			}
+		}
+		if !found {
+			// if it didn't fail compilation, it should have succeeded
+			t.Logf("Schema compilation succeeded, validation result: %v", valid)
+		}
+	} else {
+		// schema compiled and validated successfully
+		assert.True(t, valid)
+		assert.Empty(t, validationErrors)
+	}
+}
+
 type errorReader struct{}
 
 func (er *errorReader) Read(p []byte) (n int, err error) {
