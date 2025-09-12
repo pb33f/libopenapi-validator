@@ -17,9 +17,9 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"go.yaml.in/yaml/v4"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"gopkg.in/yaml.v3"
 
 	_ "embed"
 

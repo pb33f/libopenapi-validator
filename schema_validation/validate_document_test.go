@@ -85,5 +85,5 @@ info:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 6)
+	assert.Len(t, errors[0].SchemaValidationErrors, 7)
 }

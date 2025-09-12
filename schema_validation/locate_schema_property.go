@@ -4,9 +4,9 @@
 package schema_validation
 
 import (
+	"github.com/pb33f/jsonpath/pkg/jsonpath"
 	"github.com/pb33f/libopenapi/utils"
-	"github.com/speakeasy-api/jsonpath/pkg/jsonpath"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // LocateSchemaPropertyNodeByJSONPath will locate a schema property node by a JSONPath. It converts something like

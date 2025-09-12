@@ -10,7 +10,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/low"
 	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
