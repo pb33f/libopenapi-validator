@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 
@@ -195,6 +196,73 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 	assert.Len(t, valErrs, 1)
 	assert.Equal(t, "schema 'apiKey' is defined as an boolean and a integer, however it failed to pass a schema validation", valErrs[0].Reason)
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 5)
+}
+
+// TestUnifiedErrorFormatWithFormatValidation tests that format validation errors
+// use the unified SchemaValidationFailure format consistently
+// https://github.com/pb33f/libopenapi-validator/issues/168
+func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
+	bytes := []byte(`{
+  "openapi": "3.0.0", 
+  "info": {
+    "title": "API Spec With Format Validation",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/test": {
+      "get": {
+        "parameters": [
+          {
+            "name": "email_param",
+            "in": "query", 
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	doc, err := libopenapi.NewDocument(bytes)
+	if err != nil {
+		t.Fatalf("error while creating open api spec document: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", "/test?email_param=invalid-email-format", nil)
+	if err != nil {
+		t.Fatalf("error while creating request: %v", err)
+	}
+
+	v3Model, errs := doc.BuildV3Model()
+	if len(errs) > 0 {
+		t.Fatalf("error while building v3 model: %v", errs)
+	}
+
+	v3Model.Model.Servers = nil
+	_, _, v3Model, _ = doc.RenderAndReload()
+
+	validator := NewParameterValidator(&v3Model.Model, config.WithFormatAssertions())
+
+	isSuccess, valErrs := validator.ValidateQueryParams(req)
+
+	assert.False(t, isSuccess)
+	assert.Len(t, valErrs, 1)
+	assert.Equal(t, "Query parameter 'email_param' failed to validate", valErrs[0].Message)
+
+	// verify unified error format - SchemaValidationErrors should be populated
+	assert.Len(t, valErrs[0].SchemaValidationErrors, 1)
+	assert.Contains(t, valErrs[0].SchemaValidationErrors[0].Reason, "is not valid email")
+	assert.Equal(t, "/format", valErrs[0].SchemaValidationErrors[0].Location)
+	assert.NotEmpty(t, valErrs[0].SchemaValidationErrors[0].ReferenceSchema)
 }
 
 func TestHeaderSchemaStringNoJSON(t *testing.T) {

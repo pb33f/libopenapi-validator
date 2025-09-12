@@ -12,6 +12,58 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
+// createParameterValidationErrorWithSchemaFailure creates a unified parameter validation error
+// with consistent SchemaValidationFailure objects
+func createParameterValidationErrorWithSchemaFailure(
+	param *v3.Parameter,
+	schema *base.Schema, 
+	value string,
+	validationType string,
+	validationSubType string,
+	message string,
+	reason string,
+	failureReason string,
+	howToFix string,
+) *ValidationError {
+	var schemaValidationErrors []*SchemaValidationFailure
+	
+	// create schema validation failure with structured information
+	failure := &SchemaValidationFailure{
+		Reason:          failureReason,
+		Location:        "/", // root location for parameter values
+		ReferenceObject: value,
+	}
+	
+	// add reference schema if available
+	if schema != nil {
+		if rendered, err := schema.RenderInline(); err == nil && rendered != nil {
+			failure.ReferenceSchema = string(rendered)
+		}
+	}
+	
+	schemaValidationErrors = append(schemaValidationErrors, failure)
+	
+	// determine spec line and column
+	line := 0
+	col := 0
+	if param != nil && param.GoLow() != nil && param.GoLow().Schema.KeyNode != nil {
+		line = param.GoLow().Schema.KeyNode.Line
+		col = param.GoLow().Schema.KeyNode.Column
+	}
+	
+	return &ValidationError{
+		ValidationType:         validationType,
+		ValidationSubType:      validationSubType,
+		Message:               message,
+		Reason:                reason,
+		SpecLine:              line,
+		SpecCol:               col,
+		SchemaValidationErrors: schemaValidationErrors,
+		HowToFix:              howToFix,
+		Context:               schema,
+	}
+}
+
 func IncorrectFormEncoding(param *v3.Parameter, qp *helpers.QueryParam, i int) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -270,45 +322,48 @@ func IncorrectParamEncodingJSON(param *v3.Parameter, ef string, sch *base.Schema
 }
 
 func IncorrectQueryParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationQuery,
-		Message:           fmt.Sprintf("Query parameter '%s' is not a valid boolean", param.Name),
-		Reason: fmt.Sprintf("The query parameter '%s' is defined as being a boolean, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationQuery,
+		fmt.Sprintf("Query parameter '%s' is not a valid boolean", param.Name),
+		fmt.Sprintf("The query parameter '%s' is defined as being a boolean, "+
 			"however the value '%s' is not a valid boolean", param.Name, ef),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
-	}
+		fmt.Sprintf("got string, want boolean"),
+		fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
+	)
 }
 
 func InvalidQueryParamInteger(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationQuery,
-		Message:           fmt.Sprintf("Query parameter '%s' is not a valid integer", param.Name),
-		Reason: fmt.Sprintf("The query parameter '%s' is defined as being an integer, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationQuery,
+		fmt.Sprintf("Query parameter '%s' is not a valid integer", param.Name),
+		fmt.Sprintf("The query parameter '%s' is defined as being an integer, "+
 			"however the value '%s' is not a valid integer", param.Name, ef),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, ef),
-	}
+		fmt.Sprintf("got string, want integer"), // jsonschema-style error message
+		fmt.Sprintf(HowToFixParamInvalidInteger, ef),
+	)
 }
 
 func InvalidQueryParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationQuery,
-		Message:           fmt.Sprintf("Query parameter '%s' is not a valid number", param.Name),
-		Reason: fmt.Sprintf("The query parameter '%s' is defined as being a number, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationQuery,
+		fmt.Sprintf("Query parameter '%s' is not a valid number", param.Name),
+		fmt.Sprintf("The query parameter '%s' is defined as being a number, "+
 			"however the value '%s' is not a valid number", param.Name, ef),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, ef),
-	}
+		fmt.Sprintf("got string, want number"),
+		fmt.Sprintf(HowToFixParamInvalidNumber, ef),
+	)
 }
 
 func IncorrectQueryParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
@@ -317,17 +372,19 @@ func IncorrectQueryParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *
 		enums = append(enums, fmt.Sprint(sch.Enum[i].Value))
 	}
 	validEnums := strings.Join(enums, ", ")
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationQuery,
-		Message:           fmt.Sprintf("Query parameter '%s' does not match allowed values", param.Name),
-		Reason: fmt.Sprintf("The query parameter '%s' has pre-defined "+
+	
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationQuery,
+		fmt.Sprintf("Query parameter '%s' does not match allowed values", param.Name),
+		fmt.Sprintf("The query parameter '%s' has pre-defined "+
 			"values set via an enum. The value '%s' is not one of those values.", param.Name, ef),
-		SpecLine: param.GoLow().Schema.Value.Schema().Enum.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.Value.Schema().Enum.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidEnum, ef, validEnums),
-	}
+		fmt.Sprintf("value is not one of the allowed enum values"),
+		fmt.Sprintf(HowToFixParamInvalidEnum, ef, validEnums),
+	)
 }
 
 func IncorrectQueryParamEnumArray(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
@@ -366,31 +423,33 @@ func IncorrectReservedValues(param *v3.Parameter, ef string, sch *base.Schema) *
 }
 
 func InvalidHeaderParamInteger(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationHeader,
-		Message:           fmt.Sprintf("Header parameter '%s' is not a valid integer", param.Name),
-		Reason: fmt.Sprintf("The header parameter '%s' is defined as being an integer, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationHeader,
+		fmt.Sprintf("Header parameter '%s' is not a valid integer", param.Name),
+		fmt.Sprintf("The header parameter '%s' is defined as being an integer, "+
 			"however the value '%s' is not a valid integer", param.Name, ef),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, ef),
-	}
+		fmt.Sprintf("got string, want integer"),
+		fmt.Sprintf(HowToFixParamInvalidInteger, ef),
+	)
 }
 
 func InvalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationHeader,
-		Message:           fmt.Sprintf("Header parameter '%s' is not a valid number", param.Name),
-		Reason: fmt.Sprintf("The header parameter '%s' is defined as being a number, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationHeader,
+		fmt.Sprintf("Header parameter '%s' is not a valid number", param.Name),
+		fmt.Sprintf("The header parameter '%s' is defined as being a number, "+
 			"however the value '%s' is not a valid number", param.Name, ef),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidNumber, ef),
-	}
+		fmt.Sprintf("got string, want number"),
+		fmt.Sprintf(HowToFixParamInvalidNumber, ef),
+	)
 }
 
 func InvalidCookieParamInteger(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
@@ -422,17 +481,18 @@ func InvalidCookieParamNumber(param *v3.Parameter, ef string, sch *base.Schema) 
 }
 
 func IncorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationHeader,
-		Message:           fmt.Sprintf("Header parameter '%s' is not a valid boolean", param.Name),
-		Reason: fmt.Sprintf("The header parameter '%s' is defined as being a boolean, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		ef,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationHeader,
+		fmt.Sprintf("Header parameter '%s' is not a valid boolean", param.Name),
+		fmt.Sprintf("The header parameter '%s' is defined as being a boolean, "+
 			"however the value '%s' is not a valid boolean", param.Name, ef),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
-	}
+		fmt.Sprintf("got string, want boolean"),
+		fmt.Sprintf(HowToFixParamInvalidBoolean, ef),
+	)
 }
 
 func IncorrectCookieParamBool(param *v3.Parameter, ef string, sch *base.Schema) *ValidationError {
@@ -534,17 +594,18 @@ func IncorrectPathParamEnum(param *v3.Parameter, ef string, sch *base.Schema) *V
 }
 
 func IncorrectPathParamInteger(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
-	return &ValidationError{
-		ValidationType:    helpers.ParameterValidation,
-		ValidationSubType: helpers.ParameterValidationPath,
-		Message:           fmt.Sprintf("Path parameter '%s' is not a valid integer", param.Name),
-		Reason: fmt.Sprintf("The path parameter '%s' is defined as being an integer, "+
+	return createParameterValidationErrorWithSchemaFailure(
+		param,
+		sch,
+		item,
+		helpers.ParameterValidation,
+		helpers.ParameterValidationPath,
+		fmt.Sprintf("Path parameter '%s' is not a valid integer", param.Name),
+		fmt.Sprintf("The path parameter '%s' is defined as being an integer, "+
 			"however the value '%s' is not a valid integer", param.Name, item),
-		SpecLine: param.GoLow().Schema.KeyNode.Line,
-		SpecCol:  param.GoLow().Schema.KeyNode.Column,
-		Context:  sch,
-		HowToFix: fmt.Sprintf(HowToFixParamInvalidInteger, item),
-	}
+		fmt.Sprintf("got string, want integer"),
+		fmt.Sprintf(HowToFixParamInvalidInteger, item),
+	)
 }
 
 func IncorrectPathParamNumber(param *v3.Parameter, item string, sch *base.Schema) *ValidationError {
