@@ -9,7 +9,7 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestLocateSchemaPropertyNodeByJSONPath(t *testing.T) {
@@ -397,13 +397,13 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Len(t, errors[0].SchemaValidationErrors, 3)
 
 	valid, errors = v.ValidateSchemaObject(sch.Schema(), cakePlease)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Len(t, errors[0].SchemaValidationErrors, 3)
 
 	// or death!
 	bodyBytes, _ = json.Marshal(death)
@@ -414,13 +414,13 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Len(t, errors[0].SchemaValidationErrors, 3)
 
 	valid, errors = v.ValidateSchemaObject(sch.Schema(), death)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Len(t, errors[0].SchemaValidationErrors, 3)
 }
 
 func TestValidateSchema_EmptySchema(t *testing.T) {
