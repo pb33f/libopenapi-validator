@@ -18,6 +18,15 @@ type SchemaValidationFailure struct {
 	// Location is the XPath-like location of the validation failure
 	Location string `json:"location,omitempty" yaml:"location,omitempty"`
 
+	// FieldName is the name of the specific field that failed validation (last segment of the path)
+	FieldName string `json:"fieldName,omitempty" yaml:"fieldName,omitempty"`
+
+	// FieldPath is the JSONPath representation of the field location (e.g., "$.user.email")
+	FieldPath string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
+
+	// InstancePath is the raw path segments from the root to the failing field
+	InstancePath []string `json:"instancePath,omitempty" yaml:"instancePath,omitempty"`
+
 	// DeepLocation is the path to the validation failure as exposed by the jsonschema library.
 	DeepLocation string `json:"deepLocation,omitempty" yaml:"deepLocation,omitempty"`
 

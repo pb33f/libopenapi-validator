@@ -92,3 +92,70 @@ func ExtractJSONPathsFromValidationErrors(errors []*jsonschema.ValidationError) 
 	}
 	return paths
 }
+
+// ExtractFieldNameFromInstanceLocation returns the last segment of the instance location as the field name
+func ExtractFieldNameFromInstanceLocation(instanceLocation []string) string {
+	if len(instanceLocation) == 0 {
+		return ""
+	}
+	return instanceLocation[len(instanceLocation)-1]
+}
+
+// ExtractFieldNameFromStringLocation returns the last segment of the instance location as the field name
+// when the location is provided as a string path
+func ExtractFieldNameFromStringLocation(instanceLocation string) string {
+	if instanceLocation == "" {
+		return ""
+	}
+
+	// Handle string format like "/properties/email" or "/0/name"
+	segments := strings.Split(strings.Trim(instanceLocation, "/"), "/")
+	if len(segments) == 0 || (len(segments) == 1 && segments[0] == "") {
+		return ""
+	}
+
+	return segments[len(segments)-1]
+}
+
+// ExtractJSONPathFromInstanceLocation creates a JSONPath string from instance location segments
+func ExtractJSONPathFromInstanceLocation(instanceLocation []string) string {
+	if len(instanceLocation) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("$")
+
+	for _, seg := range instanceLocation {
+		switch {
+		case isNumeric(seg):
+			b.WriteString(fmt.Sprintf("[%s]", seg))
+
+		case isSimpleIdentifier(seg):
+			b.WriteByte('.')
+			b.WriteString(seg)
+
+		default:
+			esc := escapeBracketString(seg)
+			b.WriteString("['")
+			b.WriteString(esc)
+			b.WriteString("']")
+		}
+	}
+	return b.String()
+}
+
+// ExtractJSONPathFromStringLocation creates a JSONPath string from string-based instance location
+func ExtractJSONPathFromStringLocation(instanceLocation string) string {
+	if instanceLocation == "" {
+		return ""
+	}
+
+	// Convert string format like "/properties/email" to array format
+	segments := strings.Split(strings.Trim(instanceLocation, "/"), "/")
+	if len(segments) == 0 || (len(segments) == 1 && segments[0] == "") {
+		return ""
+	}
+
+	return ExtractJSONPathFromInstanceLocation(segments)
+}
