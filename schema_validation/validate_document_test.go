@@ -79,13 +79,13 @@ paths:
 		assert.NotEmpty(t, errors)
 		found := false
 		for _, validationError := range errors {
-			if validationError.ValidationType == "schema" && 
-			   validationError.ValidationSubType == "compilation" {
+			if validationError.ValidationType == "schema" &&
+				validationError.ValidationSubType == "compilation" {
 				assert.Equal(t, "OpenAPI document schema compilation failed", validationError.Message)
 				assert.Contains(t, validationError.Reason, "The OpenAPI schema failed to compile")
 				assert.Contains(t, validationError.HowToFix, "complex regex patterns")
 				assert.NotEmpty(t, validationError.SchemaValidationErrors)
-				
+
 				for _, schemaErr := range validationError.SchemaValidationErrors {
 					if schemaErr.Location == "schema compilation" {
 						assert.Contains(t, schemaErr.Reason, "failed to compile OpenAPI schema")

@@ -1478,12 +1478,12 @@ paths:
 		assert.NotEmpty(t, validationErrors)
 		found := false
 		for _, err := range validationErrors {
-			if err.ValidationSubType == helpers.Schema && 
-			   err.SchemaValidationErrors != nil &&
-			   len(err.SchemaValidationErrors) > 0 {
+			if err.ValidationSubType == helpers.Schema &&
+				err.SchemaValidationErrors != nil &&
+				len(err.SchemaValidationErrors) > 0 {
 				for _, schemaErr := range err.SchemaValidationErrors {
-					if schemaErr.Location == "schema compilation" && 
-					   schemaErr.Reason != "" {
+					if schemaErr.Location == "schema compilation" &&
+						schemaErr.Reason != "" {
 						found = true
 						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
 						assert.Contains(t, err.HowToFix, "complex regex patterns")

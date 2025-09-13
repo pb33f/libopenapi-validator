@@ -269,7 +269,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 }
 
 // TestParameterNameFieldPopulation tests that ParameterName field is consistently populated
-// for both basic validation errors and JSONSchema validation errors  
+// for both basic validation errors and JSONSchema validation errors
 func TestParameterNameFieldPopulation(t *testing.T) {
 	bytes := []byte(`{
   "openapi": "3.0.0", 
@@ -314,11 +314,11 @@ func TestParameterNameFieldPopulation(t *testing.T) {
 
 	assert.False(t, isSuccess)
 	assert.Len(t, valErrs, 1)
-	
+
 	// verify ParameterName is populated for basic type validation errors
 	assert.Equal(t, "integer_param", valErrs[0].ParameterName)
 	assert.Equal(t, "Query parameter 'integer_param' is not a valid integer", valErrs[0].Message)
-	
+
 	// basic type errors should NOT have SchemaValidationErrors (no JSONSchema validation occurred)
 	assert.Empty(t, valErrs[0].SchemaValidationErrors)
 }
@@ -467,11 +467,11 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 		found := false
 		for _, err := range valErrs {
 			if err.ParameterName == "complexParam" &&
-			   err.SchemaValidationErrors != nil &&
-			   len(err.SchemaValidationErrors) > 0 {
+				err.SchemaValidationErrors != nil &&
+				len(err.SchemaValidationErrors) > 0 {
 				for _, schemaErr := range err.SchemaValidationErrors {
 					if schemaErr.Location == "schema compilation" &&
-					   schemaErr.Reason != "" {
+						schemaErr.Reason != "" {
 						found = true
 						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
 						assert.Contains(t, err.HowToFix, "complex regex patterns")
@@ -491,7 +491,7 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 	}
 }
 
-// TestValidateParameterSchema_SchemaCompilationFailure tests that ValidateParameterSchema 
+// TestValidateParameterSchema_SchemaCompilationFailure tests that ValidateParameterSchema
 // handles schema compilation failures gracefully instead of causing panics
 func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 	bytes := []byte(`{
@@ -541,8 +541,8 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 		schema,
 		"test-value",
 		"",
-		"Query parameter", 
-		"query parameter", 
+		"Query parameter",
+		"query parameter",
 		"failParam",
 		helpers.ParameterValidation,
 		helpers.ParameterValidationQuery,
@@ -554,8 +554,8 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 		found := false
 		for _, validationError := range validationErrors {
 			if validationError.ParameterName == "failParam" &&
-			   validationError.ValidationSubType == helpers.ParameterValidationQuery &&
-			   validationError.SchemaValidationErrors != nil {
+				validationError.ValidationSubType == helpers.ParameterValidationQuery &&
+				validationError.SchemaValidationErrors != nil {
 				for _, schemaErr := range validationError.SchemaValidationErrors {
 					if schemaErr.Location == "schema compilation" {
 						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
@@ -572,7 +572,7 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 			t.Logf("Schema compilation succeeded or failed for different reasons: %v", validationErrors)
 		}
 	} else {
-		// no validation errors - schema compiled and validated successfully 
+		// no validation errors - schema compiled and validated successfully
 		t.Logf("Schema compiled and validated successfully")
 	}
 }

@@ -283,7 +283,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 
 	// wait for all the validations to complete
 	<-doneChan
-	return !(len(validationErrors) > 0), validationErrors
+	return len(validationErrors) == 0, validationErrors
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
@@ -323,7 +323,7 @@ func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, p
 	}
 
 	validationErrors = append(validationErrors, paramValidationErrors...)
-	return !(len(validationErrors) > 0), validationErrors
+	return len(validationErrors) == 0, validationErrors
 }
 
 type validator struct {
