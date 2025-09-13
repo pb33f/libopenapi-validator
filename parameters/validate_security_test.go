@@ -10,6 +10,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -498,4 +499,220 @@ components:
 	assert.Equal(t, request.Method, errors[1].RequestMethod)
 	assert.Equal(t, request.URL.Path, errors[1].RequestPath)
 	assert.Equal(t, "/products", errors[1].SpecPath)
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationDisabled_APIKeyHeader(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	// No API key header provided
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Equal(t, 0, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationDisabled_APIKeyQuery(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: query
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	// No API key query param provided
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Equal(t, 0, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationDisabled_APIKeyCookie(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: cookie
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	// No API key cookie provided
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Equal(t, 0, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationDisabled_BasicAuth(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	// No Authorization header provided
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Equal(t, 0, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationDisabled_WithPathItem(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	pathItem, errs, pv := paths.FindPath(request, &m.Model)
+	assert.Nil(t, errs)
+
+	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)
+	assert.True(t, valid)
+	assert.Equal(t, 0, len(errors))
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationDisabled_MissingPath(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/nonexistent", nil)
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid) // Should still fail for invalid paths
+	assert.Equal(t, 1, len(errors))
+	assert.Contains(t, errors[0].Message, "Path '/nonexistent' not found")
+}
+
+func TestParamValidator_ValidateSecurity_SecurityValidationEnabled_vs_Disabled(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuth:
+          - write:products
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// Test with security validation enabled (default)
+	vEnabled := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+
+	valid, errors := vEnabled.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Equal(t, 1, len(errors))
+	assert.Equal(t, "API Key X-API-Key not found in header", errors[0].Message)
+
+	// Test with security validation disabled
+	vDisabled := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
+
+	valid, errors = vDisabled.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Equal(t, 0, len(errors))
 }

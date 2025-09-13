@@ -16,6 +16,7 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.NotNil(t, opts)
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -25,6 +26,7 @@ func TestNewValidationOptions_WithNilOption(t *testing.T) {
 	assert.NotNil(t, opts)
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -33,6 +35,7 @@ func TestWithFormatAssertions(t *testing.T) {
 
 	assert.True(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -41,6 +44,16 @@ func TestWithContentAssertions(t *testing.T) {
 
 	assert.False(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
+	assert.Nil(t, opts.RegexEngine)
+}
+
+func TestWithoutSecurityValidation(t *testing.T) {
+	opts := NewValidationOptions(WithoutSecurityValidation())
+
+	assert.False(t, opts.FormatAssertions)
+	assert.False(t, opts.ContentAssertions)
+	assert.False(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -52,6 +65,7 @@ func TestWithRegexEngine(t *testing.T) {
 
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -59,9 +73,10 @@ func TestWithExistingOpts(t *testing.T) {
 	// Create original options with all settings enabled
 	var testEngine jsonschema.RegexpEngine = nil
 	original := &ValidationOptions{
-		RegexEngine:       testEngine,
-		FormatAssertions:  true,
-		ContentAssertions: true,
+		RegexEngine:        testEngine,
+		FormatAssertions:   true,
+		ContentAssertions:  true,
+		SecurityValidation: false,
 	}
 
 	// Create new options using existing options
@@ -70,6 +85,7 @@ func TestWithExistingOpts(t *testing.T) {
 	assert.Nil(t, opts.RegexEngine) // Both should be nil
 	assert.Equal(t, original.FormatAssertions, opts.FormatAssertions)
 	assert.Equal(t, original.ContentAssertions, opts.ContentAssertions)
+	assert.Equal(t, original.SecurityValidation, opts.SecurityValidation)
 }
 
 func TestWithExistingOpts_NilSource(t *testing.T) {
@@ -80,6 +96,7 @@ func TestWithExistingOpts_NilSource(t *testing.T) {
 	// Should not panic and should have default values
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -91,6 +108,7 @@ func TestMultipleOptions(t *testing.T) {
 
 	assert.True(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -104,6 +122,7 @@ func TestOptionOverride(t *testing.T) {
 
 	assert.True(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -111,9 +130,10 @@ func TestWithExistingOpts_PartialOverride(t *testing.T) {
 	// Create original options
 	var testEngine jsonschema.RegexpEngine = nil
 	original := &ValidationOptions{
-		RegexEngine:       testEngine,
-		FormatAssertions:  true,
-		ContentAssertions: true,
+		RegexEngine:        testEngine,
+		FormatAssertions:   true,
+		ContentAssertions:  true,
+		SecurityValidation: false,
 	}
 
 	// Create new options using existing options, then override one setting
@@ -122,9 +142,10 @@ func TestWithExistingOpts_PartialOverride(t *testing.T) {
 		WithContentAssertions(), // This should still be true (no change)
 	)
 
-	assert.Nil(t, opts.RegexEngine)        // Both should be nil
-	assert.True(t, opts.FormatAssertions)  // From original
-	assert.True(t, opts.ContentAssertions) // Reapplied, but same value
+	assert.Nil(t, opts.RegexEngine)          // Both should be nil
+	assert.True(t, opts.FormatAssertions)    // From original
+	assert.True(t, opts.ContentAssertions)   // Reapplied, but same value
+	assert.False(t, opts.SecurityValidation) // From original
 }
 
 func TestComplexScenario(t *testing.T) {
@@ -133,7 +154,8 @@ func TestComplexScenario(t *testing.T) {
 
 	// Start with some base options
 	baseOpts := &ValidationOptions{
-		FormatAssertions: true,
+		FormatAssertions:   true,
+		SecurityValidation: false,
 		// RegexEngine and ContentAssertions are defaults (nil/false)
 	}
 
@@ -145,7 +167,41 @@ func TestComplexScenario(t *testing.T) {
 	)
 
 	// Verify all settings are as expected
-	assert.True(t, opts.FormatAssertions)  // From base
-	assert.True(t, opts.ContentAssertions) // Added
-	assert.Nil(t, opts.RegexEngine)        // Should be nil
+	assert.True(t, opts.FormatAssertions)    // From base
+	assert.True(t, opts.ContentAssertions)   // Added
+	assert.False(t, opts.SecurityValidation) // From base
+	assert.Nil(t, opts.RegexEngine)          // Should be nil
+}
+
+func TestMultipleOptionsWithSecurityDisabled(t *testing.T) {
+	opts := NewValidationOptions(
+		WithFormatAssertions(),
+		WithContentAssertions(),
+		WithoutSecurityValidation(),
+	)
+
+	assert.True(t, opts.FormatAssertions)
+	assert.True(t, opts.ContentAssertions)
+	assert.False(t, opts.SecurityValidation)
+	assert.Nil(t, opts.RegexEngine)
+}
+
+func TestWithExistingOpts_SecurityValidationCopied(t *testing.T) {
+	// Test that SecurityValidation is properly copied
+	original := &ValidationOptions{
+		SecurityValidation: false,
+	}
+
+	opts := NewValidationOptions(WithExistingOpts(original))
+
+	assert.False(t, opts.SecurityValidation)
+
+	// Test the opposite
+	original2 := &ValidationOptions{
+		SecurityValidation: true,
+	}
+
+	opts2 := NewValidationOptions(WithExistingOpts(original2))
+
+	assert.True(t, opts2.SecurityValidation)
 }
