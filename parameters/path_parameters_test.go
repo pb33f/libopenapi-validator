@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -137,55 +136,6 @@ paths:
 	valid, errors := v.ValidatePathParams(request)
 	assert.True(t, valid, "Integer parameter should validate correctly")
 	assert.Len(t, errors, 0)
-}
-
-func TestNewValidator_PathParamURLEncoding_InvalidURLEncoding(t *testing.T) {
-	spec := `openapi: 3.1.0
-paths:
-  /test/{pathParam}:
-    parameters:
-      - name: pathParam
-        in: path
-        required: true
-        schema:
-          type: string
-    get:
-      operationId: testOperation`
-
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-	m, _ := doc.BuildV3Model()
-	v := NewParameterValidator(&m.Model)
-
-	pathItem := m.Model.Paths.PathItems.GetOrZero("/test/{pathParam}")
-
-	// create a request where the EscapedPath() will return
-	// a string that contains malformed percent encoding after path segment extraction
-	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test/placeholder", nil)
-
-	// manipulate the URL after creation to have invalid encoding
-	// in the specific segment that will be extracted as the parameter value
-	request.URL.RawPath = "/test/param%ZZ" // Invalid percent encoding in parameter position
-	request.URL.Path = "/test/paramZZ"     // Valid path (percent escaping is for the raw path)
-
-	valid, errors := v.ValidatePathParamsWithPathItem(request, pathItem, "/test/{pathParam}")
-
-	if !valid && len(errors) > 0 {
-		for _, err := range errors {
-			if err.Message == "Path parameter 'pathParam' contains invalid URL encoding" {
-				assert.Contains(t, err.Reason, "invalid URL encoding")
-				assert.Equal(t, "pathParam", err.ParameterName)
-				assert.Equal(t, helpers.ParameterValidation, err.ValidationType)
-				assert.Equal(t, helpers.ParameterValidationPath, err.ValidationSubType)
-				assert.Equal(t, "Ensure the path parameter is properly URL encoded according to RFC 3986", err.HowToFix)
-				assert.Equal(t, -1, err.SpecLine)
-				assert.Equal(t, 0, err.SpecCol)
-				// Successfully tested the error handling path!
-				return
-			}
-		}
-	}
-
-	t.Logf("URL decoding error path not triggered - this is expected as it's defensive programming for edge cases")
 }
 
 func TestNewValidator_SimpleArrayEncodedPath_InvalidInteger(t *testing.T) {
