@@ -12,7 +12,6 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
-
 func IncorrectFormEncoding(param *v3.Parameter, qp *helpers.QueryParam, i int) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,

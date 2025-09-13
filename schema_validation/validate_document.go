@@ -46,10 +46,10 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 			ReferenceSchema: loadedSchema,
 		}
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:    "schema",
-			ValidationSubType: "compilation",
-			Message:           "OpenAPI document schema compilation failed",
-			Reason: fmt.Sprintf("The OpenAPI schema failed to compile: %s", err.Error()),
+			ValidationType:         "schema",
+			ValidationSubType:      "compilation",
+			Message:                "OpenAPI document schema compilation failed",
+			Reason:                 fmt.Sprintf("The OpenAPI schema failed to compile: %s", err.Error()),
 			SpecLine:               1,
 			SpecCol:                0,
 			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
