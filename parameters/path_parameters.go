@@ -6,6 +6,7 @@ package parameters
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -106,7 +107,24 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 					paramValue := match
 
-					if paramValue == "" {
+					// URL decode the parameter value before validation
+					decodedParamValue, err := url.PathUnescape(paramValue)
+					if err != nil {
+						// If URL decoding fails, create a validation error
+						validationErrors = append(validationErrors, &errors.ValidationError{
+							ValidationType:    helpers.ParameterValidation,
+							ValidationSubType: helpers.ParameterValidationPath,
+							Message:           fmt.Sprintf("Path parameter '%s' contains invalid URL encoding", p.Name),
+							Reason:            fmt.Sprintf("The path parameter '%s' value '%s' contains invalid URL encoding: %s", p.Name, paramValue, err.Error()),
+							ParameterName:     p.Name,
+							SpecLine:          -1,
+							SpecCol:           -1,
+							HowToFix:          "Ensure the path parameter is properly URL encoded according to RFC 3986",
+						})
+						continue
+					}
+
+					if decodedParamValue == "" {
 						// Mandatory path parameter cannot be empty
 						if p.Required != nil && *p.Required {
 							validationErrors = append(validationErrors, errors.PathParameterMissing(p))
@@ -119,17 +137,17 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					sch := p.Schema.Schema()
 
 					// check enum (if present)
-					enumCheck := func(paramValue string) {
+					enumCheck := func(decodedValue string) {
 						matchFound := false
 						for _, enumVal := range sch.Enum {
-							if strings.TrimSpace(paramValue) == fmt.Sprint(enumVal.Value) {
+							if strings.TrimSpace(decodedValue) == fmt.Sprint(enumVal.Value) {
 								matchFound = true
 								break
 							}
 						}
 						if !matchFound {
 							validationErrors = append(validationErrors,
-								errors.IncorrectPathParamEnum(p, strings.ToLower(paramValue), sch))
+								errors.IncorrectPathParamEnum(p, strings.ToLower(decodedValue), sch))
 						}
 					}
 
@@ -143,13 +161,13 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 								// check if the param is within the enum
 								if sch.Enum != nil {
-									enumCheck(paramValue)
+									enumCheck(decodedParamValue)
 									break
 								}
 								validationErrors = append(validationErrors,
 									ValidateSingleParameterSchema(
 										sch,
-										paramValue,
+										decodedParamValue,
 										"Path parameter",
 										"The path parameter",
 										p.Name,
@@ -160,7 +178,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 							case helpers.Integer:
 								// simple use case is already handled in find param.
-								rawParamValue, paramValueParsed, err := v.resolveInteger(sch, p, isLabel, isMatrix, paramValue)
+								rawParamValue, paramValueParsed, err := v.resolveInteger(sch, p, isLabel, isMatrix, decodedParamValue)
 								if err != nil {
 									validationErrors = append(validationErrors, err...)
 									break
@@ -183,7 +201,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 							case helpers.Number:
 								// simple use case is already handled in find param.
-								rawParamValue, paramValueParsed, err := v.resolveNumber(sch, p, isLabel, isMatrix, paramValue)
+								rawParamValue, paramValueParsed, err := v.resolveNumber(sch, p, isLabel, isMatrix, decodedParamValue)
 								if err != nil {
 									validationErrors = append(validationErrors, err...)
 									break
@@ -206,49 +224,49 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 							case helpers.Boolean:
 								if isLabel && p.Style == helpers.LabelStyle {
-									if _, err := strconv.ParseBool(paramValue[1:]); err != nil {
+									if _, err := strconv.ParseBool(decodedParamValue[1:]); err != nil {
 										validationErrors = append(validationErrors,
-											errors.IncorrectPathParamBool(p, paramValue[1:], sch))
+											errors.IncorrectPathParamBool(p, decodedParamValue[1:], sch))
 									}
 								}
 								if isSimple {
-									if _, err := strconv.ParseBool(paramValue); err != nil {
+									if _, err := strconv.ParseBool(decodedParamValue); err != nil {
 										validationErrors = append(validationErrors,
-											errors.IncorrectPathParamBool(p, paramValue, sch))
+											errors.IncorrectPathParamBool(p, decodedParamValue, sch))
 									}
 								}
 								if isMatrix && p.Style == helpers.MatrixStyle {
 									// strip off the colon and the parameter name
-									paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-									if _, err := strconv.ParseBool(paramValue); err != nil {
+									decodedForMatrix := strings.Replace(decodedParamValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+									if _, err := strconv.ParseBool(decodedForMatrix); err != nil {
 										validationErrors = append(validationErrors,
-											errors.IncorrectPathParamBool(p, paramValue, sch))
+											errors.IncorrectPathParamBool(p, decodedForMatrix, sch))
 									}
 								}
 							case helpers.Object:
 								var encodedObject interface{}
 
 								if p.IsDefaultPathEncoding() {
-									encodedObject = helpers.ConstructMapFromCSV(paramValue)
+									encodedObject = helpers.ConstructMapFromCSV(decodedParamValue)
 								} else {
 									switch p.Style {
 									case helpers.LabelStyle:
 										if !p.IsExploded() {
-											encodedObject = helpers.ConstructMapFromCSV(paramValue[1:])
+											encodedObject = helpers.ConstructMapFromCSV(decodedParamValue[1:])
 										} else {
-											encodedObject = helpers.ConstructKVFromLabelEncoding(paramValue)
+											encodedObject = helpers.ConstructKVFromLabelEncoding(decodedParamValue)
 										}
 									case helpers.MatrixStyle:
 										if !p.IsExploded() {
-											paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-											encodedObject = helpers.ConstructMapFromCSV(paramValue)
+											decodedForMatrix := strings.Replace(decodedParamValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+											encodedObject = helpers.ConstructMapFromCSV(decodedForMatrix)
 										} else {
-											paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-											encodedObject = helpers.ConstructKVFromMatrixCSV(paramValue)
+											decodedForMatrix := strings.Replace(decodedParamValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+											encodedObject = helpers.ConstructKVFromMatrixCSV(decodedForMatrix)
 										}
 									default:
 										if p.IsExploded() {
-											encodedObject = helpers.ConstructKVFromCSV(paramValue)
+											encodedObject = helpers.ConstructKVFromCSV(decodedParamValue)
 										}
 									}
 								}
@@ -274,22 +292,22 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 										// determine how to explode the array
 										var arrayValues []string
 										if isSimple {
-											arrayValues = strings.Split(paramValue, helpers.Comma)
+											arrayValues = strings.Split(decodedParamValue, helpers.Comma)
 										}
 										if isLabel {
 											if !p.IsExploded() {
-												arrayValues = strings.Split(paramValue[1:], helpers.Comma)
+												arrayValues = strings.Split(decodedParamValue[1:], helpers.Comma)
 											} else {
-												arrayValues = strings.Split(paramValue[1:], helpers.Period)
+												arrayValues = strings.Split(decodedParamValue[1:], helpers.Period)
 											}
 										}
 										if isMatrix {
 											if !p.IsExploded() {
-												paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-												arrayValues = strings.Split(paramValue, helpers.Comma)
+												decodedForMatrix := strings.Replace(decodedParamValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
+												arrayValues = strings.Split(decodedForMatrix, helpers.Comma)
 											} else {
-												paramValue = strings.ReplaceAll(paramValue[1:], fmt.Sprintf("%s=", p.Name), "")
-												arrayValues = strings.Split(paramValue, helpers.SemiColon)
+												decodedForMatrix := strings.ReplaceAll(decodedParamValue[1:], fmt.Sprintf("%s=", p.Name), "")
+												arrayValues = strings.Split(decodedForMatrix, helpers.SemiColon)
 											}
 										}
 										switch iSch.Type[n] {

@@ -41,6 +41,103 @@ paths:
 	assert.Len(t, errors, 0)
 }
 
+func TestNewValidator_PathParamURLEncoding_EnumValidation(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /test/{pathParam}:
+    parameters:
+      - name: pathParam
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: ["foo/bar", "hello world", "special@chars"]
+    get:
+      operationId: testOperation`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Test 1: URL-encoded forward slash should match enum value "foo/bar"
+	request1, _ := http.NewRequest(http.MethodGet, "https://example.com/test/foo%2Fbar", nil)
+	valid1, errors1 := v.ValidatePathParams(request1)
+	assert.True(t, valid1, "URL-encoded path parameter 'foo%%2Fbar' should match enum value 'foo/bar'")
+	assert.Len(t, errors1, 0)
+
+	// Test 2: URL-encoded space should match enum value "hello world"
+	request2, _ := http.NewRequest(http.MethodGet, "https://example.com/test/hello%20world", nil)
+	valid2, errors2 := v.ValidatePathParams(request2)
+	assert.True(t, valid2, "URL-encoded path parameter 'hello%%20world' should match enum value 'hello world'")
+	assert.Len(t, errors2, 0)
+
+	// Test 3: URL-encoded @ symbol should match enum value "special@chars"
+	request3, _ := http.NewRequest(http.MethodGet, "https://example.com/test/special%40chars", nil)
+	valid3, errors3 := v.ValidatePathParams(request3)
+	assert.True(t, valid3, "URL-encoded path parameter 'special%%40chars' should match enum value 'special@chars'")
+	assert.Len(t, errors3, 0)
+
+	// Test 4: Non-matching encoded value should fail
+	request4, _ := http.NewRequest(http.MethodGet, "https://example.com/test/not%2Dfound", nil)
+	valid4, errors4 := v.ValidatePathParams(request4)
+	assert.False(t, valid4, "URL-encoded path parameter 'not%%2Dfound' should not match any enum values")
+	assert.Len(t, errors4, 1)
+	assert.Contains(t, errors4[0].Reason, "pre-defined values set via an enum")
+}
+
+func TestNewValidator_PathParamURLEncoding_BackwardCompatibility(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /test/{pathParam}:
+    parameters:
+      - name: pathParam
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: ["normal-value", "encoded%2Fvalue"]
+    get:
+      operationId: testOperation`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Test backward compatibility: if enum contains encoded values,
+	// they should still work for backward compatibility
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test/encoded%2Fvalue", nil)
+	valid, errors := v.ValidatePathParams(request)
+	// This should fail because the decoded value "encoded/value" doesn't match "encoded%2Fvalue"
+	assert.False(t, valid, "Encoded enum values should require exact match after decoding")
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Reason, "pre-defined values set via an enum")
+}
+
+func TestNewValidator_PathParamURLEncoding_IntegerEnum(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /test/{numParam}:
+    parameters:
+      - name: numParam
+        in: path
+        required: true
+        schema:
+          type: integer
+          enum: [123, 456]
+    get:
+      operationId: testOperation`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Test URL-encoded integer (though integers typically don't need encoding)
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test/123", nil)
+	valid, errors := v.ValidatePathParams(request)
+	assert.True(t, valid, "Integer parameter should validate correctly")
+	assert.Len(t, errors, 0)
+}
+
 func TestNewValidator_SimpleArrayEncodedPath_InvalidInteger(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
