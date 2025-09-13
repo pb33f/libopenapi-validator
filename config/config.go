@@ -37,6 +37,7 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 // WithExistingOpts returns an Option that will copy the values from the supplied ValidationOptions instance
 func WithExistingOpts(options *ValidationOptions) Option {
 	return func(o *ValidationOptions) {
+		if options != nil {
 		o.RegexEngine = options.RegexEngine
 		o.FormatAssertions = options.FormatAssertions
 		o.ContentAssertions = options.ContentAssertions
