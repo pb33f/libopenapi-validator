@@ -123,45 +123,19 @@ func TestValidateDocument_SchemaCompilationFailure(t *testing.T) {
 	assert.Equal(t, malformedSchema, schemaErr.ReferenceSchema)
 }
 
-// TestValidateDocument_ActualSchemaCompilationFailure tests the actual ValidateOpenAPIDocument function
+// TestValidateDocument_CompilationFailure tests the actual ValidateOpenAPIDocument function
 // with a corrupted document that causes schema compilation to fail
-func TestValidateDocument_ActualSchemaCompilationFailure(t *testing.T) {
-	// Create a completely malformed OpenAPI document
-	// This is designed to create a scenario where the APISchema itself is corrupted
-	malformedSpec := `{"openapi": "3.1.0", "info": {"title": "Test", "version": "1.0.0"}`
+func TestValidateDocument_CompilationFailure(t *testing.T) {
 
-	// Create the document - this should work since we're just parsing the main structure
-	doc, err := libopenapi.NewDocument([]byte(malformedSpec))
-	if err != nil {
-		// If document creation fails, that's a different kind of error
-		t.Skipf("Document creation failed: %v", err)
-		return
-	}
-
-	// Now try to validate - this might hit the schema compilation error path
+	doc, _ := libopenapi.NewDocumentWithTypeCheck([]byte(`{}`), true)
+	doc.GetSpecInfo().APISchema = `{"type": "object", "properties": {"test": :bad"": JSON: } here.}}`
+	// validate!
 	valid, errors := ValidateOpenAPIDocument(doc)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "failed to compile OpenAPI schema")
 
-	// Log what actually happened for debugging
-	t.Logf("Validation result: valid=%v, error_count=%d", valid, len(errors))
-	for i, e := range errors {
-		t.Logf("Error %d: Type=%s, SubType=%s, Message=%s", i, e.ValidationType, e.ValidationSubType, e.Message)
-	}
-
-	// Look for a schema compilation error
-	foundCompilationError := false
-	for _, validationError := range errors {
-		if validationError.ValidationType == "schema" && validationError.ValidationSubType == "compilation" {
-			foundCompilationError = true
-			assert.Equal(t, "OpenAPI document schema compilation failed", validationError.Message)
-			assert.Contains(t, validationError.Reason, "The OpenAPI schema failed to compile")
-			assert.Contains(t, validationError.HowToFix, "complex regex patterns")
-			break
-		}
-	}
-
-	if !foundCompilationError {
-		t.Logf("No schema compilation error found. This test may not trigger the intended error path.")
-	}
 }
 
 func TestValidateSchema_ValidateLicenseIdentifier(t *testing.T) {
