@@ -526,3 +526,64 @@ func TestExtractJSONPathFromStringLocation(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertStringLocationToPathSegments(t *testing.T) {
+	testCases := []struct {
+		name         string
+		instancePath string
+		expected     []string
+	}{
+		{
+			name:         "Empty string",
+			instancePath: "",
+			expected:     []string{},
+		},
+		{
+			name:         "Root path only",
+			instancePath: "/",
+			expected:     []string{},
+		},
+		{
+			name:         "Single field",
+			instancePath: "/name",
+			expected:     []string{"name"},
+		},
+		{
+			name:         "Multiple fields",
+			instancePath: "/user/profile/email",
+			expected:     []string{"user", "profile", "email"},
+		},
+		{
+			name:         "Array index",
+			instancePath: "/users/0/name",
+			expected:     []string{"users", "0", "name"},
+		},
+		{
+			name:         "Multiple array indices",
+			instancePath: "/matrix/0/1/value",
+			expected:     []string{"matrix", "0", "1", "value"},
+		},
+		{
+			name:         "Field with special characters",
+			instancePath: "/user/email-address",
+			expected:     []string{"user", "email-address"},
+		},
+		{
+			name:         "Complex nested path",
+			instancePath: "/data/items/1/properties/field-name",
+			expected:     []string{"data", "items", "1", "properties", "field-name"},
+		},
+		{
+			name:         "Leading and trailing slashes",
+			instancePath: "///user/name///",
+			expected:     []string{"user", "name"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ConvertStringLocationToPathSegments(tc.instancePath)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

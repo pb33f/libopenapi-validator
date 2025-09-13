@@ -12,7 +12,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -167,21 +166,12 @@ func ValidateRequestSchema(
 
 				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
 
-				// Convert string location to path segments for InstancePath
-				var instancePathSegments []string
-				if er.InstanceLocation != "" {
-					instancePathSegments = strings.Split(strings.Trim(er.InstanceLocation, "/"), "/")
-					if len(instancePathSegments) == 1 && instancePathSegments[0] == "" {
-						instancePathSegments = []string{}
-					}
-				}
-
 				violation := &errors.SchemaValidationFailure{
 					Reason:          errMsg,
 					Location:        er.KeywordLocation,
 					FieldName:       helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
 					FieldPath:       helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-					InstancePath:    instancePathSegments,
+					InstancePath:    helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
 					ReferenceSchema: string(renderedSchema),
 					ReferenceObject: referenceObject,
 					OriginalError:   jk,
