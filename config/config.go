@@ -38,10 +38,11 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 func WithExistingOpts(options *ValidationOptions) Option {
 	return func(o *ValidationOptions) {
 		if options != nil {
-		o.RegexEngine = options.RegexEngine
-		o.FormatAssertions = options.FormatAssertions
-		o.ContentAssertions = options.ContentAssertions
-		o.Formats = options.Formats
+			o.RegexEngine = options.RegexEngine
+			o.FormatAssertions = options.FormatAssertions
+			o.ContentAssertions = options.ContentAssertions
+			o.Formats = options.Formats
+		}
 	}
 }
 
