@@ -173,5 +173,5 @@ info:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 7)
+	assert.Len(t, errors[0].SchemaValidationErrors, 6)
 }

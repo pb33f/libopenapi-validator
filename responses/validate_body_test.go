@@ -859,8 +859,8 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
-	assert.Equal(t, "missing properties 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[1].Reason)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "missing properties 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[0].Reason)
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {

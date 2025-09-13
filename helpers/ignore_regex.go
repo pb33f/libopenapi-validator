@@ -6,8 +6,8 @@ package helpers
 import "regexp"
 
 var (
-	IgnorePattern     = `^\b(anyOf|allOf|oneOf|validation) failed\b`
-	IgnorePolyPattern = `^\b(anyOf|allOf|oneOf) failed\b`
+	IgnorePattern     = `^'?(anyOf|allOf|oneOf|validation)'? failed\b`
+	IgnorePolyPattern = `^'?(anyOf|allOf|oneOf)'? failed\b`
 )
 
 // IgnoreRegex is a regular expression that matches the IgnorePattern

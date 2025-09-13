@@ -810,7 +810,7 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
 }
 
 func TestValidateBody_ValidSchemaUsingAllOfAnyOf(t *testing.T) {
@@ -983,10 +983,9 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 3)
-	assert.Equal(t, "'oneOf' failed, none matched", errors[0].SchemaValidationErrors[0].Reason)
-	assert.Equal(t, "missing properties 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[1].Reason)
-	assert.Equal(t, "missing properties 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[2].Reason)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Equal(t, "missing properties 'uncookedWeight', 'uncookedHeight'", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "missing properties 'usedOil', 'usedAnimalFat'", errors[0].SchemaValidationErrors[1].Reason)
 }
 
 func TestValidateBody_InvalidSchemaMinMax(t *testing.T) {
