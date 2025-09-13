@@ -39,6 +39,9 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 			HowToFix: errors.HowToFixPath,
 		}}
 	}
+	if !v.options.SecurityValidation {
+		return true, nil
+	}
 	// extract security for the operation
 	security := helpers.ExtractSecurityForOperation(request, pathItem)
 
