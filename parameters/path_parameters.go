@@ -108,21 +108,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					paramValue := match
 
 					// URL decode the parameter value before validation
-					decodedParamValue, err := url.PathUnescape(paramValue)
-					if err != nil {
-						// If URL decoding fails, create a validation error
-						validationErrors = append(validationErrors, &errors.ValidationError{
-							ValidationType:    helpers.ParameterValidation,
-							ValidationSubType: helpers.ParameterValidationPath,
-							Message:           fmt.Sprintf("Path parameter '%s' contains invalid URL encoding", p.Name),
-							Reason:            fmt.Sprintf("The path parameter '%s' value '%s' contains invalid URL encoding: %s", p.Name, paramValue, err.Error()),
-							ParameterName:     p.Name,
-							SpecLine:          -1,
-							SpecCol:           -1,
-							HowToFix:          "Ensure the path parameter is properly URL encoded according to RFC 3986",
-						})
-						continue
-					}
+					decodedParamValue, _ := url.PathUnescape(paramValue)
 
 					if decodedParamValue == "" {
 						// Mandatory path parameter cannot be empty
