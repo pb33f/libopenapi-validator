@@ -126,7 +126,6 @@ func TestValidateDocument_SchemaCompilationFailure(t *testing.T) {
 // TestValidateDocument_CompilationFailure tests the actual ValidateOpenAPIDocument function
 // with a corrupted document that causes schema compilation to fail
 func TestValidateDocument_CompilationFailure(t *testing.T) {
-
 	doc, _ := libopenapi.NewDocumentWithTypeCheck([]byte(`{}`), true)
 	doc.GetSpecInfo().APISchema = `{"type": "object", "properties": {"test": :bad"": JSON: } here.}}`
 	// validate!
@@ -135,7 +134,6 @@ func TestValidateDocument_CompilationFailure(t *testing.T) {
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "failed to compile OpenAPI schema")
-
 }
 
 func TestValidateSchema_ValidateLicenseIdentifier(t *testing.T) {
