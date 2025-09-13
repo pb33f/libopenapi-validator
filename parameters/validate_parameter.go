@@ -225,9 +225,21 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 			continue // ignore this error, it's not useful
 		}
 
+		// Convert string location to path segments for InstancePath
+		var instancePathSegments []string
+		if er.InstanceLocation != "" {
+			instancePathSegments = strings.Split(strings.Trim(er.InstanceLocation, "/"), "/")
+			if len(instancePathSegments) == 1 && instancePathSegments[0] == "" {
+				instancePathSegments = []string{}
+			}
+		}
+
 		fail := &errors.SchemaValidationFailure{
 			Reason:        errMsg,
 			Location:      er.KeywordLocation,
+			FieldName:     helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+			FieldPath:     helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+			InstancePath:  instancePathSegments,
 			OriginalError: scErrs,
 		}
 		if schema != nil {

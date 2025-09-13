@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -83,9 +84,21 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 
 					// locate the violated property in the schema
 					located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
+					// Convert string location to path segments for InstancePath
+					var instancePathSegments []string
+					if er.InstanceLocation != "" {
+						instancePathSegments = strings.Split(strings.Trim(er.InstanceLocation, "/"), "/")
+						if len(instancePathSegments) == 1 && instancePathSegments[0] == "" {
+							instancePathSegments = []string{}
+						}
+					}
+
 					violation := &liberrors.SchemaValidationFailure{
 						Reason:           errMsg,
 						Location:         er.InstanceLocation,
+						FieldName:        helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+						FieldPath:        helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+						InstancePath:     instancePathSegments,
 						DeepLocation:     er.KeywordLocation,
 						AbsoluteLocation: er.AbsoluteKeywordLocation,
 						OriginalError:    jk,

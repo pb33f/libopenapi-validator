@@ -302,3 +302,227 @@ func TestExtractJSONPathsFromValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractFieldNameFromInstanceLocation(t *testing.T) {
+	testCases := []struct {
+		name         string
+		instancePath []string
+		expected     string
+	}{
+		{
+			name:         "Empty path",
+			instancePath: []string{},
+			expected:     "",
+		},
+		{
+			name:         "Single field",
+			instancePath: []string{"name"},
+			expected:     "name",
+		},
+		{
+			name:         "Nested field",
+			instancePath: []string{"user", "profile", "email"},
+			expected:     "email",
+		},
+		{
+			name:         "Array index",
+			instancePath: []string{"users", "0", "name"},
+			expected:     "name",
+		},
+		{
+			name:         "Complex path",
+			instancePath: []string{"root", "nested", "array", "1", "field"},
+			expected:     "field",
+		},
+		{
+			name:         "Field with special characters",
+			instancePath: []string{"user", "email-address", "value"},
+			expected:     "value",
+		},
+		{
+			name:         "Numeric field name",
+			instancePath: []string{"data", "123"},
+			expected:     "123",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ExtractFieldNameFromInstanceLocation(tc.instancePath)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestExtractJSONPathFromInstanceLocation(t *testing.T) {
+	testCases := []struct {
+		name         string
+		instancePath []string
+		expected     string
+	}{
+		{
+			name:         "Empty path",
+			instancePath: []string{},
+			expected:     "",
+		},
+		{
+			name:         "Simple field",
+			instancePath: []string{"name"},
+			expected:     "$.name",
+		},
+		{
+			name:         "Nested object fields",
+			instancePath: []string{"user", "profile", "email"},
+			expected:     "$.user.profile.email",
+		},
+		{
+			name:         "Array access",
+			instancePath: []string{"users", "0", "name"},
+			expected:     "$.users[0].name",
+		},
+		{
+			name:         "Mixed array and object",
+			instancePath: []string{"data", "items", "1", "properties", "value"},
+			expected:     "$.data.items[1].properties.value",
+		},
+		{
+			name:         "Field with dashes",
+			instancePath: []string{"user", "email-address"},
+			expected:     "$.user['email-address']",
+		},
+		{
+			name:         "Field with spaces",
+			instancePath: []string{"user", "full name"},
+			expected:     "$.user['full name']",
+		},
+		{
+			name:         "Field with special characters",
+			instancePath: []string{"data", "field'with'quotes"},
+			expected:     "$.data['field\\'with\\'quotes']",
+		},
+		{
+			name:         "Field with backslash",
+			instancePath: []string{"data", "field\\with\\backslash"},
+			expected:     "$.data['field\\\\with\\\\backslash']",
+		},
+		{
+			name:         "Unicode field name",
+			instancePath: []string{"🙂", "unicode_field"},
+			expected:     "$['🙂'].unicode_field",
+		},
+		{
+			name:         "Numeric array indices",
+			instancePath: []string{"matrix", "0", "1", "value"},
+			expected:     "$.matrix[0][1].value",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ExtractJSONPathFromInstanceLocation(tc.instancePath)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestExtractFieldNameFromStringLocation(t *testing.T) {
+	testCases := []struct {
+		name         string
+		instancePath string
+		expected     string
+	}{
+		{
+			name:         "Empty path",
+			instancePath: "",
+			expected:     "",
+		},
+		{
+			name:         "Single field",
+			instancePath: "/name",
+			expected:     "name",
+		},
+		{
+			name:         "Nested field",
+			instancePath: "/user/profile/email",
+			expected:     "email",
+		},
+		{
+			name:         "Array index",
+			instancePath: "/users/0/name",
+			expected:     "name",
+		},
+		{
+			name:         "Complex path",
+			instancePath: "/root/nested/array/1/field",
+			expected:     "field",
+		},
+		{
+			name:         "Field with special characters",
+			instancePath: "/user/email-address/value",
+			expected:     "value",
+		},
+		{
+			name:         "Root path only",
+			instancePath: "/",
+			expected:     "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ExtractFieldNameFromStringLocation(tc.instancePath)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestExtractJSONPathFromStringLocation(t *testing.T) {
+	testCases := []struct {
+		name         string
+		instancePath string
+		expected     string
+	}{
+		{
+			name:         "Empty path",
+			instancePath: "",
+			expected:     "",
+		},
+		{
+			name:         "Simple field",
+			instancePath: "/name",
+			expected:     "$.name",
+		},
+		{
+			name:         "Nested object fields",
+			instancePath: "/user/profile/email",
+			expected:     "$.user.profile.email",
+		},
+		{
+			name:         "Array access",
+			instancePath: "/users/0/name",
+			expected:     "$.users[0].name",
+		},
+		{
+			name:         "Mixed array and object",
+			instancePath: "/data/items/1/properties/value",
+			expected:     "$.data.items[1].properties.value",
+		},
+		{
+			name:         "Root path only",
+			instancePath: "/",
+			expected:     "",
+		},
+		{
+			name:         "Complex nested path",
+			instancePath: "/matrix/0/1/value",
+			expected:     "$.matrix[0][1].value",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ExtractJSONPathFromStringLocation(tc.instancePath)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

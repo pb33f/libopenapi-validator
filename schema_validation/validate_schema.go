@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -241,9 +242,21 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 				referenceObject = string(payload)
 			}
 
+			// Convert string location to path segments for InstancePath
+			var instancePathSegments []string
+			if er.InstanceLocation != "" {
+				instancePathSegments = strings.Split(strings.Trim(er.InstanceLocation, "/"), "/")
+				if len(instancePathSegments) == 1 && instancePathSegments[0] == "" {
+					instancePathSegments = []string{}
+				}
+			}
+
 			violation := &liberrors.SchemaValidationFailure{
 				Reason:           errMsg,
 				Location:         er.InstanceLocation,
+				FieldName:        helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+				FieldPath:        helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+				InstancePath:     instancePathSegments,
 				DeepLocation:     er.KeywordLocation,
 				AbsoluteLocation: er.AbsoluteKeywordLocation,
 				ReferenceSchema:  string(renderedSchema),
