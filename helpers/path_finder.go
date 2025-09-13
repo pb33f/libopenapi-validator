@@ -159,3 +159,18 @@ func ExtractJSONPathFromStringLocation(instanceLocation string) string {
 
 	return ExtractJSONPathFromInstanceLocation(segments)
 }
+
+// ConvertStringLocationToPathSegments converts a string-based instance location to path segments array
+// Handles edge cases like empty strings and root-only paths
+func ConvertStringLocationToPathSegments(instanceLocation string) []string {
+	if instanceLocation == "" {
+		return []string{}
+	}
+
+	segments := strings.Split(strings.Trim(instanceLocation, "/"), "/")
+	if len(segments) == 1 && segments[0] == "" {
+		return []string{}
+	}
+
+	return segments
+}
