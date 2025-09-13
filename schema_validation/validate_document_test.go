@@ -100,7 +100,7 @@ func TestValidateDocument_SchemaCompilationFailure(t *testing.T) {
 	// Call our helper function which replicates the exact logic from validate_document.go
 	valid, errors := validateOpenAPIDocumentWithMalformedSchema(malformedSchema, decodedDocument)
 
-	// Should fail validation due to schema compilation error  
+	// Should fail validation due to schema compilation error
 	assert.False(t, valid)
 	assert.NotEmpty(t, errors)
 
@@ -140,13 +140,13 @@ func TestValidateDocument_ActualSchemaCompilationFailure(t *testing.T) {
 
 	// Now try to validate - this might hit the schema compilation error path
 	valid, errors := ValidateOpenAPIDocument(doc)
-	
+
 	// Log what actually happened for debugging
 	t.Logf("Validation result: valid=%v, error_count=%d", valid, len(errors))
 	for i, e := range errors {
 		t.Logf("Error %d: Type=%s, SubType=%s, Message=%s", i, e.ValidationType, e.ValidationSubType, e.Message)
 	}
-	
+
 	// Look for a schema compilation error
 	foundCompilationError := false
 	for _, validationError := range errors {
