@@ -74,12 +74,10 @@ func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.Vali
 		compiler.RegisterVocabulary(vocab)
 		compiler.AssertVocabs()
 
-		// for OpenAPI 3.0, transform nullable keywords to proper JSON Schema format
 		if version < 3.05 {
 			jsonSchema = transformOpenAPI30Schema(jsonSchema)
 		}
 
-		// Apply scalar coercion transformation if enabled
 		if o.AllowScalarCoercion {
 			jsonSchema = transformSchemaForCoercion(jsonSchema)
 		}
@@ -162,20 +160,19 @@ func transformNullableInSchema(schema interface{}) interface{} {
 
 // transformNullableSchema transforms a schema with nullable: true to JSON Schema compatible format
 func transformNullableSchema(schema map[string]interface{}) map[string]interface{} {
-	// Remove the nullable keyword
 	delete(schema, "nullable")
 
-	// Get the current type
+	// get the current type
 	currentType, hasType := schema["type"]
 
 	if hasType {
-		// If there's already a type, convert it to include null
+		// if there's already a type, convert it to include null
 		switch t := currentType.(type) {
 		case string:
-			// Convert "string" to ["string", "null"]
+			// convert "string" to ["string", "null"]
 			schema["type"] = []interface{}{t, "null"}
 		case []interface{}:
-			// If it's already an array, add null if not present
+			// if it's already an array, add null if not present
 			found := false
 			for _, item := range t {
 				if str, ok := item.(string); ok && str == "null" {
@@ -206,7 +203,6 @@ func transformSchemaForCoercion(jsonSchema []byte) []byte {
 
 	result, err := json.Marshal(transformed)
 	if err != nil {
-		// If we can't marshal the result, return original
 		return jsonSchema
 	}
 
@@ -219,12 +215,12 @@ func transformCoercionInSchema(schema interface{}) interface{} {
 	case map[string]interface{}:
 		result := make(map[string]interface{})
 
-		// Copy all properties first
+		// copy all properties first
 		for key, value := range s {
 			result[key] = transformCoercionInSchema(value)
 		}
 
-		// Transform type to allow string coercion for coercible types
+		// transform type to allow string coercion for coercible types
 		if schemaType, hasType := s["type"]; hasType {
 			result["type"] = transformTypeForCoercion(schemaType)
 		}
@@ -247,14 +243,14 @@ func transformCoercionInSchema(schema interface{}) interface{} {
 func transformTypeForCoercion(schemaType interface{}) interface{} {
 	switch t := schemaType.(type) {
 	case string:
-		// Transform scalar types to include string for coercion
+		// transform scalar types to include string for coercion
 		if t == "boolean" || t == "number" || t == "integer" {
 			return []interface{}{t, "string"}
 		}
 		return t
 
 	case []interface{}:
-		// If already an array, add string if it contains coercible types and doesn't already have string
+		// if already an array, add string if it contains coercible types and doesn't already have string
 		hasCoercibleType := false
 		hasString := false
 
@@ -270,7 +266,6 @@ func transformTypeForCoercion(schemaType interface{}) interface{} {
 		}
 
 		if hasCoercibleType && !hasString {
-			// Add string to the type array for coercion
 			newTypes := make([]interface{}, len(t)+1)
 			copy(newTypes, t)
 			newTypes[len(t)] = "string"

@@ -334,3 +334,207 @@ func TestTransformNullableInSchema_MapWithNullableFalse(t *testing.T) {
 	_, hasNullable := resultMap["nullable"]
 	assert.False(t, hasNullable)
 }
+
+func TestTransformNullableInSchema_Array(t *testing.T) {
+	schema := []interface{}{
+		map[string]interface{}{
+			"type":     "string",
+			"nullable": true,
+		},
+		"other-item",
+	}
+
+	result := transformNullableInSchema(schema)
+
+	resultArray, ok := result.([]interface{})
+	require.True(t, ok)
+	assert.Len(t, resultArray, 2)
+
+	firstItem, ok := resultArray[0].(map[string]interface{})
+	require.True(t, ok)
+
+	schemaType := firstItem["type"].([]interface{})
+	assert.Contains(t, schemaType, "string")
+	assert.Contains(t, schemaType, "null")
+
+	_, hasNullable := firstItem["nullable"]
+	assert.False(t, hasNullable)
+}
+
+func TestTransformNullableInSchema_OtherTypes(t *testing.T) {
+	stringSchema := "string-value"
+	result := transformNullableInSchema(stringSchema)
+	assert.Equal(t, stringSchema, result)
+
+	numberSchema := 123
+	result = transformNullableInSchema(numberSchema)
+	assert.Equal(t, numberSchema, result)
+
+	var nilSchema interface{} = nil
+	result = transformNullableInSchema(nilSchema)
+	assert.Equal(t, nilSchema, result)
+}
+
+func TestTransformNullableSchema_ArrayType(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":     []interface{}{"string", "number"},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "string")
+	assert.Contains(t, typeArray, "number")
+	assert.Contains(t, typeArray, "null")
+
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+}
+
+func TestTransformNullableSchema_ArrayTypeWithNull(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":     []interface{}{"string", "null"},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "string")
+	assert.Contains(t, typeArray, "null")
+	// Should not have duplicate "null"
+	nullCount := 0
+	for _, item := range typeArray {
+		if item == "null" {
+			nullCount++
+		}
+	}
+	assert.Equal(t, 1, nullCount)
+
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+}
+
+func TestTransformSchemaForCoercion_ValidJSON(t *testing.T) {
+	input := []byte(`{
+		"type": "boolean"
+	}`)
+
+	result := transformSchemaForCoercion(input)
+
+	var schema map[string]interface{}
+	err := json.Unmarshal(result, &schema)
+	require.NoError(t, err, "Result should be valid JSON")
+
+	// Check that type was transformed to include string
+	schemaType, ok := schema["type"]
+	assert.True(t, ok, "Should have type field")
+
+	typeArray, ok := schemaType.([]interface{})
+	assert.True(t, ok, "Type should be an array")
+	assert.Contains(t, typeArray, "boolean")
+	assert.Contains(t, typeArray, "string")
+}
+
+func TestTransformSchemaForCoercion_InvalidJSON(t *testing.T) {
+	input := []byte(`{invalid json}`)
+
+	result := transformSchemaForCoercion(input)
+
+	// Should return original when invalid
+	assert.Equal(t, input, result)
+}
+
+func TestTransformOpenAPI30Schema_MarshalError(t *testing.T) {
+	// Create a transformation that could potentially cause marshal issues
+	// This is hard to test because Go's json.Marshal rarely fails
+	// The error path exists for defensive programming
+	input := []byte(`{
+		"type": "string",
+		"nullable": true
+	}`)
+
+	result := transformOpenAPI30Schema(input)
+
+	// Should return valid transformed JSON even if marshal could theoretically fail
+	var schema map[string]interface{}
+	err := json.Unmarshal(result, &schema)
+	assert.NoError(t, err)
+}
+
+func TestTransformSchemaForCoercion_MarshalError(t *testing.T) {
+	// Create a transformation that could potentially cause marshal issues
+	// This is hard to test because Go's json.Marshal rarely fails
+	// The error path exists for defensive programming
+	input := []byte(`{
+		"type": "boolean"
+	}`)
+
+	result := transformSchemaForCoercion(input)
+
+	// Should return valid transformed JSON even if marshal could theoretically fail
+	var schema map[string]interface{}
+	err := json.Unmarshal(result, &schema)
+	assert.NoError(t, err)
+}
+
+func TestTransformCoercionInSchema_Array(t *testing.T) {
+	schema := []interface{}{
+		map[string]interface{}{
+			"type": "number",
+		},
+		"other-item",
+	}
+
+	result := transformCoercionInSchema(schema)
+
+	resultArray, ok := result.([]interface{})
+	require.True(t, ok)
+	assert.Len(t, resultArray, 2)
+
+	firstItem, ok := resultArray[0].(map[string]interface{})
+	require.True(t, ok)
+
+	schemaType := firstItem["type"].([]interface{})
+	assert.Contains(t, schemaType, "number")
+	assert.Contains(t, schemaType, "string")
+}
+
+func TestTransformCoercionInSchema_OtherTypes(t *testing.T) {
+	stringSchema := "string-value"
+	result := transformCoercionInSchema(stringSchema)
+	assert.Equal(t, stringSchema, result)
+}
+
+func TestTransformTypeForCoercion_ArrayWithNonStringItems(t *testing.T) {
+	input := []interface{}{"boolean", 123, "null"}
+
+	result := transformTypeForCoercion(input)
+
+	typeArray, ok := result.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "boolean")
+	assert.Contains(t, typeArray, 123)
+	assert.Contains(t, typeArray, "null")
+	assert.Contains(t, typeArray, "string")
+}
+
+func TestTransformTypeForCoercion_OtherTypes(t *testing.T) {
+	result := transformTypeForCoercion(123)
+	assert.Equal(t, 123, result)
+
+	result = transformTypeForCoercion(nil)
+	assert.Equal(t, nil, result)
+
+	result = transformTypeForCoercion(map[string]interface{}{})
+	assert.Equal(t, map[string]interface{}{}, result)
+}

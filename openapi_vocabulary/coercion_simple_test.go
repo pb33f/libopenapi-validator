@@ -310,3 +310,97 @@ func TestIsCoercibleType_String(t *testing.T) {
 	assert.False(t, IsCoercibleType("object"))
 	assert.False(t, IsCoercibleType("array"))
 }
+
+func TestCoercionExtension_ShouldCoerceToMethods(t *testing.T) {
+	// Test shouldCoerceToNumber method
+	ext := &coercionExtension{
+		schemaType: "number",
+	}
+	assert.True(t, ext.shouldCoerceToNumber())
+	assert.False(t, ext.shouldCoerceToBoolean())
+	assert.False(t, ext.shouldCoerceToInteger())
+
+	// Test shouldCoerceToInteger method
+	ext = &coercionExtension{
+		schemaType: "integer",
+	}
+	assert.True(t, ext.shouldCoerceToInteger())
+	assert.False(t, ext.shouldCoerceToBoolean())
+	assert.False(t, ext.shouldCoerceToNumber())
+
+	// Test shouldCoerceToBoolean method
+	ext = &coercionExtension{
+		schemaType: "boolean",
+	}
+	assert.True(t, ext.shouldCoerceToBoolean())
+	assert.False(t, ext.shouldCoerceToNumber())
+	assert.False(t, ext.shouldCoerceToInteger())
+}
+
+func TestCoercionExtension_Validate_NumberCoercion(t *testing.T) {
+	// Test number coercion path in Validate method
+	schemaJSON := `{"type": ["number", "string"]}`
+	schema, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaJSON))
+	assert.NoError(t, err)
+
+	compiler := jsonschema.NewCompiler()
+	compiler.RegisterVocabulary(NewOpenAPIVocabularyWithCoercion(Version30, true))
+	compiler.AssertVocabs()
+
+	err = compiler.AddResource("test.json", schema)
+	assert.NoError(t, err)
+
+	compiledSchema, err := compiler.Compile("test.json")
+	assert.NoError(t, err)
+
+	// Test valid number strings
+	err = compiledSchema.Validate("123.45")
+	assert.NoError(t, err)
+
+	err = compiledSchema.Validate("-123")
+	assert.NoError(t, err)
+
+	// Test invalid number string
+	err = compiledSchema.Validate("abc")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot coerce")
+}
+
+func TestCoercionExtension_Validate_IntegerCoercion(t *testing.T) {
+	// Test integer coercion path in Validate method
+	schemaJSON := `{"type": ["integer", "string"]}`
+	schema, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaJSON))
+	assert.NoError(t, err)
+
+	compiler := jsonschema.NewCompiler()
+	compiler.RegisterVocabulary(NewOpenAPIVocabularyWithCoercion(Version30, true))
+	compiler.AssertVocabs()
+
+	err = compiler.AddResource("test.json", schema)
+	assert.NoError(t, err)
+
+	compiledSchema, err := compiler.Compile("test.json")
+	assert.NoError(t, err)
+
+	// Test valid integer strings
+	err = compiledSchema.Validate("123")
+	assert.NoError(t, err)
+
+	err = compiledSchema.Validate("-123")
+	assert.NoError(t, err)
+
+	// Test invalid integer string
+	err = compiledSchema.Validate("123.45")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot coerce")
+}
+
+func TestMetadataExtensions_Validate_Coverage(t *testing.T) {
+	// Test example extension validate method (just for coverage)
+	exampleExt := &exampleExtension{example: "test"}
+	exampleExt.Validate(nil, "any-value") // No-op, just for coverage
+
+	// Test deprecated extension validate method (just for coverage)
+	deprecatedExt := &deprecatedExtension{deprecated: true}
+	deprecatedExt.Validate(nil, "any-value") // No-op, just for coverage
+}
