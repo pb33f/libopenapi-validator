@@ -42,35 +42,35 @@ func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext, obj map[string]any,
 	var extensions []jsonschema.SchemaExt
 
 	// Handle nullable keyword
-	if ext, err := compileNullable(ctx, obj, version); err != nil {
+	if ext, err := CompileNullable(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
 	// Handle discriminator keyword
-	if ext, err := compileDiscriminator(ctx, obj, version); err != nil {
+	if ext, err := CompileDiscriminator(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
 	// Handle example keyword
-	if ext, err := compileExample(ctx, obj, version); err != nil {
+	if ext, err := CompileExample(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
 	// Handle deprecated keyword
-	if ext, err := compileDeprecated(ctx, obj, version); err != nil {
+	if ext, err := CompileDeprecated(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
 	// Handle scalar coercion (applies to all schemas with coercible types)
-	if ext, err := compileCoercion(ctx, obj, allowCoercion); err != nil {
+	if ext, err := CompileCoercion(ctx, obj, allowCoercion); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)

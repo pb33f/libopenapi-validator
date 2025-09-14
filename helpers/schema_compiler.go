@@ -133,11 +133,16 @@ func transformNullableInSchema(schema interface{}) interface{} {
 			result[key] = transformNullableInSchema(value)
 		}
 
-		// check if this schema has nullable: true
+		// check if this schema has nullable keyword
 		if nullable, ok := s["nullable"]; ok {
-			if nullableBool, ok := nullable.(bool); ok && nullableBool {
-				// Transform the schema to support null values
-				return transformNullableSchema(result)
+			if nullableBool, ok := nullable.(bool); ok {
+				if nullableBool {
+					// Transform the schema to support null values
+					return transformNullableSchema(result)
+				} else {
+					// nullable: false - just remove the nullable keyword
+					delete(result, "nullable")
+				}
 			}
 		}
 

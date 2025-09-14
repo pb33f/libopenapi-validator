@@ -34,7 +34,7 @@ func (d *discriminatorExtension) Validate(ctx *jsonschema.ValidatorContext, v an
 }
 
 // compileDiscriminator compiles the discriminator keyword
-func compileDiscriminator(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
+func CompileDiscriminator(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
 	v, exists := obj["discriminator"]
 	if !exists {
 		return nil, nil

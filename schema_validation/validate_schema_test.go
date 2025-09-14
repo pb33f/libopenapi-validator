@@ -785,3 +785,38 @@ paths:
 	assert.False(t, valid)
 	assert.NotEmpty(t, errors)
 }
+
+// Additional comprehensive tests for version-aware validation
+
+func TestSchemaValidator_ValidateSchemaStringWithVersion_NilSchema(t *testing.T) {
+	v := NewSchemaValidator()
+
+	valid, errors := v.ValidateSchemaStringWithVersion(nil, `{"test": "value"}`, 3.0)
+
+	assert.False(t, valid, "Should fail with nil schema")
+	assert.Empty(t, errors, "Should not return errors for nil schema")
+}
+
+func TestSchemaValidator_ValidateSchemaObjectWithVersion_NilSchema(t *testing.T) {
+	v := NewSchemaValidator()
+
+	testObj := map[string]interface{}{
+		"test": "value",
+	}
+
+	valid, errors := v.ValidateSchemaObjectWithVersion(nil, testObj, 3.0)
+
+	assert.False(t, valid, "Should fail with nil schema")
+	assert.Empty(t, errors, "Should not return errors for nil schema")
+}
+
+func TestSchemaValidator_ValidateSchemaBytesWithVersion_NilSchema(t *testing.T) {
+	v := NewSchemaValidator()
+
+	payload := []byte(`{"test": "value"}`)
+
+	valid, errors := v.ValidateSchemaBytesWithVersion(nil, payload, 3.0)
+
+	assert.False(t, valid, "Should fail with nil schema")
+	assert.Empty(t, errors, "Should not return errors for nil schema")
+}

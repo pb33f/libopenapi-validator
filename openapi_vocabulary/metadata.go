@@ -28,7 +28,7 @@ func (d *deprecatedExtension) Validate(ctx *jsonschema.ValidatorContext, v any) 
 }
 
 // compileExample compiles the example keyword
-func compileExample(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
+func CompileExample(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
 	v, exists := obj["example"]
 	if !exists {
 		return nil, nil
@@ -40,7 +40,7 @@ func compileExample(ctx *jsonschema.CompilerContext, obj map[string]any, version
 }
 
 // compileDeprecated compiles the deprecated keyword
-func compileDeprecated(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
+func CompileDeprecated(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
 	v, exists := obj["deprecated"]
 	if !exists {
 		return nil, nil
