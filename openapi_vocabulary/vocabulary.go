@@ -23,17 +23,22 @@ const (
 // NewOpenAPIVocabulary creates a vocabulary for OpenAPI-specific keywords
 // version determines which keywords are allowed/forbidden
 func NewOpenAPIVocabulary(version VersionType) *jsonschema.Vocabulary {
+	return NewOpenAPIVocabularyWithCoercion(version, false)
+}
+
+// NewOpenAPIVocabularyWithCoercion creates a vocabulary with optional scalar coercion
+func NewOpenAPIVocabularyWithCoercion(version VersionType, allowCoercion bool) *jsonschema.Vocabulary {
 	return &jsonschema.Vocabulary{
 		URL:    OpenAPIVocabularyURL,
 		Schema: nil, // We don't validate the vocabulary schema itself
 		Compile: func(ctx *jsonschema.CompilerContext, obj map[string]any) (jsonschema.SchemaExt, error) {
-			return compileOpenAPIKeywords(ctx, obj, version)
+			return compileOpenAPIKeywords(ctx, obj, version, allowCoercion)
 		},
 	}
 }
 
 // compileOpenAPIKeywords compiles all OpenAPI-specific keywords found in the schema object
-func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
+func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType, allowCoercion bool) (jsonschema.SchemaExt, error) {
 	var extensions []jsonschema.SchemaExt
 
 	// Handle nullable keyword
@@ -59,6 +64,13 @@ func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext, obj map[string]any,
 
 	// Handle deprecated keyword
 	if ext, err := compileDeprecated(ctx, obj, version); err != nil {
+		return nil, err
+	} else if ext != nil {
+		extensions = append(extensions, ext)
+	}
+
+	// Handle scalar coercion (applies to all schemas with coercible types)
+	if ext, err := compileCoercion(ctx, obj, allowCoercion); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
