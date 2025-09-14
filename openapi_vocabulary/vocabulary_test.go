@@ -336,7 +336,7 @@ func TestCompileOpenAPIKeywords_EmptySchema(t *testing.T) {
 
 func TestCompileOpenAPIKeywords_NoOpenAPIKeywords(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":      "string",
 		"minLength": 1,
 	}
 
@@ -347,7 +347,7 @@ func TestCompileOpenAPIKeywords_NoOpenAPIKeywords(t *testing.T) {
 
 func TestCompileOpenAPIKeywords_NullableOnly(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":     "string",
 		"nullable": true,
 	}
 
@@ -373,7 +373,7 @@ func TestCompileOpenAPIKeywords_DiscriminatorOnly(t *testing.T) {
 
 func TestCompileOpenAPIKeywords_ExampleOnly(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":    "string",
 		"example": "test",
 	}
 
@@ -384,7 +384,7 @@ func TestCompileOpenAPIKeywords_ExampleOnly(t *testing.T) {
 
 func TestCompileOpenAPIKeywords_DeprecatedOnly(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":       "string",
 		"deprecated": true,
 	}
 
@@ -405,12 +405,12 @@ func TestCompileOpenAPIKeywords_CoercionOnly(t *testing.T) {
 
 func TestCompileOpenAPIKeywords_AllKeywordsCombined(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":     "string",
 		"nullable": true,
 		"discriminator": map[string]any{
 			"propertyName": "type",
 		},
-		"example": "test",
+		"example":    "test",
 		"deprecated": false,
 	}
 
@@ -513,7 +513,7 @@ func TestMetadataKeywords_ExampleCompilation(t *testing.T) {
 
 func TestMetadataKeywords_DeprecatedTrueCompilation(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":       "string",
 		"deprecated": true,
 	}
 
@@ -524,7 +524,7 @@ func TestMetadataKeywords_DeprecatedTrueCompilation(t *testing.T) {
 
 func TestMetadataKeywords_DeprecatedFalseCompilation(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":       "string",
 		"deprecated": false,
 	}
 
@@ -535,7 +535,7 @@ func TestMetadataKeywords_DeprecatedFalseCompilation(t *testing.T) {
 
 func TestMetadataKeywords_DeprecatedInvalidType(t *testing.T) {
 	obj := map[string]any{
-		"type": "string",
+		"type":       "string",
 		"deprecated": "invalid",
 	}
 
