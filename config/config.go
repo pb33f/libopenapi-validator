@@ -10,6 +10,7 @@ type ValidationOptions struct {
 	FormatAssertions   bool
 	ContentAssertions  bool
 	SecurityValidation bool
+	OpenAPIMode        bool // Enable OpenAPI-specific vocabulary validation
 	Formats            map[string]func(v any) error
 }
 
@@ -23,6 +24,7 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 		FormatAssertions:   false,
 		ContentAssertions:  false,
 		SecurityValidation: true,
+		OpenAPIMode:        true, // Enable OpenAPI vocabulary by default
 	}
 
 	// Apply any supplied overrides
@@ -44,6 +46,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.FormatAssertions = options.FormatAssertions
 			o.ContentAssertions = options.ContentAssertions
 			o.SecurityValidation = options.SecurityValidation
+			o.OpenAPIMode = options.OpenAPIMode
 			o.Formats = options.Formats
 		}
 	}
@@ -87,5 +90,19 @@ func WithCustomFormat(name string, validator func(v any) error) Option {
 		}
 
 		o.Formats[name] = validator
+	}
+}
+
+// WithOpenAPIMode enables OpenAPI-specific keyword validation (default: true)
+func WithOpenAPIMode() Option {
+	return func(o *ValidationOptions) {
+		o.OpenAPIMode = true
+	}
+}
+
+// WithoutOpenAPIMode disables OpenAPI-specific keyword validation
+func WithoutOpenAPIMode() Option {
+	return func(o *ValidationOptions) {
+		o.OpenAPIMode = false
 	}
 }

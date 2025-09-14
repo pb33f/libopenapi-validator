@@ -636,50 +636,55 @@ paths:
 	assert.Empty(t, errors)
 }
 
-//func TestValidateSchema_NullableEnum(t *testing.T) {
-//	spec := `openapi: 3.0.0
-//paths:
-//  /burgers/createBurger:
-//    post:
-//      requestBody:
-//        content:
-//          application/json:
-//            schema:
-//              type: object
-//              required: [name]
-//              properties:
-//                name:
-//                  type: string
-//                  enum: [mcbird, mcbeef, veggie, null]
-//                  nullable: true
-//                patties:
-//                  type: integer
-//                vegetarian:
-//                  type: boolean`
-//
-//	doc, _ := libopenapi.NewDocument([]byte(spec))
-//
-//	m, _ := doc.BuildV3Model()
-//
-//	body := map[string]interface{}{
-//		"name":       nil,
-//		"patties":    2,
-//		"vegetarian": true,
-//	}
-//
-//	bodyBytes, _ := json.Marshal(body)
-//	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger"].Post.RequestBody.Content.GetOrZero("application/json"].Schema
-//
-//	// create a schema validator
-//	v := NewSchemaValidator()
-//
-//	// validate!
-//	valid, errors := v.ValidateSchemaString(sch.Schema(), string(bodyBytes))
-//
-//	assert.True(t, valid)
-//	assert.Len(t, errors, 0)
-//
-//}
+func TestValidateSchema_NullableEnum(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  enum: [mcbird, mcbeef, veggie, null]
+                  nullable: true
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	body := map[string]interface{}{
+		"name":       nil,
+		"patties":    2,
+		"vegetarian": true,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+	sch := m.Model.Paths.PathItems.GetOrZero("/burgers/createBurger").Post.RequestBody.Content.GetOrZero("application/json").Schema
+
+	// create a schema validator
+	v := NewSchemaValidator()
+
+	// validate with OpenAPI 3.0 version - should pass with nullable support!
+	valid, errors := v.ValidateSchemaStringWithVersion(sch.Schema(), string(bodyBytes), 3.0)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+
+	// validate with default behavior (3.1+) - should fail due to nullable keyword
+	valid, errors = v.ValidateSchemaString(sch.Schema(), string(bodyBytes))
+	assert.False(t, valid)
+	assert.NotEmpty(t, errors)
+}
 
 // https://github.com/pb33f/libopenapi/issues/415
 func TestValidateSchema_v3_1_DependentSchemas(t *testing.T) {

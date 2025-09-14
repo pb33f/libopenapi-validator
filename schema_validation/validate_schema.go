@@ -28,23 +28,50 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // SchemaValidator is an interface that defines the methods for validating a *base.Schema (V3+ Only) object.
-// There are 3 methods for validating a schema:
+// There are 6 methods for validating a schema:
 //
 //	ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 //	ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
 //	ValidateSchemaBytes accepts a schema object to validate against, and a JSON/YAML blob that is defined as a byte array.
+//	ValidateSchemaStringWithVersion - version-aware validation that allows OpenAPI 3.0 keywords when version is specified.
+//	ValidateSchemaObjectWithVersion - version-aware validation that allows OpenAPI 3.0 keywords when version is specified.
+//	ValidateSchemaBytesWithVersion - version-aware validation that allows OpenAPI 3.0 keywords when version is specified.
 type SchemaValidator interface {
 	// ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
+	// Uses OpenAPI 3.1+ validation by default (strict JSON Schema compliance).
 	ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError)
 
 	// ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
 	// This is a pre-decoded object that will skip the need to unmarshal a string of JSON/YAML.
+	// Uses OpenAPI 3.1+ validation by default (strict JSON Schema compliance).
 	ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*liberrors.ValidationError)
 
 	// ValidateSchemaBytes accepts a schema object to validate against, and a byte slice containing a schema to
-	// validate against.
+	// validate against. Uses OpenAPI 3.1+ validation by default (strict JSON Schema compliance).
 	ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*liberrors.ValidationError)
+
+	// ValidateSchemaStringWithVersion accepts a schema object to validate against, a JSON/YAML blob, and an OpenAPI version.
+	// When version is 3.0, OpenAPI 3.0-specific keywords like 'nullable' are allowed and processed.
+	// When version is 3.1+, OpenAPI 3.0-specific keywords like 'nullable' will cause validation to fail.
+	ValidateSchemaStringWithVersion(schema *base.Schema, payload string, version float32) (bool, []*liberrors.ValidationError)
+
+	// ValidateSchemaObjectWithVersion accepts a schema object to validate against, an object, and an OpenAPI version.
+	// When version is 3.0, OpenAPI 3.0-specific keywords like 'nullable' are allowed and processed.
+	// When version is 3.1+, OpenAPI 3.0-specific keywords like 'nullable' will cause validation to fail.
+	ValidateSchemaObjectWithVersion(schema *base.Schema, payload interface{}, version float32) (bool, []*liberrors.ValidationError)
+
+	// ValidateSchemaBytesWithVersion accepts a schema object to validate against, a byte slice, and an OpenAPI version.
+	// When version is 3.0, OpenAPI 3.0-specific keywords like 'nullable' are allowed and processed.
+	// When version is 3.1+, OpenAPI 3.0-specific keywords like 'nullable' will cause validation to fail.
+	ValidateSchemaBytesWithVersion(schema *base.Schema, payload []byte, version float32) (bool, []*liberrors.ValidationError)
 }
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
@@ -71,18 +98,30 @@ func NewSchemaValidator(opts ...config.Option) SchemaValidator {
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError) {
-	return s.validateSchema(schema, []byte(payload), nil, s.logger)
+	return s.validateSchemaWithVersion(schema, []byte(payload), nil, s.logger, 3.1)
 }
 
 func (s *schemaValidator) ValidateSchemaObject(schema *base.Schema, payload interface{}) (bool, []*liberrors.ValidationError) {
-	return s.validateSchema(schema, nil, payload, s.logger)
+	return s.validateSchemaWithVersion(schema, nil, payload, s.logger, 3.1)
 }
 
 func (s *schemaValidator) ValidateSchemaBytes(schema *base.Schema, payload []byte) (bool, []*liberrors.ValidationError) {
-	return s.validateSchema(schema, payload, nil, s.logger)
+	return s.validateSchemaWithVersion(schema, payload, nil, s.logger, 3.1)
 }
 
-func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, decodedObject interface{}, log *slog.Logger) (bool, []*liberrors.ValidationError) {
+func (s *schemaValidator) ValidateSchemaStringWithVersion(schema *base.Schema, payload string, version float32) (bool, []*liberrors.ValidationError) {
+	return s.validateSchemaWithVersion(schema, []byte(payload), nil, s.logger, version)
+}
+
+func (s *schemaValidator) ValidateSchemaObjectWithVersion(schema *base.Schema, payload interface{}, version float32) (bool, []*liberrors.ValidationError) {
+	return s.validateSchemaWithVersion(schema, nil, payload, s.logger, version)
+}
+
+func (s *schemaValidator) ValidateSchemaBytesWithVersion(schema *base.Schema, payload []byte, version float32) (bool, []*liberrors.ValidationError) {
+	return s.validateSchemaWithVersion(schema, payload, nil, s.logger, version)
+}
+
+func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload []byte, decodedObject interface{}, log *slog.Logger, version float32) (bool, []*liberrors.ValidationError) {
 	var validationErrors []*liberrors.ValidationError
 
 	if schema == nil {
@@ -128,41 +167,33 @@ func (s *schemaValidator) validateSchema(schema *base.Schema, payload []byte, de
 
 	}
 
-	// Build the compiled JSON Schema
-	jsch, err := helpers.NewCompiledSchema("schema", jsonSchema, s.options)
+	// Build the compiled JSON Schema with version awareness
+	jsch, err := helpers.NewCompiledSchemaWithVersion("schema", jsonSchema, s.options, version)
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 
 	// is the schema even valid? did it compile?
 	if err != nil {
-		var ve *jsonschema.SchemaValidationError
-		if errors.As(err, &ve) {
-			if ve != nil {
 
-				// no, this won't work, so we need to extract the errors and return them.
-				// basicErrors := ve.BasicOutput().Errors
-				// schemaValidationErrors = extractBasicErrors(basicErrors, renderedSchema, decodedObject, payload, ve, schemaValidationErrors)
-				// cannot compile schema, so it's not valid
-				violation := &liberrors.SchemaValidationFailure{
-					Reason:          err.Error(),
-					Location:        "unavailable",
-					ReferenceSchema: string(renderedSchema),
-					ReferenceObject: string(payload),
-				}
-				validationErrors = append(validationErrors, &liberrors.ValidationError{
-					ValidationType:         helpers.RequestBodyValidation,
-					ValidationSubType:      helpers.Schema,
-					Message:                "schema does not pass validation",
-					Reason:                 fmt.Sprintf("The schema cannot be decoded: %s", err.Error()),
-					SpecLine:               1,
-					SpecCol:                0,
-					SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-					HowToFix:               liberrors.HowToFixInvalidSchema,
-					Context:                string(renderedSchema), // attach the rendered schema to the error
-				})
-				return false, validationErrors
-			}
+		// Handle any compilation error (including vocabulary errors)
+		violation := &liberrors.SchemaValidationFailure{
+			Reason:          err.Error(),
+			Location:        "schema compilation",
+			ReferenceSchema: string(renderedSchema),
+			ReferenceObject: string(payload),
 		}
+		validationErrors = append(validationErrors, &liberrors.ValidationError{
+			ValidationType:         helpers.Schema,
+			ValidationSubType:      helpers.Schema,
+			Message:                "schema compilation failed",
+			Reason:                 fmt.Sprintf("Schema compilation failed: %s", err.Error()),
+			SpecLine:               1,
+			SpecCol:                0,
+			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
+			HowToFix:               liberrors.HowToFixInvalidSchema,
+			Context:                string(renderedSchema), // attach the rendered schema to the error
+		})
+		return false, validationErrors
 	}
 
 	// 4. validate the object against the schema
