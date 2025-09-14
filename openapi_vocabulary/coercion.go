@@ -124,7 +124,7 @@ func (c *coercionExtension) isValidIntegerString(s string) bool {
 }
 
 // compileCoercion compiles coercion behavior based on schema type
-func compileCoercion(ctx *jsonschema.CompilerContext, obj map[string]any, allowCoercion bool) (jsonschema.SchemaExt, error) {
+func CompileCoercion(ctx *jsonschema.CompilerContext, obj map[string]any, allowCoercion bool) (jsonschema.SchemaExt, error) {
 	if !allowCoercion {
 		return nil, nil // Coercion disabled
 	}
@@ -136,7 +136,7 @@ func compileCoercion(ctx *jsonschema.CompilerContext, obj map[string]any, allowC
 	}
 
 	// Only apply coercion to scalar types
-	if !isCoercibleType(schemaType) {
+	if !IsCoercibleType(schemaType) {
 		return nil, nil
 	}
 
@@ -147,7 +147,7 @@ func compileCoercion(ctx *jsonschema.CompilerContext, obj map[string]any, allowC
 }
 
 // isCoercibleType checks if the type supports scalar coercion
-func isCoercibleType(schemaType any) bool {
+func IsCoercibleType(schemaType any) bool {
 	switch t := schemaType.(type) {
 	case string:
 		return t == "boolean" || t == "number" || t == "integer"
