@@ -28,13 +28,6 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // SchemaValidator is an interface that defines the methods for validating a *base.Schema (V3+ Only) object.
 // There are 6 methods for validating a schema:
 //
