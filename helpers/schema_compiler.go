@@ -199,4 +199,3 @@ func transformNullableSchema(schema map[string]interface{}) map[string]interface
 
 	return schema
 }
-
