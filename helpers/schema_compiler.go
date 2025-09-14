@@ -21,17 +21,14 @@ func ConfigureCompiler(c *jsonschema.Compiler, o *config.ValidationOptions) {
 	// nil is the default so this is OK.
 	c.UseRegexpEngine(o.RegexEngine)
 
-	// Enable Format assertions if required.
 	if o.FormatAssertions {
 		c.AssertFormat()
 	}
 
-	// Content Assertions
 	if o.ContentAssertions {
 		c.AssertContent()
 	}
 
-	// Register custom formats
 	for n, v := range o.Formats {
 		c.RegisterFormat(&jsonschema.Format{
 			Name:     n,
@@ -42,13 +39,8 @@ func ConfigureCompiler(c *jsonschema.Compiler, o *config.ValidationOptions) {
 
 // NewCompilerWithOptions mints a new JSON schema compiler with custom configuration.
 func NewCompilerWithOptions(o *config.ValidationOptions) *jsonschema.Compiler {
-	// Build it
 	c := jsonschema.NewCompiler()
-
-	// Configure it
 	ConfigureCompiler(c, o)
-
-	// Return it
 	return c
 }
 
@@ -63,49 +55,50 @@ func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptio
 // - version 3.0: Allows OpenAPI 3.0 keywords like 'nullable'
 // - version 3.1+: Rejects OpenAPI 3.0 keywords like 'nullable' (strict JSON Schema compliance)
 func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.ValidationOptions, version float32) (*jsonschema.Schema, error) {
-	// Fake-Up a resource name for the schema
+	// fake-Up a resource name for the schema
 	resourceName := fmt.Sprintf("%s.json", name)
 
-	// Establish a compiler with the desired configuration
 	compiler := NewCompilerWithOptions(o)
 	compiler.UseLoader(NewCompilerLoader())
 
-	// For OpenAPI 3.1+, register vocabulary to validate and reject OpenAPI 3.0 keywords
-	if o != nil && o.OpenAPIMode && version >= 3.05 { // Use 3.05 to avoid floating point precision issues
-		vocab := openapi_vocabulary.NewOpenAPIVocabulary(openapi_vocabulary.Version31)
+	// register OpenAPI vocabulary with appropriate version and coercion settings
+	if o != nil && o.OpenAPIMode {
+		var vocabVersion openapi_vocabulary.VersionType
+		if version >= 3.05 { // Use 3.05 to avoid floating point precision issues
+			vocabVersion = openapi_vocabulary.Version31
+		} else {
+			vocabVersion = openapi_vocabulary.Version30
+		}
+
+		vocab := openapi_vocabulary.NewOpenAPIVocabularyWithCoercion(vocabVersion, o.AllowScalarCoercion)
 		compiler.RegisterVocabulary(vocab)
 		compiler.AssertVocabs()
+
+		// for OpenAPI 3.0, transform nullable keywords to proper JSON Schema format
+		if version < 3.05 {
+			jsonSchema = transformOpenAPI30Schema(jsonSchema)
+		}
+
+		// Apply scalar coercion transformation if enabled
+		if o.AllowScalarCoercion {
+			jsonSchema = transformSchemaForCoercion(jsonSchema)
+		}
 	}
 
-	// For OpenAPI 3.0, transform schemas to JSON Schema compatible format
-	if o != nil && o.OpenAPIMode && version < 3.05 { // Use 3.05 to avoid floating point precision issues
-		// Register vocabulary for structure validation (without rejection)
-		vocab := openapi_vocabulary.NewOpenAPIVocabulary(openapi_vocabulary.Version30)
-		compiler.RegisterVocabulary(vocab)
-		compiler.AssertVocabs()
-
-		// Transform nullable keywords to proper JSON Schema format
-		jsonSchema = transformOpenAPI30Schema(jsonSchema)
-	}
-
-	// Decode the JSON Schema into a JSON blob.
 	decodedSchema, err := jsonschema.UnmarshalJSON(bytes.NewReader(jsonSchema))
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON schema: %w", err)
 	}
 
-	// Give our schema to the compiler.
 	if err = compiler.AddResource(resourceName, decodedSchema); err != nil {
 		return nil, fmt.Errorf("failed to add resource to schema compiler: %w", err)
 	}
 
-	// Try to compile it.
 	jsch, err := compiler.Compile(resourceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile JSON schema: %w", err)
 	}
 
-	// Done.
 	return jsch, nil
 }
 
@@ -135,12 +128,12 @@ func transformNullableInSchema(schema interface{}) interface{} {
 	case map[string]interface{}:
 		result := make(map[string]interface{})
 
-		// Copy all properties first
+		// copy all properties first
 		for key, value := range s {
 			result[key] = transformNullableInSchema(value)
 		}
 
-		// Check if this schema has nullable: true
+		// check if this schema has nullable: true
 		if nullable, ok := s["nullable"]; ok {
 			if nullableBool, ok := nullable.(bool); ok && nullableBool {
 				// Transform the schema to support null values
@@ -192,10 +185,96 @@ func transformNullableSchema(schema map[string]interface{}) map[string]interface
 				schema["type"] = newTypes
 			}
 		}
-	} else {
-		// If no type specified, this schema can be anything including null
-		// We don't need to do anything special here
+	}
+	return schema
+}
+
+// transformSchemaForCoercion transforms schemas to allow scalar coercion (string->boolean/number)
+func transformSchemaForCoercion(jsonSchema []byte) []byte {
+	var schema map[string]interface{}
+	if err := json.Unmarshal(jsonSchema, &schema); err != nil {
+		// If we can't parse it, return as-is
+		return jsonSchema
 	}
 
-	return schema
+	transformed := transformCoercionInSchema(schema)
+
+	result, err := json.Marshal(transformed)
+	if err != nil {
+		// If we can't marshal the result, return original
+		return jsonSchema
+	}
+
+	return result
+}
+
+// transformCoercionInSchema recursively transforms schemas to support scalar coercion
+func transformCoercionInSchema(schema interface{}) interface{} {
+	switch s := schema.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+
+		// Copy all properties first
+		for key, value := range s {
+			result[key] = transformCoercionInSchema(value)
+		}
+
+		// Transform type to allow string coercion for coercible types
+		if schemaType, hasType := s["type"]; hasType {
+			result["type"] = transformTypeForCoercion(schemaType)
+		}
+
+		return result
+
+	case []interface{}:
+		result := make([]interface{}, len(s))
+		for i, item := range s {
+			result[i] = transformCoercionInSchema(item)
+		}
+		return result
+
+	default:
+		return schema
+	}
+}
+
+// transformTypeForCoercion transforms type fields to allow string coercion
+func transformTypeForCoercion(schemaType interface{}) interface{} {
+	switch t := schemaType.(type) {
+	case string:
+		// Transform scalar types to include string for coercion
+		if t == "boolean" || t == "number" || t == "integer" {
+			return []interface{}{t, "string"}
+		}
+		return t
+
+	case []interface{}:
+		// If already an array, add string if it contains coercible types and doesn't already have string
+		hasCoercibleType := false
+		hasString := false
+
+		for _, item := range t {
+			if str, ok := item.(string); ok {
+				if str == "boolean" || str == "number" || str == "integer" {
+					hasCoercibleType = true
+				}
+				if str == "string" {
+					hasString = true
+				}
+			}
+		}
+
+		if hasCoercibleType && !hasString {
+			// Add string to the type array for coercion
+			newTypes := make([]interface{}, len(t)+1)
+			copy(newTypes, t)
+			newTypes[len(t)] = "string"
+			return newTypes
+		}
+
+		return t
+
+	default:
+		return schemaType
+	}
 }

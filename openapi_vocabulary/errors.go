@@ -35,3 +35,23 @@ func (e *DiscriminatorPropertyMissingError) LocalizedString(printer *message.Pri
 func (e *DiscriminatorPropertyMissingError) Error() string {
 	return fmt.Sprintf("discriminator property '%s' is missing", e.PropertyName)
 }
+
+// CoercionError represents an error during scalar type coercion
+type CoercionError struct {
+	SourceType string
+	TargetType string
+	Value      string
+	Message    string
+}
+
+func (e *CoercionError) KeywordPath() []string {
+	return []string{"type"}
+}
+
+func (e *CoercionError) LocalizedString(printer *message.Printer) string {
+	return fmt.Sprintf("cannot coerce %s '%s' to %s: %s", e.SourceType, e.Value, e.TargetType, e.Message)
+}
+
+func (e *CoercionError) Error() string {
+	return fmt.Sprintf("cannot coerce %s '%s' to %s: %s", e.SourceType, e.Value, e.TargetType, e.Message)
+}

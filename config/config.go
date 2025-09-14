@@ -6,12 +6,13 @@ import "github.com/santhosh-tekuri/jsonschema/v6"
 //
 // Generally fluent With... style functions are used to establish the desired behavior.
 type ValidationOptions struct {
-	RegexEngine        jsonschema.RegexpEngine
-	FormatAssertions   bool
-	ContentAssertions  bool
-	SecurityValidation bool
-	OpenAPIMode        bool // Enable OpenAPI-specific vocabulary validation
-	Formats            map[string]func(v any) error
+	RegexEngine         jsonschema.RegexpEngine
+	FormatAssertions    bool
+	ContentAssertions   bool
+	SecurityValidation  bool
+	OpenAPIMode         bool // Enable OpenAPI-specific vocabulary validation
+	AllowScalarCoercion bool // Enable string->boolean/number coercion
+	Formats             map[string]func(v any) error
 }
 
 // Option Enables an 'Options pattern' approach
@@ -47,6 +48,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.ContentAssertions = options.ContentAssertions
 			o.SecurityValidation = options.SecurityValidation
 			o.OpenAPIMode = options.OpenAPIMode
+			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
 		}
 	}
@@ -104,5 +106,12 @@ func WithOpenAPIMode() Option {
 func WithoutOpenAPIMode() Option {
 	return func(o *ValidationOptions) {
 		o.OpenAPIMode = false
+	}
+}
+
+// WithScalarCoercion enables string to boolean/number coercion (Jackson-style)
+func WithScalarCoercion() Option {
+	return func(o *ValidationOptions) {
+		o.AllowScalarCoercion = true
 	}
 }
