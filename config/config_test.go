@@ -17,6 +17,8 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -27,6 +29,8 @@ func TestNewValidationOptions_WithNilOption(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -36,6 +40,8 @@ func TestWithFormatAssertions(t *testing.T) {
 	assert.True(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -45,6 +51,8 @@ func TestWithContentAssertions(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -54,6 +62,8 @@ func TestWithoutSecurityValidation(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.False(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -66,6 +76,8 @@ func TestWithRegexEngine(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -97,6 +109,8 @@ func TestWithExistingOpts_NilSource(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -109,6 +123,8 @@ func TestMultipleOptions(t *testing.T) {
 	assert.True(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -123,6 +139,8 @@ func TestOptionOverride(t *testing.T) {
 	assert.True(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.OpenAPIMode)          // Default is true
+	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 }
 
@@ -204,4 +222,110 @@ func TestWithExistingOpts_SecurityValidationCopied(t *testing.T) {
 	opts2 := NewValidationOptions(WithExistingOpts(original2))
 
 	assert.True(t, opts2.SecurityValidation)
+}
+
+// Tests for new OpenAPI and scalar coercion configuration options
+
+func TestWithOpenAPIMode(t *testing.T) {
+	opts := NewValidationOptions(WithOpenAPIMode())
+
+	assert.True(t, opts.OpenAPIMode)
+	assert.False(t, opts.AllowScalarCoercion) // Should be default false
+	assert.False(t, opts.FormatAssertions)    // Should be default false
+	assert.False(t, opts.ContentAssertions)   // Should be default false
+	assert.True(t, opts.SecurityValidation)   // Should be default true
+}
+
+func TestWithoutOpenAPIMode(t *testing.T) {
+	opts := NewValidationOptions(WithoutOpenAPIMode())
+
+	assert.False(t, opts.OpenAPIMode)
+	assert.False(t, opts.AllowScalarCoercion) // Should be default false
+	assert.False(t, opts.FormatAssertions)    // Should be default false
+	assert.False(t, opts.ContentAssertions)   // Should be default false
+	assert.True(t, opts.SecurityValidation)   // Should be default true
+}
+
+func TestWithScalarCoercion(t *testing.T) {
+	opts := NewValidationOptions(WithScalarCoercion())
+
+	assert.True(t, opts.AllowScalarCoercion)
+	assert.True(t, opts.OpenAPIMode)        // Should be default true
+	assert.False(t, opts.FormatAssertions)  // Should be default false
+	assert.False(t, opts.ContentAssertions) // Should be default false
+	assert.True(t, opts.SecurityValidation) // Should be default true
+}
+
+func TestWithOpenAPIModeAndScalarCoercion(t *testing.T) {
+	opts := NewValidationOptions(
+		WithOpenAPIMode(),
+		WithScalarCoercion(),
+	)
+
+	assert.True(t, opts.OpenAPIMode)
+	assert.True(t, opts.AllowScalarCoercion)
+	assert.False(t, opts.FormatAssertions)  // Should be default false
+	assert.False(t, opts.ContentAssertions) // Should be default false
+	assert.True(t, opts.SecurityValidation) // Should be default true
+}
+
+func TestWithOpenAPIModeOverride(t *testing.T) {
+	// Test that WithoutOpenAPIMode can override WithOpenAPIMode
+	opts := NewValidationOptions(
+		WithOpenAPIMode(),
+		WithoutOpenAPIMode(),
+	)
+
+	assert.False(t, opts.OpenAPIMode) // Should be false (last option wins)
+	assert.False(t, opts.AllowScalarCoercion)
+}
+
+func TestComplexOpenAPIScenario(t *testing.T) {
+	// Test a complex scenario with OpenAPI mode and other options
+	opts := NewValidationOptions(
+		WithFormatAssertions(),
+		WithOpenAPIMode(),
+		WithScalarCoercion(),
+		WithContentAssertions(),
+		WithoutSecurityValidation(),
+	)
+
+	assert.True(t, opts.OpenAPIMode)
+	assert.True(t, opts.AllowScalarCoercion)
+	assert.True(t, opts.FormatAssertions)
+	assert.True(t, opts.ContentAssertions)
+	assert.False(t, opts.SecurityValidation)
+	assert.Nil(t, opts.RegexEngine)
+}
+
+func TestWithExistingOpts_OpenAPIFields(t *testing.T) {
+	// Test that OpenAPI fields are properly copied from existing options
+	original := &ValidationOptions{
+		OpenAPIMode:         true,
+		AllowScalarCoercion: true,
+		FormatAssertions:    false,
+		ContentAssertions:   false,
+		SecurityValidation:  true,
+	}
+
+	opts := NewValidationOptions(WithExistingOpts(original))
+
+	assert.True(t, opts.OpenAPIMode)
+	assert.True(t, opts.AllowScalarCoercion)
+	assert.False(t, opts.FormatAssertions)
+	assert.False(t, opts.ContentAssertions)
+	assert.True(t, opts.SecurityValidation)
+}
+
+func TestWithCustomFormat(t *testing.T) {
+	// Test WithCustomFormat option
+	testFormatFunc := func(v any) error {
+		return nil // Simple test format function
+	}
+
+	opts := NewValidationOptions(WithCustomFormat("test-format", testFormatFunc))
+
+	assert.NotNil(t, opts.Formats)
+	assert.Contains(t, opts.Formats, "test-format")
+	assert.NotNil(t, opts.Formats["test-format"])
 }
