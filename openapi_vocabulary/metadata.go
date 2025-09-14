@@ -7,24 +7,22 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-// exampleExtension handles the OpenAPI example keyword
+// exampleExtension handles the OpenAPI example keyword (metadata only)
 type exampleExtension struct {
 	example any
 }
 
 func (e *exampleExtension) Validate(ctx *jsonschema.ValidatorContext, v any) {
-	// Example keyword is metadata only - no validation needed
-	// We've already validated the structure during compilation
+	// Example keyword is metadata only - no validation needed during runtime
 }
 
-// deprecatedExtension handles the OpenAPI deprecated keyword
+// deprecatedExtension handles the OpenAPI deprecated keyword (metadata only)
 type deprecatedExtension struct {
 	deprecated bool
 }
 
 func (d *deprecatedExtension) Validate(ctx *jsonschema.ValidatorContext, v any) {
-	// Deprecated keyword is metadata only - no validation needed
-	// Could potentially be used for warnings in the future
+	// Deprecated keyword is metadata only - no validation needed during runtime
 }
 
 // compileExample compiles the example keyword
