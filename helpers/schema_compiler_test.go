@@ -538,3 +538,11 @@ func TestTransformTypeForCoercion_OtherTypes(t *testing.T) {
 	result = transformTypeForCoercion(map[string]interface{}{})
 	assert.Equal(t, map[string]interface{}{}, result)
 }
+
+func TestTransformTypeForCoercion_EdgeCases(t *testing.T) {
+	result := transformTypeForCoercion("fudge")
+	assert.Equal(t, "fudge", result)
+
+	result = transformTypeForCoercion([]interface{}{"string"})
+	assert.Equal(t, []interface{}{"string"}, result)
+}
