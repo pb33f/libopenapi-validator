@@ -38,45 +38,43 @@ func NewOpenAPIVocabularyWithCoercion(version VersionType, allowCoercion bool) *
 }
 
 // compileOpenAPIKeywords compiles all OpenAPI-specific keywords found in the schema object
-func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType, allowCoercion bool) (jsonschema.SchemaExt, error) {
+func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext,
+	obj map[string]any,
+	version VersionType,
+	allowCoercion bool) (jsonschema.SchemaExt, error) {
+
 	var extensions []jsonschema.SchemaExt
 
-	// Handle nullable keyword
 	if ext, err := CompileNullable(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
-	// Handle discriminator keyword
 	if ext, err := CompileDiscriminator(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
-	// Handle example keyword
 	if ext, err := CompileExample(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
-	// Handle deprecated keyword
 	if ext, err := CompileDeprecated(ctx, obj, version); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
-	// Handle scalar coercion (applies to all schemas with coercible types)
 	if ext, err := CompileCoercion(ctx, obj, allowCoercion); err != nil {
 		return nil, err
 	} else if ext != nil {
 		extensions = append(extensions, ext)
 	}
 
-	// Return combined extension if any keywords were found
 	if len(extensions) == 0 {
 		return nil, nil
 	}

@@ -703,7 +703,10 @@ func TestDiscriminatorValidation_NonObjectValue(t *testing.T) {
 	schemaJSON := `{
 		"type": "object",
 		"discriminator": {
-			"propertyName": "type"
+			"propertyName": "type",
+             "mapping": {
+                "dog": "#/components/schemas/Dog",  
+            }
 		}
 	}`
 
@@ -725,4 +728,54 @@ func TestDiscriminatorValidation_NonObjectValue(t *testing.T) {
 	assert.Error(t, err)
 	// Should get type validation error, not discriminator error
 	assert.NotContains(t, err.Error(), "discriminator property")
+}
+
+func TestDiscriminatorValidation_DiscriminatorBadMapping(t *testing.T) {
+	schemaJSON := `{
+		"type": "object",
+		"discriminator": {
+			"propertyName": "type",
+             "mapping": "not an object"
+		}
+	}`
+
+	schema, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaJSON))
+	assert.NoError(t, err)
+
+	compiler := jsonschema.NewCompiler()
+	compiler.RegisterVocabulary(NewOpenAPIVocabulary(Version30))
+	compiler.AssertVocabs()
+
+	err = compiler.AddResource("test.json", schema)
+	assert.NoError(t, err)
+
+	_, err = compiler.Compile("test.json")
+	assert.Error(t, err)
+	assert.Equal(t, "OpenAPI keyword 'discriminator': discriminator mapping must be an object", err.Error())
+}
+
+func TestDiscriminatorValidation_BadMappingType(t *testing.T) {
+	schemaJSON := `{
+		"type": "object",
+		"discriminator": {
+			"propertyName": "type",
+             "mapping": {
+                "fish":  12345  
+            }
+		}
+	}`
+
+	schema, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaJSON))
+	assert.NoError(t, err)
+
+	compiler := jsonschema.NewCompiler()
+	compiler.RegisterVocabulary(NewOpenAPIVocabulary(Version30))
+	compiler.AssertVocabs()
+
+	err = compiler.AddResource("test.json", schema)
+	assert.NoError(t, err)
+
+	_, err = compiler.Compile("test.json")
+	assert.Error(t, err)
+	assert.Equal(t, "OpenAPI keyword 'discriminator': discriminator mapping values must be strings", err.Error())
 }
