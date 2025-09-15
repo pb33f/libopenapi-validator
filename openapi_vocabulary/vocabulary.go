@@ -41,8 +41,8 @@ func NewOpenAPIVocabularyWithCoercion(version VersionType, allowCoercion bool) *
 func compileOpenAPIKeywords(ctx *jsonschema.CompilerContext,
 	obj map[string]any,
 	version VersionType,
-	allowCoercion bool) (jsonschema.SchemaExt, error) {
-
+	allowCoercion bool,
+) (jsonschema.SchemaExt, error) {
 	var extensions []jsonschema.SchemaExt
 
 	if ext, err := CompileNullable(ctx, obj, version); err != nil {
