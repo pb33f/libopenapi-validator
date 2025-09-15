@@ -13,17 +13,11 @@ type discriminatorExtension struct {
 	mapping      map[string]string // value -> schema reference
 }
 
+// Validate validates the discriminator property exists in the instance
 func (d *discriminatorExtension) Validate(ctx *jsonschema.ValidatorContext, v any) {
-	// Validate that discriminator structure is correct
-	// For now, we only validate the structure, not the discriminator semantics
-	// Full discriminator validation would require schema resolution which is complex
+	obj, _ := v.(map[string]any)
 
-	obj, ok := v.(map[string]any)
-	if !ok {
-		return // discriminator only applies to objects
-	}
-
-	// Check if discriminator property exists in the object
+	// check if discriminator property exists in the object
 	if d.propertyName != "" {
 		if _, exists := obj[d.propertyName]; !exists {
 			ctx.AddError(&DiscriminatorPropertyMissingError{
@@ -33,14 +27,13 @@ func (d *discriminatorExtension) Validate(ctx *jsonschema.ValidatorContext, v an
 	}
 }
 
-// compileDiscriminator compiles the discriminator keyword
-func CompileDiscriminator(ctx *jsonschema.CompilerContext, obj map[string]any, version VersionType) (jsonschema.SchemaExt, error) {
+// CompileDiscriminator compiles the OpenAPI discriminator keyword
+func CompileDiscriminator(_ *jsonschema.CompilerContext, obj map[string]any, _ VersionType) (jsonschema.SchemaExt, error) {
 	v, exists := obj["discriminator"]
 	if !exists {
 		return nil, nil
 	}
 
-	// Validate discriminator structure
 	discriminator, ok := v.(map[string]any)
 	if !ok {
 		return nil, &OpenAPIKeywordError{
@@ -49,7 +42,6 @@ func CompileDiscriminator(ctx *jsonschema.CompilerContext, obj map[string]any, v
 		}
 	}
 
-	// Extract propertyName (required)
 	propertyNameValue, exists := discriminator["propertyName"]
 	if !exists {
 		return nil, &OpenAPIKeywordError{
@@ -66,7 +58,6 @@ func CompileDiscriminator(ctx *jsonschema.CompilerContext, obj map[string]any, v
 		}
 	}
 
-	// Extract mapping (optional)
 	var mapping map[string]string
 	if mappingValue, exists := discriminator["mapping"]; exists {
 		mappingObj, ok := mappingValue.(map[string]any)
