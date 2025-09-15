@@ -701,14 +701,14 @@ func TestDiscriminatorValidation_PropertyPresent(t *testing.T) {
 
 func TestDiscriminatorValidation_NonObjectValue(t *testing.T) {
 	schemaJSON := `{
-		"type": "object",
-		"discriminator": {
-			"propertyName": "type",
-             "mapping": {
-                "dog": "#/components/schemas/Dog",  
-            }
-		}
-	}`
+  "type": "object",
+  "discriminator": {
+    "propertyName": "type",
+    "mapping": {
+      "dog": "#/components/schemas/Dog"
+    }
+  }
+}`
 
 	schema, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaJSON))
 	assert.NoError(t, err)
