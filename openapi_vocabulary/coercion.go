@@ -17,11 +17,8 @@ type coercionExtension struct {
 }
 
 var (
-	// Pre-compiled regex for boolean coercion
 	booleanRegex = regexp.MustCompile(`^(true|false)$`)
-	// Pre-compiled regex for number validation
-	numberRegex = regexp.MustCompile(`^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$`)
-	// Pre-compiled regex for integer validation
+	numberRegex  = regexp.MustCompile(`^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$`)
 	integerRegex = regexp.MustCompile(`^-?(?:0|[1-9]\d*)$`)
 )
 
@@ -35,7 +32,7 @@ func (c *coercionExtension) Validate(ctx *jsonschema.ValidatorContext, v any) {
 		return // Not a string - let normal validation handle it
 	}
 
-	// Check if we should coerce and validate the string format
+	// check if we should coerce and validate the string format
 	if c.shouldCoerceToBoolean() {
 		if !c.isValidBooleanString(str) {
 			ctx.AddError(&CoercionError{
@@ -71,8 +68,6 @@ func (c *coercionExtension) Validate(ctx *jsonschema.ValidatorContext, v any) {
 		}
 		return
 	}
-
-	// No coercion applies - let normal validation handle it
 }
 
 func (c *coercionExtension) shouldCoerceToBoolean() bool {
@@ -123,7 +118,7 @@ func (c *coercionExtension) isValidIntegerString(s string) bool {
 	return err == nil
 }
 
-// compileCoercion compiles coercion behavior based on schema type
+// CompileCoercion compiles the coercion extension if coercion is allowed and applicable
 func CompileCoercion(ctx *jsonschema.CompilerContext, obj map[string]any, allowCoercion bool) (jsonschema.SchemaExt, error) {
 	if !allowCoercion {
 		return nil, nil // Coercion disabled
@@ -146,13 +141,13 @@ func CompileCoercion(ctx *jsonschema.CompilerContext, obj map[string]any, allowC
 	}, nil
 }
 
-// isCoercibleType checks if the type supports scalar coercion
+// IsCoercibleType checks if the schema type is one that supports coercion
 func IsCoercibleType(schemaType any) bool {
 	switch t := schemaType.(type) {
 	case string:
 		return t == "boolean" || t == "number" || t == "integer"
 	case []any:
-		// For type arrays, check if any coercible type is present
+		// for type arrays, check if any coercible type is present
 		for _, item := range t {
 			if str, ok := item.(string); ok {
 				if str == "boolean" || str == "number" || str == "integer" {
