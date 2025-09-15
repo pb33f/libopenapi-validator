@@ -137,6 +137,7 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 	if decodedObject == nil && len(payload) > 0 {
 		err := json.Unmarshal(payload, &decodedObject)
 		if err != nil {
+
 			// cannot decode the request body, so it's not valid
 			violation := &liberrors.SchemaValidationFailure{
 				Reason:          err.Error(),
@@ -160,15 +161,10 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 
 	}
 
-	// Build the compiled JSON Schema with version awareness
 	jsch, err := helpers.NewCompiledSchemaWithVersion("schema", jsonSchema, s.options, version)
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
-
-	// is the schema even valid? did it compile?
 	if err != nil {
-
-		// Handle any compilation error (including vocabulary errors)
 		violation := &liberrors.SchemaValidationFailure{
 			Reason:          err.Error(),
 			Location:        "schema compilation",
@@ -189,7 +185,6 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 		return false, validationErrors
 	}
 
-	// 4. validate the object against the schema
 	if jsch != nil && decodedObject != nil {
 		scErrs := jsch.Validate(decodedObject)
 		if scErrs != nil {
@@ -209,7 +204,6 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 				col = schema.GoLow().Type.KeyNode.Column
 			}
 
-			// add the error to the list
 			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:         helpers.Schema,
 				Message:                "schema does not pass validation",
