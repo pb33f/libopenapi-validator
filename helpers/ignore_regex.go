@@ -6,8 +6,10 @@ package helpers
 import "regexp"
 
 var (
-	IgnorePattern     = `^'?(anyOf|allOf|oneOf|validation)'? failed\b`
-	IgnorePolyPattern = `^'?(anyOf|allOf|oneOf)'? failed\b`
+	// Ignore generic poly errors that just say "none matched" since we get specific errors
+	// But keep errors that say which subschemas matched (for multiple match scenarios)
+	IgnorePattern     = `^'?(anyOf|allOf|oneOf|validation)'? failed(, none matched)?$`
+	IgnorePolyPattern = `^'?(anyOf|allOf|oneOf)'? failed(, none matched)?$`
 )
 
 // IgnoreRegex is a regular expression that matches the IgnorePattern

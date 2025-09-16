@@ -820,3 +820,239 @@ func TestSchemaValidator_ValidateSchemaBytesWithVersion_NilSchema(t *testing.T) 
 	assert.False(t, valid, "Should fail with nil schema")
 	assert.Empty(t, errors, "Should not return errors for nil schema")
 }
+
+// https://github.com/daveshanley/vacuum/issues/520
+func TestValidateSchema_OneOf_MultipleMatches_Issue520(t *testing.T) {
+	// This test reproduces the issue from vacuum #520
+	// The example matches BOTH oneOf alternatives which should fail validation
+	// but the error details are not being populated correctly
+
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Test:
+      type: object
+      oneOf:
+        - properties:
+            pim:
+              type: string
+        - properties:
+            pam:
+              type: string
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	testSchema := model.Model.Components.Schemas.GetOrZero("Test").Schema()
+
+	testData := map[string]interface{}{
+		"pam": "nop",
+	}
+
+	validator := NewSchemaValidator()
+	valid, validationErrors := validator.ValidateSchemaObject(testSchema, testData)
+
+	assert.False(t, valid, "validation should fail because example matches both oneOf alternatives")
+	assert.NotEmpty(t, validationErrors, "validation errors should be present")
+
+	if len(validationErrors) > 0 {
+
+		assert.NotEmpty(t, validationErrors[0].SchemaValidationErrors,
+			"SchemaValidationErrors should contain detailed error information about the oneOf violation")
+
+		if len(validationErrors[0].SchemaValidationErrors) > 0 {
+			firstError := validationErrors[0].SchemaValidationErrors[0]
+
+			assert.Contains(t, firstError.Reason, "oneOf",
+				"error should mention oneOf constraint violation")
+		}
+	}
+}
+
+// https://github.com/daveshanley/vacuum/issues/520
+func TestValidateSchema_OneOf_Discriminant_Valid(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Test:
+      type: object
+      oneOf:
+        - properties:
+            type:
+              const: pim
+            pim:
+              type: string
+          required: [type, pim]
+        - properties:
+            type:
+              const: pam
+            pam:
+              type: string
+          required: [type, pam]`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	testSchema := model.Model.Components.Schemas.GetOrZero("Test").Schema()
+
+	testData := map[string]interface{}{
+		"type": "pam",
+		"pam":  "nop",
+	}
+
+	validator := NewSchemaValidator()
+	valid, validationErrors := validator.ValidateSchemaObject(testSchema, testData)
+
+	assert.True(t, valid, "validation should pass for discriminant oneOf")
+	assert.Empty(t, validationErrors, "no validation errors should be present")
+}
+
+// https://github.com/daveshanley/vacuum/issues/520
+func TestValidateSchema_OneOf_NoMatches(t *testing.T) {
+
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Test:
+      type: object
+      oneOf:
+        - properties:
+            foo:
+              type: string
+          required: [foo]
+        - properties:
+            bar:
+              type: integer
+          required: [bar]`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	testSchema := model.Model.Components.Schemas.GetOrZero("Test").Schema()
+
+	testData := map[string]interface{}{
+		"baz": "invalid",
+	}
+
+	validator := NewSchemaValidator()
+	valid, validationErrors := validator.ValidateSchemaObject(testSchema, testData)
+
+	assert.False(t, valid, "validation should fail because example matches no oneOf alternatives")
+	assert.NotEmpty(t, validationErrors, "validation errors should be present")
+
+	if len(validationErrors) > 0 {
+		assert.NotEmpty(t, validationErrors[0].SchemaValidationErrors,
+			"SchemaValidationErrors should contain detailed error information")
+	}
+}
+
+// https://github.com/daveshanley/vacuum/issues/520
+func TestValidateSchema_OneOf_SimpleTypes(t *testing.T) {
+
+	testCases := []struct {
+		name        string
+		spec        string
+		value       interface{}
+		shouldPass  bool
+		errorDetail string
+	}{
+		{
+			name: "valid string",
+			spec: `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Test:
+      oneOf:
+        - type: string
+        - type: integer`,
+			value:      "hello",
+			shouldPass: true,
+		},
+		{
+			name: "valid integer",
+			spec: `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Test:
+      oneOf:
+        - type: string
+        - type: integer`,
+			value:      42,
+			shouldPass: true,
+		},
+		{
+			name: "invalid - matches both (ambiguous pattern)",
+			spec: `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Test:
+      oneOf:
+        - type: string
+        - type: string
+          pattern: '^[0-9]+$'`,
+			value:       "123",
+			shouldPass:  false,
+			errorDetail: "oneOf",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, err := libopenapi.NewDocument([]byte(tc.spec))
+			assert.NoError(t, err)
+
+			model, errs := doc.BuildV3Model()
+			assert.Empty(t, errs)
+
+			testSchema := model.Model.Components.Schemas.GetOrZero("Test").Schema()
+
+			validator := NewSchemaValidator()
+			valid, validationErrors := validator.ValidateSchemaObject(testSchema, tc.value)
+
+			if tc.shouldPass {
+				assert.True(t, valid, "validation should pass")
+				assert.Empty(t, validationErrors, "no validation errors expected")
+			} else {
+				assert.False(t, valid, "validation should fail")
+				assert.NotEmpty(t, validationErrors, "validation errors should be present")
+
+				if len(validationErrors) > 0 && tc.errorDetail != "" {
+					if len(validationErrors[0].SchemaValidationErrors) > 0 {
+						firstError := validationErrors[0].SchemaValidationErrors[0]
+						assert.Contains(t, firstError.Reason, tc.errorDetail,
+							"error should contain expected detail")
+					}
+				}
+			}
+		})
+	}
+}
