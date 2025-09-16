@@ -878,7 +878,6 @@ components:
 
 // https://github.com/daveshanley/vacuum/issues/520
 func TestValidateSchema_OneOf_Discriminant_Valid(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 info:
   title: Test
@@ -923,7 +922,6 @@ components:
 
 // https://github.com/daveshanley/vacuum/issues/520
 func TestValidateSchema_OneOf_NoMatches(t *testing.T) {
-
 	spec := `openapi: 3.1.0
 info:
   title: Test
@@ -968,7 +966,6 @@ components:
 
 // https://github.com/daveshanley/vacuum/issues/520
 func TestValidateSchema_OneOf_SimpleTypes(t *testing.T) {
-
 	testCases := []struct {
 		name        string
 		spec        string
