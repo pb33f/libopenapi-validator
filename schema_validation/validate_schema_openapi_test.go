@@ -327,7 +327,6 @@ components:
 	t.Run("should fail rendering", func(t *testing.T) {
 		_, err := schema.Schema().RenderInline()
 		assert.Error(t, err, "RenderInline should not error on circular refs")
-
 	})
 
 	t.Run("should fail validating", func(t *testing.T) {
