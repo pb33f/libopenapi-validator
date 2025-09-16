@@ -414,11 +414,10 @@ components:
 	valid, errors := sv.ValidateSchemaString(nodeSchema, exampleJSON)
 
 	t.Logf("Simple circular ref - Schema validation valid: %v", valid)
-	if errors != nil {
-		for _, err := range errors {
-			t.Logf("Error: %s", err.Error())
-		}
+	for _, err := range errors {
+		t.Logf("Error: %s", err.Error())
 	}
+
 }
 
 // Helper function to check if a string contains a substring (case-insensitive)
