@@ -5,7 +5,7 @@ go 1.24.7
 require (
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/pb33f/jsonpath v0.1.2
-	github.com/pb33f/libopenapi v0.27.0
+	github.com/pb33f/libopenapi v0.27.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v4 v4.0.0-rc.2
