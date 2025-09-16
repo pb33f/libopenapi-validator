@@ -1364,7 +1364,7 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "cannot render circular reference: #/components/schemas/Error", errors[0].Reason)
+	assert.Equal(t, "schema render failure, circular reference: `#/components/schemas/Error`", errors[0].Reason)
 }
 
 func TestValidateBody_CheckHeader(t *testing.T) {

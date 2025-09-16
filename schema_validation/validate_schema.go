@@ -129,7 +129,31 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 	// render the schema, to be used for validation, stop this from running concurrently, mutations are made to state
 	// and, it will cause async issues.
 	s.lock.Lock()
-	renderedSchema, _ = schema.RenderInline()
+	var e error
+	renderedSchema, e = schema.RenderInline()
+	if e != nil {
+		// schema cannot be rendered, so it's not valid!
+		violation := &liberrors.SchemaValidationFailure{
+			Reason:          e.Error(),
+			Location:        "unavailable",
+			ReferenceSchema: string(renderedSchema),
+			ReferenceObject: string(payload),
+		}
+		validationErrors = append(validationErrors, &liberrors.ValidationError{
+			ValidationType:         helpers.RequestBodyValidation,
+			ValidationSubType:      helpers.Schema,
+			Message:                "schema does not pass validation",
+			Reason:                 fmt.Sprintf("The schema cannot be decoded: %s", e.Error()),
+			SpecLine:               schema.GoLow().GetRootNode().Line,
+			SpecCol:                schema.GoLow().GetRootNode().Column,
+			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
+			HowToFix:               liberrors.HowToFixInvalidSchema,
+			Context:                string(renderedSchema),
+		})
+		s.lock.Unlock()
+		return false, validationErrors
+
+	}
 	s.lock.Unlock()
 
 	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
@@ -145,23 +169,29 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 				ReferenceSchema: string(renderedSchema),
 				ReferenceObject: string(payload),
 			}
+			line := 1
+			col := 0
+			if schema.GoLow().Type.KeyNode != nil {
+				line = schema.GoLow().Type.KeyNode.Line
+				col = schema.GoLow().Type.KeyNode.Column
+			}
 			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:         helpers.RequestBodyValidation,
 				ValidationSubType:      helpers.Schema,
 				Message:                "schema does not pass validation",
 				Reason:                 fmt.Sprintf("The schema cannot be decoded: %s", err.Error()),
-				SpecLine:               1,
-				SpecCol:                0,
+				SpecLine:               line,
+				SpecCol:                col,
 				SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
 				HowToFix:               liberrors.HowToFixInvalidSchema,
-				Context:                string(renderedSchema), // attach the rendered schema to the error
+				Context:                string(renderedSchema),
 			})
 			return false, validationErrors
 		}
 
 	}
 
-	jsch, err := helpers.NewCompiledSchemaWithVersion("schema", jsonSchema, s.options, version)
+	jsch, err := helpers.NewCompiledSchemaWithVersion(schema.GoLow().GetIndex().GetSpecAbsolutePath(), jsonSchema, s.options, version)
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 	if err != nil {
@@ -171,16 +201,22 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 			ReferenceSchema: string(renderedSchema),
 			ReferenceObject: string(payload),
 		}
+		line := 1
+		col := 0
+		if schema.GoLow().Type.KeyNode != nil {
+			line = schema.GoLow().Type.KeyNode.Line
+			col = schema.GoLow().Type.KeyNode.Column
+		}
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:         helpers.Schema,
 			ValidationSubType:      helpers.Schema,
 			Message:                "schema compilation failed",
 			Reason:                 fmt.Sprintf("Schema compilation failed: %s", err.Error()),
-			SpecLine:               1,
-			SpecCol:                0,
+			SpecLine:               line,
+			SpecCol:                col,
 			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
 			HowToFix:               liberrors.HowToFixInvalidSchema,
-			Context:                string(renderedSchema), // attach the rendered schema to the error
+			Context:                string(renderedSchema),
 		})
 		return false, validationErrors
 	}
@@ -212,7 +248,7 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 				SpecCol:                col,
 				SchemaValidationErrors: schemaValidationErrors,
 				HowToFix:               liberrors.HowToFixInvalidSchema,
-				Context:                string(renderedSchema), // attach the rendered schema to the error
+				Context:                string(renderedSchema),
 			})
 		}
 	}

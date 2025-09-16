@@ -55,8 +55,7 @@ func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptio
 // - version 3.0: Allows OpenAPI 3.0 keywords like 'nullable'
 // - version 3.1+: Rejects OpenAPI 3.0 keywords like 'nullable' (strict JSON Schema compliance)
 func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.ValidationOptions, version float32) (*jsonschema.Schema, error) {
-	// fake-Up a resource name for the schema
-	resourceName := fmt.Sprintf("%s.json", name)
+	resourceName := fmt.Sprintf("%s", name)
 
 	compiler := NewCompilerWithOptions(o)
 	compiler.UseLoader(NewCompilerLoader())
@@ -94,7 +93,7 @@ func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.Vali
 
 	jsch, err := compiler.Compile(resourceName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile JSON schema: %w", err)
+		return nil, fmt.Errorf("JSON schema compile failed: %s", err.Error())
 	}
 
 	return jsch, nil
