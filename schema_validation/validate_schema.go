@@ -191,7 +191,11 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 
 	}
 
-	jsch, err := helpers.NewCompiledSchemaWithVersion(schema.GoLow().GetIndex().GetSpecAbsolutePath(), jsonSchema, s.options, version)
+	path := ""
+	if schema.GoLow().GetIndex() != nil {
+		path = schema.GoLow().GetIndex().GetSpecAbsolutePath()
+	}
+	jsch, err := helpers.NewCompiledSchemaWithVersion(path, jsonSchema, s.options, version)
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 	if err != nil {
