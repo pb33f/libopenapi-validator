@@ -417,7 +417,6 @@ components:
 	for _, err := range errors {
 		t.Logf("Error: %s", err.Error())
 	}
-
 }
 
 // Helper function to check if a string contains a substring (case-insensitive)

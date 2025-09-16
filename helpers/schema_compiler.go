@@ -55,7 +55,6 @@ func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptio
 // - version 3.0: Allows OpenAPI 3.0 keywords like 'nullable'
 // - version 3.1+: Rejects OpenAPI 3.0 keywords like 'nullable' (strict JSON Schema compliance)
 func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.ValidationOptions, version float32) (*jsonschema.Schema, error) {
-
 	compiler := NewCompilerWithOptions(o)
 	compiler.UseLoader(NewCompilerLoader())
 
