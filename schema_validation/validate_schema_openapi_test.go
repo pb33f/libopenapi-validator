@@ -277,6 +277,151 @@ paths:
 	assert.Empty(t, errors, "Should have no validation errors")
 }
 
+func TestValidateSchema_CircularReference(t *testing.T) {
+	spec := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1"
+paths:
+  /:
+    post:
+      operationId: op
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/c'
+components:
+  schemas:
+    a:
+      type: "string"
+      examples:
+       - ''
+    b:
+      type: "object"
+      examples:
+        - { "z": "" }
+      properties:
+        z:
+          "$ref": '#/components/schemas/a'
+        b:
+          "$ref": '#/components/schemas/b'
+    c:
+      type: "object"
+      examples:
+        - { "b": { "z": "" } }
+      properties:
+        "b":
+          "$ref": '#/components/schemas/b'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Nil(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/").Post.RequestBody.Content.GetOrZero("application/json").Schema
+	assert.NotNil(t, schema)
+	assert.NotNil(t, schema.Schema())
+
+	t.Run("should fail rendering", func(t *testing.T) {
+		_, err := schema.Schema().RenderInline()
+		assert.Error(t, err, "RenderInline should not error on circular refs")
+
+	})
+
+	t.Run("should fail validating", func(t *testing.T) {
+		sv := NewSchemaValidator()
+
+		schemaB := model.Model.Components.Schemas.GetOrZero("b").Schema()
+
+		assert.NotNil(t, schemaB)
+		assert.NotNil(t, schemaB.Examples)
+
+		exampleJSON := `{"z": "", "b": {"z": ""}}`
+		valid, errors := sv.ValidateSchemaString(schemaB, exampleJSON)
+
+		assert.False(t, valid, "Schema with circular refs should currently fail validation")
+		assert.NotNil(t, errors, "Should have validation errors")
+
+		foundCompilationError := false
+		for _, err := range errors {
+			if err.SchemaValidationErrors != nil {
+				for _, schErr := range err.SchemaValidationErrors {
+					if schErr.Location == "unavailable" && schErr.Reason == "schema render failure, circular reference: `#/components/schemas/b`" {
+						foundCompilationError = true
+					}
+				}
+			}
+		}
+		assert.True(t, foundCompilationError, "Should have schema compilation error for circular references")
+	})
+}
+
+func TestValidateSchema_SimpleCircularReference(t *testing.T) {
+	// Even simpler test case
+	spec := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1"
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+components:
+  schemas:
+    Node:
+      type: object
+      properties:
+        value:
+          type: string
+        next:
+          $ref: '#/components/schemas/Node'
+      examples:
+        - value: "test"
+          next:
+            value: "nested"`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Nil(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/test").Get.Responses.Codes.GetOrZero("200").Content.GetOrZero("application/json").Schema
+	assert.NotNil(t, schema)
+	assert.NotNil(t, schema.Schema())
+
+	// Try to render inline
+	rendered, err := schema.Schema().RenderInline()
+	if err != nil {
+		t.Logf("RenderInline error on simple circular ref: %v", err)
+	} else {
+		t.Logf("RenderInline succeeded for simple circular ref, rendered %d bytes", len(rendered))
+	}
+
+	// Validate using schema validator
+	sv := NewSchemaValidator()
+	nodeSchema := model.Model.Components.Schemas.GetOrZero("Node").Schema()
+
+	// Try to validate an example against the schema
+	exampleJSON := `{"value": "test", "next": {"value": "nested"}}`
+	valid, errors := sv.ValidateSchemaString(nodeSchema, exampleJSON)
+
+	t.Logf("Simple circular ref - Schema validation valid: %v", valid)
+	if errors != nil {
+		for _, err := range errors {
+			t.Logf("Error: %s", err.Error())
+		}
+	}
+}
+
 // Helper function to check if a string contains a substring (case-insensitive)
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||

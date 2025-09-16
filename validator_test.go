@@ -1829,7 +1829,7 @@ components:
 	}
 	if ok, errs := oapiValidator.ValidateHttpResponse(req, res); !ok {
 		assert.Equal(t, 1, len(errs))
-		assert.Equal(t, "cannot render circular reference: #/components/schemas/Error", errs[0].Reason)
+		assert.Equal(t, "schema render failure, circular reference: `#/components/schemas/Error`", errs[0].Reason)
 
 	}
 }
