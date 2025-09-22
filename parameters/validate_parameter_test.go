@@ -88,7 +88,7 @@ func TestHeaderSchemaNoType(t *testing.T) {
 	req.Header.Set("apiKey", "headerValue")
 
 	v3Model, errs := doc.BuildV3Model()
-	if len(errs) > 0 {
+	if errs != nil {
 		t.Fatalf("error while building v3 model: %v", errs)
 	}
 
@@ -179,7 +179,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 	req.Header.Set("apiKey", "headerValue")
 
 	v3Model, errs := doc.BuildV3Model()
-	if len(errs) > 0 {
+	if errs != nil {
 		t.Fatalf("error while building v3 model: %v", errs)
 	}
 
@@ -242,7 +242,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 	}
 
 	v3Model, errs := doc.BuildV3Model()
-	if len(errs) > 0 {
+	if errs != nil {
 		t.Fatalf("error while building v3 model: %v", errs)
 	}
 
@@ -387,7 +387,7 @@ func TestHeaderSchemaStringNoJSON(t *testing.T) {
 	req.Header.Set("apiKey", "headerValue")
 
 	v3Model, errs := doc.BuildV3Model()
-	if len(errs) > 0 {
+	if errs != nil {
 		t.Fatalf("error while building v3 model: %v", errs)
 	}
 
@@ -450,7 +450,7 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 	}
 
 	v3Model, errs := doc.BuildV3Model()
-	if len(errs) > 0 {
+	if errs != nil {
 		t.Fatalf("error while building v3 model: %v", errs)
 	}
 

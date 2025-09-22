@@ -70,7 +70,7 @@ type Validator interface {
 func NewValidator(document libopenapi.Document, opts ...config.Option) (Validator, []error) {
 	m, errs := document.BuildV3Model()
 	if errs != nil {
-		return nil, errs
+		return nil, []error{errs}
 	}
 	v := NewValidatorFromV3Model(&m.Model, opts...)
 	v.(*validator).document = document

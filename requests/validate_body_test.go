@@ -1432,7 +1432,7 @@ func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	v3Model, errs := doc.BuildV3Model()
-	if len(errs) > 0 {
+	if errs != nil {
 		fmt.Println("error while building a Open API spec V3 model", errs)
 		return
 	}
