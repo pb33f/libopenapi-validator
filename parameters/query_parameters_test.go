@@ -94,7 +94,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -124,7 +124,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -183,7 +183,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -213,7 +213,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -591,7 +591,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -621,7 +621,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -651,7 +651,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -681,7 +681,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -825,7 +825,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -855,7 +855,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -885,7 +885,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -914,7 +914,7 @@ paths:
 	doc, err := libopenapi.NewDocument([]byte(spec))
 	require.NoError(t, err)
 	m, errs := doc.BuildV3Model()
-	require.Len(t, errs, 0)
+	require.NoError(t, errs)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -3329,7 +3329,7 @@ components:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 1) // path build will fail because of missing schema.
+	assert.Error(t, err) // path build will fail because of missing schema.
 
 	v := NewParameterValidator(&m.Model)
 
@@ -3377,7 +3377,7 @@ components:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 0) // no patch build here
+	assert.NoError(t, err)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -3467,7 +3467,7 @@ components:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 0) // no patch build here
+	assert.NoError(t, err)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -3508,7 +3508,7 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 0)
+	assert.NoError(t, err)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -3560,7 +3560,7 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 0)
+	assert.NoError(t, err)
 
 	v := NewParameterValidator(&m.Model)
 
@@ -3611,7 +3611,7 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
 	m, err := doc.BuildV3Model()
-	assert.Len(t, err, 0)
+	assert.NoError(t, err)
 
 	v := NewParameterValidator(&m.Model)
 

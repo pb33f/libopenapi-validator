@@ -1797,21 +1797,18 @@ components:
 	circ := model.Index.GetCircularReferences()
 	fmt.Println("Circular references: ", len(circ))
 
-	if len(errs) > 0 {
-		for i := range errs {
-			fmt.Printf("model error: %e\n", errs[i])
-		}
-		panic(fmt.Sprintf("failed to create v3 model from document: %d errors reported", len(errs)))
+	if errs != nil {
+		panic(fmt.Sprintf("failed to create v3 model from document: %e", errs))
 	}
 
 	fmt.Println("Successfully parsed OpenAPI spec")
 
-	oapiValidator, errs := NewValidator(document)
-	if errs != nil {
-		panic(fmt.Sprintf("failed to create validator: %v", errs))
+	oapiValidator, merrs := NewValidator(document)
+	if merrs != nil {
+		panic(fmt.Sprintf("failed to create validator: %v", merrs))
 	}
-	if ok, errs := oapiValidator.ValidateDocument(); !ok {
-		panic(fmt.Sprintf("document validation errors: %v", errs))
+	if ok, merrs := oapiValidator.ValidateDocument(); !ok {
+		panic(fmt.Sprintf("document validation errors: %v", merrs))
 	}
 
 	req := &http.Request{
@@ -1874,21 +1871,18 @@ components:
 	circ := model.Index.GetCircularReferences()
 	fmt.Println("Circular references: ", len(circ))
 
-	if len(errs) > 0 {
-		for i := range errs {
-			fmt.Printf("model error: %e\n", errs[i])
-		}
-		panic(fmt.Sprintf("failed to create v3 model from document: %d errors reported", len(errs)))
+	if errs != nil {
+		panic(fmt.Sprintf("failed to create v3 model from document: %e", errs))
 	}
 
 	fmt.Println("Successfully parsed OpenAPI spec")
 
-	oapiValidator, errs := NewValidator(document)
-	if errs != nil {
-		panic(fmt.Sprintf("failed to create validator: %v", errs))
+	oapiValidator, merrs := NewValidator(document)
+	if merrs != nil {
+		panic(fmt.Sprintf("failed to create validator: %v", merrs))
 	}
-	if ok, errs := oapiValidator.ValidateDocument(); !ok {
-		panic(fmt.Sprintf("document validation errors: %v", errs))
+	if ok, merrs := oapiValidator.ValidateDocument(); !ok {
+		panic(fmt.Sprintf("document validation errors: %v", merrs))
 	}
 
 	req := &http.Request{
@@ -1942,7 +1936,7 @@ components:
 	model, errs := document.BuildV3Model()
 
 	if errs != nil {
-		panic(fmt.Sprintf("failed to create v3 model from document: %d errors reported", len(errs)))
+		panic(fmt.Sprintf("failed to create v3 model from document: %e", errs))
 	}
 
 	v := NewValidatorFromV3Model(&model.Model)
