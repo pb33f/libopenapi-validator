@@ -108,7 +108,7 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 		})
 	}
 
-	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, config.WithExistingOpts(v.options))
+	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, helpers.VersionToFloat(v.document.Version), config.WithExistingOpts(v.options))
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 
