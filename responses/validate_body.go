@@ -186,7 +186,7 @@ func (v *responseBodyValidator) checkResponseSchema(
 
 			if len(renderedInline) > 0 && len(renderedJSON) > 0 && schema != nil {
 				// render the schema, to be used for validation
-				valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
+				valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, helpers.VersionToFloat(v.document.Version), config.WithRegexEngine(v.options.RegexEngine))
 				if !valid {
 					validationErrors = append(validationErrors, vErrs...)
 				}

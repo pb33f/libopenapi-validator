@@ -34,6 +34,7 @@ func ValidateRequestSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
+	version float32,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
 	validationOptions := config.NewValidationOptions(opts...)
@@ -110,7 +111,7 @@ func ValidateRequestSchema(
 	}
 
 	// Attempt to compile the JSON schema
-	jsch, err := helpers.NewCompiledSchema("requestBody", jsonSchema, validationOptions)
+	jsch, err := helpers.NewCompiledSchemaWithVersion("requestBody", jsonSchema, validationOptions, version)
 	if err != nil {
 		validationErrors = append(validationErrors, &errors.ValidationError{
 			ValidationType:    helpers.RequestBodyValidation,

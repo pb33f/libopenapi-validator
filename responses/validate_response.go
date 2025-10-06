@@ -38,6 +38,7 @@ func ValidateResponseSchema(
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
+	version float32,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
 	options := config.NewValidationOptions(opts...)
@@ -128,7 +129,7 @@ func ValidateResponseSchema(
 	}
 
 	// create a new jsonschema compiler and add in the rendered JSON schema.
-	jsch, err := helpers.NewCompiledSchema(helpers.ResponseBodyValidation, jsonSchema, options)
+	jsch, err := helpers.NewCompiledSchemaWithVersion(helpers.ResponseBodyValidation, jsonSchema, options, version)
 	if err != nil {
 		// schema compilation failed, return validation error instead of panicking
 		violation := &errors.SchemaValidationFailure{
