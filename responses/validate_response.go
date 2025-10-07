@@ -32,6 +32,7 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 // schema of the response body are valid.
 //
 // This function is used by the ValidateResponseBody function, but can be used independently.
+// The compiledSchema parameter must be non-nil (schema must be pre-compiled before calling this function).
 func ValidateResponseSchema(
 	request *http.Request,
 	response *http.Response,
@@ -39,10 +40,9 @@ func ValidateResponseSchema(
 	renderedSchema,
 	jsonSchema []byte,
 	version float32,
+	compiledSchema *jsonschema.Schema,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
-	options := config.NewValidationOptions(opts...)
-
 	var validationErrors []*errors.ValidationError
 
 	if response == nil || response.Body == http.NoBody {
@@ -128,30 +128,38 @@ func ValidateResponseSchema(
 		return true, nil
 	}
 
-	// create a new jsonschema compiler and add in the rendered JSON schema.
-	jsch, err := helpers.NewCompiledSchemaWithVersion(helpers.ResponseBodyValidation, jsonSchema, options, version)
-	if err != nil {
-		// schema compilation failed, return validation error instead of panicking
-		violation := &errors.SchemaValidationFailure{
-			Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
-			Location:        "schema compilation",
-			ReferenceSchema: string(renderedSchema),
-			ReferenceObject: string(responseBody),
+	// Use pre-compiled schema if available, otherwise compile now (for backward compatibility)
+	var jsch *jsonschema.Schema
+	if compiledSchema != nil {
+		// Use the cached pre-compiled schema - this is the optimization!
+		jsch = compiledSchema
+	} else {
+		// Compile the schema (for direct calls to this function without pre-compilation)
+		options := config.NewValidationOptions(opts...)
+		var err error
+		jsch, err = helpers.NewCompiledSchemaWithVersion(helpers.ResponseBodyValidation, jsonSchema, options, version)
+		if err != nil {
+			violation := &errors.SchemaValidationFailure{
+				Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
+				Location:        "schema compilation",
+				ReferenceSchema: string(renderedSchema),
+				ReferenceObject: string(responseBody),
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.ResponseBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%d response body for '%s' failed schema compilation",
+					response.StatusCode, request.URL.Path),
+				Reason: fmt.Sprintf("The response schema for status code '%d' failed to compile: %s",
+					response.StatusCode, err.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               "check the response schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+				Context:                string(renderedSchema),
+			})
+			return false, validationErrors
 		}
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:    helpers.ResponseBodyValidation,
-			ValidationSubType: helpers.Schema,
-			Message: fmt.Sprintf("%d response body for '%s' failed schema compilation",
-				response.StatusCode, request.URL.Path),
-			Reason: fmt.Sprintf("The response schema for status code '%d' failed to compile: %s",
-				response.StatusCode, err.Error()),
-			SpecLine:               1,
-			SpecCol:                0,
-			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
-			HowToFix:               "check the response schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
-			Context:                string(renderedSchema),
-		})
-		return false, validationErrors
 	}
 
 	// validate the object against the schema

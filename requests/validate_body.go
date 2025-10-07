@@ -10,6 +10,7 @@ import (
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -83,32 +84,47 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	// extract schema from media type
 	var schema *base.Schema
 	var renderedInline, renderedJSON []byte
+	var validationErrors []*errors.ValidationError
 
 	// have we seen this schema before? let's hash it and check the cache.
 	hash := mediaType.GoLow().Schema.Value.Hash()
 
-	// perform work only once and cache the result in the validator.
+	// Check cache for pre-rendered and pre-compiled schema
+	var compiledSchema *jsonschema.Schema
 	if cacheHit, ch := v.schemaCache.Load(hash); ch {
 		// got a hit, use cached values
-		schema = cacheHit.(*schemaCache).schema
-		renderedInline = cacheHit.(*schemaCache).renderedInline
-		renderedJSON = cacheHit.(*schemaCache).renderedJSON
-
+		if cached, ok := cacheHit.(*helpers.SchemaCache); ok {
+			schema = cached.Schema
+			renderedInline = cached.RenderedInline
+			renderedJSON = cached.RenderedJSON
+			compiledSchema = cached.CompiledSchema
+		}
 	} else {
-
 		// render the schema inline and perform the intensive work of rendering and converting
 		// this is only performed once per schema and cached in the validator.
 		schema = mediaType.Schema.Schema()
 		renderedInline, _ = schema.RenderInline()
 		renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-		v.schemaCache.Store(hash, &schemaCache{
-			schema:         schema,
-			renderedInline: renderedInline,
-			renderedJSON:   renderedJSON,
+
+		// Compile the schema and cache it (so future requests don't need to compile)
+		var err error
+		compiledSchema, err = helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, v.options)
+		if err != nil {
+			// Compilation failed - cache with nil compiledSchema so we don't re-render
+			// ValidateRequestSchema will handle nil and report the compilation error
+			compiledSchema = nil
+		}
+
+		// Always cache (even if compilation failed) to avoid re-rendering on every request
+		v.schemaCache.Store(hash, &helpers.SchemaCache{
+			Schema:         schema,
+			RenderedInline: renderedInline,
+			RenderedJSON:   renderedJSON,
+			CompiledSchema: compiledSchema, // may be nil if compilation failed
 		})
 	}
 
-	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, helpers.VersionToFloat(v.document.Version), config.WithExistingOpts(v.options))
+	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, helpers.VersionToFloat(v.document.Version), compiledSchema, config.WithExistingOpts(v.options))
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 

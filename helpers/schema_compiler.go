@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -274,4 +275,13 @@ func transformTypeForCoercion(schemaType interface{}) interface{} {
 	default:
 		return schemaType
 	}
+}
+
+// SchemaCache represents a cached schema with all its compiled forms.
+// This is used by validators to cache rendered and compiled schemas.
+type SchemaCache struct {
+	Schema         *base.Schema
+	RenderedInline []byte
+	RenderedJSON   []byte
+	CompiledSchema *jsonschema.Schema
 }

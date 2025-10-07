@@ -118,7 +118,7 @@ properties:
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			valid, errors := ValidateResponseSchema(tc.request, tc.response, tc.schema, tc.renderedSchema, tc.jsonSchema, tc.version)
+			valid, errors := ValidateResponseSchema(tc.request, tc.response, tc.schema, tc.renderedSchema, tc.jsonSchema, tc.version, nil)
 
 			tc.assertValidResponseSchema(t, valid)
 			assert.Len(t, errors, tc.expectedErrorsCount)
@@ -159,6 +159,7 @@ properties:
 		renderedSchema,
 		jsonSchema,
 		3.1,
+		nil,
 	)
 
 	assert.False(t, valid)
