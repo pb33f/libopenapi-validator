@@ -399,25 +399,20 @@ func warmSchemaCaches(
 	for pathPair := doc.Paths.PathItems.First(); pathPair != nil; pathPair = pathPair.Next() {
 		pathItem := pathPair.Value()
 
-		// Get all operations for this path
-		operations := []*v3.Operation{
-			pathItem.Get,
-			pathItem.Post,
-			pathItem.Put,
-			pathItem.Patch,
-			pathItem.Delete,
-			pathItem.Head,
-			pathItem.Options,
-			pathItem.Trace,
+		// Get all operations for this path (handles all HTTP methods including OpenAPI 3.2+ extensions)
+		operations := pathItem.GetOperations()
+		if operations == nil {
+			continue
 		}
 
-		for _, operation := range operations {
+		for opPair := operations.First(); opPair != nil; opPair = opPair.Next() {
+			operation := opPair.Value()
 			if operation == nil {
 				continue
 			}
 
 			// Warm request body schemas
-			if operation.RequestBody != nil && operation.RequestBody.Content != nil && requestCache != nil {
+			if requestCache != nil && operation.RequestBody != nil && operation.RequestBody.Content != nil {
 				for contentPair := operation.RequestBody.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
 					mediaType := contentPair.Value()
 					if mediaType.Schema != nil {
@@ -427,32 +422,35 @@ func warmSchemaCaches(
 			}
 
 			// Warm response body schemas
-			if operation.Responses != nil && operation.Responses.Codes != nil && responseCache != nil {
-				for codePair := operation.Responses.Codes.First(); codePair != nil; codePair = codePair.Next() {
-					response := codePair.Value()
-					if response != nil && response.Content != nil {
-						for contentPair := response.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
-							mediaType := contentPair.Value()
-							if mediaType.Schema != nil {
-								warmMediaTypeSchema(mediaType, responseCache, options)
+			if responseCache != nil && operation.Responses != nil {
+				// Warm status code responses
+				if operation.Responses.Codes != nil {
+					for codePair := operation.Responses.Codes.First(); codePair != nil; codePair = codePair.Next() {
+						response := codePair.Value()
+						if response != nil && response.Content != nil {
+							for contentPair := response.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+								mediaType := contentPair.Value()
+								if mediaType.Schema != nil {
+									warmMediaTypeSchema(mediaType, responseCache, options)
+								}
 							}
+						}
+					}
+				}
+
+				// Warm default response schemas
+				if operation.Responses.Default != nil && operation.Responses.Default.Content != nil {
+					for contentPair := operation.Responses.Default.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+						mediaType := contentPair.Value()
+						if mediaType.Schema != nil {
+							warmMediaTypeSchema(mediaType, responseCache, options)
 						}
 					}
 				}
 			}
 
-			// Warm default response schemas
-			if operation.Responses != nil && operation.Responses.Default != nil && operation.Responses.Default.Content != nil && responseCache != nil {
-				for contentPair := operation.Responses.Default.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
-					mediaType := contentPair.Value()
-					if mediaType.Schema != nil {
-						warmMediaTypeSchema(mediaType, responseCache, options)
-					}
-				}
-			}
-
 			// Warm parameter schemas
-			if operation.Parameters != nil && paramCache != nil {
+			if paramCache != nil && operation.Parameters != nil {
 				for _, param := range operation.Parameters {
 					if param != nil {
 						warmParameterSchema(param, paramCache, options)
@@ -462,7 +460,7 @@ func warmSchemaCaches(
 		}
 
 		// Warm path-level parameters
-		if pathItem.Parameters != nil && paramCache != nil {
+		if paramCache != nil && pathItem.Parameters != nil {
 			for _, param := range pathItem.Parameters {
 				if param != nil {
 					warmParameterSchema(param, paramCache, options)
@@ -478,38 +476,25 @@ func warmMediaTypeSchema(mediaType *v3.MediaType, cache *sync.Map, options *conf
 		return
 	}
 
-	// Get the schema hash (same logic as in validate_body.go)
 	hash := mediaType.GoLow().Schema.Value.Hash()
 
-	// Check if already cached
 	if _, exists := cache.Load(hash); exists {
 		return
 	}
 
-	// Render and compile the schema
 	schema := mediaType.Schema.Schema()
 	if schema == nil {
 		return
 	}
 
-	renderedInline, err := schema.RenderInline()
-	if err != nil {
-		return // Skip schemas that can't be rendered
-	}
-
-	renderedJSON, err := utils.ConvertYAMLtoJSON(renderedInline)
-	if err != nil {
+	renderedInline, _ := schema.RenderInline()
+	renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+	if len(renderedInline) == 0 {
 		return
 	}
 
-	// Compile the schema (use hex encoding of hash as the schema name)
-	compiledSchema, err := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
-	if err != nil {
-		// Log error but continue - don't fail the entire warming process
-		return
-	}
+	compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
 
-	// Store in cache using the shared SchemaCache type
 	cache.Store(hash, &helpers.SchemaCache{
 		Schema:         schema,
 		RenderedInline: renderedInline,
@@ -551,27 +536,17 @@ func warmParameterSchema(param *v3.Parameter, cache *sync.Map, options *config.V
 		return
 	}
 
-	// Check if already cached
 	if _, exists := cache.Load(hash); exists {
 		return
 	}
 
-	// Render and compile the schema
-	renderedInline, err := schema.RenderInline()
-	if err != nil {
+	renderedInline, _ := schema.RenderInline()
+	renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+	if len(renderedInline) == 0 {
 		return
 	}
 
-	renderedJSON, err := utils.ConvertYAMLtoJSON(renderedInline)
-	if err != nil {
-		return
-	}
-
-	// Compile the schema (use hex encoding of hash as the schema name)
-	compiledSchema, err := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
-	if err != nil {
-		return
-	}
+	compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
 
 	// Store in cache using the shared SchemaCache type
 	cache.Store(hash, &helpers.SchemaCache{
