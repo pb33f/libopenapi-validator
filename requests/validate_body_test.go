@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -689,7 +691,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Nutrients:
@@ -706,7 +708,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       allOf:
@@ -755,7 +757,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Nutrients:
@@ -772,7 +774,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       allOf:
@@ -822,7 +824,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Uncooked:
@@ -855,7 +857,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       oneOf:
@@ -909,7 +911,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Uncooked:
@@ -942,7 +944,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       oneOf:
@@ -997,7 +999,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1050,7 +1052,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1154,7 +1156,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1278,7 +1280,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1455,7 +1457,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/V1_UserRequest' 
+              $ref: '#/components/schema_validation/V1_UserRequest'
 components:
   schema_validation:
     V1_UserRequest:
@@ -1492,4 +1494,22 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Equal(t, "'test' is not valid email: missing @", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+// TestGetSchemaCache tests the GetSchemaCache method
+func TestGetSchemaCache(t *testing.T) {
+	spec, err := os.ReadFile("../test_specs/petstorev3.json")
+	require.NoError(t, err)
+
+	doc, _ := libopenapi.NewDocument(spec)
+	m, _ := doc.BuildV3Model()
+
+	validator := NewRequestBodyValidator(&m.Model)
+
+	// Verify validator implements SchemaCacheAccessor interface
+	accessor, ok := validator.(helpers.SchemaCacheAccessor)
+	require.True(t, ok, "Validator should implement helpers.SchemaCacheAccessor interface")
+
+	cache := accessor.GetSchemaCache()
+	assert.NotNil(t, cache, "Cache should not be nil")
 }

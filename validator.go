@@ -383,19 +383,15 @@ func warmSchemaCaches(
 	}
 
 	// Type assert to get the concrete types with GetSchemaCache methods
-	type cacheGetter interface {
-		GetSchemaCache() *sync.Map
-	}
-
 	var requestCache, responseCache, paramCache *sync.Map
 
-	if rg, ok := requestValidator.(cacheGetter); ok {
+	if rg, ok := requestValidator.(helpers.SchemaCacheAccessor); ok {
 		requestCache = rg.GetSchemaCache()
 	}
-	if rg, ok := responseValidator.(cacheGetter); ok {
+	if rg, ok := responseValidator.(helpers.SchemaCacheAccessor); ok {
 		responseCache = rg.GetSchemaCache()
 	}
-	if rg, ok := paramValidator.(cacheGetter); ok {
+	if rg, ok := paramValidator.(helpers.SchemaCacheAccessor); ok {
 		paramCache = rg.GetSchemaCache()
 	}
 

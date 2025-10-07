@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -665,7 +666,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schema_validation/TestBody' 
+                $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Uncooked:
@@ -698,7 +699,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       oneOf:
@@ -768,7 +769,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schema_validation/TestBody' 
+                $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Uncooked:
@@ -801,7 +802,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       oneOf:
@@ -1511,4 +1512,28 @@ func (er *errorReader) Read(p []byte) (n int, err error) {
 
 func (er *errorReader) Close() error {
 	return nil
+}
+
+// TestGetSchemaCache tests the GetSchemaCache method
+func TestGetSchemaCache(t *testing.T) {
+	spec, err := os.ReadFile("../test_specs/petstorev3.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc, _ := libopenapi.NewDocument(spec)
+	m, _ := doc.BuildV3Model()
+
+	validator := NewResponseBodyValidator(&m.Model)
+
+	// Verify validator implements SchemaCacheAccessor interface
+	accessor, ok := validator.(helpers.SchemaCacheAccessor)
+	if !ok {
+		t.Fatal("Validator should implement helpers.SchemaCacheAccessor interface")
+	}
+
+	cache := accessor.GetSchemaCache()
+	if cache == nil {
+		t.Error("Cache should not be nil")
+	}
 }

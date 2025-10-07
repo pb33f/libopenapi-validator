@@ -610,7 +610,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuid		
+            format: uuid
 `
 
 	doc, err := libopenapi.NewDocument([]byte(spec))
@@ -1951,4 +1951,62 @@ components:
 	valid, vErrs = v.ValidateDocument()
 	assert.True(t, valid)
 	assert.Len(t, vErrs, 0)
+}
+
+// TestCacheWarming_PopulatesCache verifies that cache warming populates the validator caches
+func TestCacheWarming_PopulatesCache(t *testing.T) {
+	spec, err := os.ReadFile("test_specs/petstorev3.json")
+	require.NoError(t, err)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Nil(t, errs)
+
+	validator := v.(*validator)
+
+	// Check that caches were populated
+	// Check request validator cache
+	if rg, ok := validator.requestValidator.(helpers.SchemaCacheAccessor); ok {
+		cache := rg.GetSchemaCache()
+		count := 0
+		cache.Range(func(key, value interface{}) bool {
+			count++
+			// Verify the cache entry has a compiled schema
+			if cached, ok := value.(*helpers.SchemaCache); ok {
+				assert.NotNil(t, cached.CompiledSchema, "Cache entry should have compiled schema")
+			}
+			return true
+		})
+		assert.Greater(t, count, 0, "Request validator cache should have entries")
+	}
+
+	// Check response validator cache
+	if rg, ok := validator.responseValidator.(helpers.SchemaCacheAccessor); ok {
+		cache := rg.GetSchemaCache()
+		count := 0
+		cache.Range(func(key, value interface{}) bool {
+			count++
+			if cached, ok := value.(*helpers.SchemaCache); ok {
+				assert.NotNil(t, cached.CompiledSchema, "Cache entry should have compiled schema")
+			}
+			return true
+		})
+		assert.Greater(t, count, 0, "Response validator cache should have entries")
+	}
+}
+
+// TestCacheWarming_EdgeCases tests edge cases in cache warming
+func TestCacheWarming_EdgeCases(t *testing.T) {
+	// Test nil document
+	warmSchemaCaches(nil, nil, nil, nil, nil)
+
+	// Test empty document
+	doc := &v3.Document{}
+	warmSchemaCaches(doc, nil, nil, nil, nil)
+
+	// Test document with nil PathItems
+	doc = &v3.Document{Paths: &v3.Paths{}}
+	warmSchemaCaches(doc, nil, nil, nil, nil)
 }

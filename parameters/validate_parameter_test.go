@@ -2,6 +2,7 @@ package parameters
 
 import (
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -202,7 +203,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 // https://github.com/pb33f/libopenapi-validator/issues/168
 func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 	bytes := []byte(`{
-  "openapi": "3.0.0", 
+  "openapi": "3.0.0",
   "info": {
     "title": "API Spec With Format Validation",
     "version": "1.0.0"
@@ -213,7 +214,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
         "parameters": [
           {
             "name": "email_param",
-            "in": "query", 
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
@@ -271,7 +272,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 // for both basic validation errors and JSONSchema validation errors
 func TestParameterNameFieldPopulation(t *testing.T) {
 	bytes := []byte(`{
-  "openapi": "3.0.0", 
+  "openapi": "3.0.0",
   "info": {
     "title": "Parameter Name Test",
     "version": "1.0.0"
@@ -282,7 +283,7 @@ func TestParameterNameFieldPopulation(t *testing.T) {
         "parameters": [
           {
             "name": "integer_param",
-            "in": "query", 
+            "in": "query",
             "required": true,
             "schema": {
               "type": "integer"
@@ -333,11 +334,11 @@ func TestHeaderSchemaStringNoJSON(t *testing.T) {
     "/api-endpoint": {
       "get": {
         "summary": "Restricted API Endpoint",
-        
+
         "responses": {
           "200": {
             "description": "Successful response",
-             "headers": { 
+             "headers": {
                "chicken-nuggets": {
 				"required": true,
 				"schema": {
@@ -573,5 +574,29 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 	} else {
 		// no validation errors - schema compiled and validated successfully
 		t.Logf("Schema compiled and validated successfully")
+	}
+}
+
+// TestGetSchemaCache tests the GetSchemaCache method
+func TestGetSchemaCache(t *testing.T) {
+	spec, err := os.ReadFile("../test_specs/petstorev3.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc, _ := libopenapi.NewDocument(spec)
+	m, _ := doc.BuildV3Model()
+
+	validator := NewParameterValidator(&m.Model)
+
+	// Verify validator implements SchemaCacheAccessor interface
+	accessor, ok := validator.(helpers.SchemaCacheAccessor)
+	if !ok {
+		t.Fatal("Validator should implement helpers.SchemaCacheAccessor interface")
+	}
+
+	cache := accessor.GetSchemaCache()
+	if cache == nil {
+		t.Error("Cache should not be nil")
 	}
 }
