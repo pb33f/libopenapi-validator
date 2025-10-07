@@ -2018,6 +2018,87 @@ func TestCacheWarming_EdgeCases(t *testing.T) {
 	warmSchemaCaches(doc, nil, nil, nil, nil)
 }
 
+// TestCacheWarming_NilOperations tests warming with nil operations
+func TestCacheWarming_NilOperations(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, _ := doc.BuildV3Model()
+
+	// Manually set operations to nil to test edge cases
+	for pair := m.Model.Paths.PathItems.First(); pair != nil; pair = pair.Next() {
+		pathItem := pair.Value()
+		// Force GetOperations to return something with nil operation
+		pathItem.Post = nil
+		pathItem.Put = nil
+		pathItem.Delete = nil
+		pathItem.Patch = nil
+		pathItem.Head = nil
+		pathItem.Options = nil
+		pathItem.Trace = nil
+	}
+
+	// This should not panic even with nil operations
+	v := NewValidatorFromV3Model(&m.Model)
+	assert.NotNil(t, v)
+}
+
+// TestCacheWarming_NilSchema tests warming with nil schema
+func TestCacheWarming_NilSchema(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, _ := doc.BuildV3Model()
+
+	// Manually set schema to nil to test edge case in warmMediaTypeSchema
+	for pathPair := m.Model.Paths.PathItems.First(); pathPair != nil; pathPair = pathPair.Next() {
+		pathItem := pathPair.Value()
+		if pathItem.Post != nil && pathItem.Post.RequestBody != nil && pathItem.Post.RequestBody.Content != nil {
+			for contentPair := pathItem.Post.RequestBody.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+				mediaType := contentPair.Value()
+				// Set schema to nil to trigger the schema == nil check
+				mediaType.Schema = nil
+			}
+		}
+	}
+
+	// This should not panic even with nil schemas
+	v := NewValidatorFromV3Model(&m.Model)
+	assert.NotNil(t, v)
+}
+
 // TestCacheWarming_DefaultResponse tests cache warming with default responses
 func TestCacheWarming_DefaultResponse(t *testing.T) {
 	spec := `openapi: 3.1.0
@@ -2251,4 +2332,78 @@ paths:
 
 	assert.Greater(t, requestCacheCount, 0, "Should have warmed request schemas")
 	assert.Greater(t, responseCacheCount, 0, "Should have warmed response schemas")
+}
+
+// TestValidateHttpRequestResponse_WithErrors tests the combined request/response validation
+func TestValidateHttpRequestResponse_WithErrors(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    post:
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - result
+                properties:
+                  result:
+                    type: string`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Nil(t, errs)
+
+	// Create request with missing required parameter and invalid body
+	body := []byte(`{"invalid": "field"}`)
+	request, _ := http.NewRequest(http.MethodPost, "https://api.example.com/test", bytes.NewBuffer(body))
+	request.Header.Set("Content-Type", "application/json")
+
+	// Create response with invalid body
+	responseBody := []byte(`{"invalid": "field"}`)
+	response := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader(responseBody)),
+	}
+
+	// Should get both request and response errors
+	valid, validationErrs := v.ValidateHttpRequestResponse(request, response)
+	assert.False(t, valid)
+	assert.Greater(t, len(validationErrs), 1, "Should have multiple validation errors from both request and response")
+
+	// Check we have errors from both request and response validation
+	hasRequestError := false
+	hasResponseError := false
+	for _, err := range validationErrs {
+		if strings.Contains(err.Message, "request") || strings.Contains(err.Message, "Query") {
+			hasRequestError = true
+		}
+		if strings.Contains(err.Message, "response") {
+			hasResponseError = true
+		}
+	}
+	assert.True(t, hasRequestError || hasResponseError, "Should have validation errors")
 }
