@@ -472,87 +472,71 @@ func warmSchemaCaches(
 
 // warmMediaTypeSchema warms the cache for a media type schema
 func warmMediaTypeSchema(mediaType *v3.MediaType, cache *sync.Map, options *config.ValidationOptions) {
-	if mediaType == nil || mediaType.Schema == nil {
-		return
+	if mediaType != nil && mediaType.Schema != nil {
+		hash := mediaType.GoLow().Schema.Value.Hash()
+
+		if _, exists := cache.Load(hash); !exists {
+			schema := mediaType.Schema.Schema()
+			if schema != nil {
+				renderedInline, _ := schema.RenderInline()
+				renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+				if len(renderedInline) > 0 {
+					compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
+
+					cache.Store(hash, &helpers.SchemaCache{
+						Schema:         schema,
+						RenderedInline: renderedInline,
+						RenderedJSON:   renderedJSON,
+						CompiledSchema: compiledSchema,
+					})
+				}
+			}
+		}
 	}
-
-	hash := mediaType.GoLow().Schema.Value.Hash()
-
-	if _, exists := cache.Load(hash); exists {
-		return
-	}
-
-	schema := mediaType.Schema.Schema()
-	if schema == nil {
-		return
-	}
-
-	renderedInline, _ := schema.RenderInline()
-	renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
-	if len(renderedInline) == 0 {
-		return
-	}
-
-	compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
-
-	cache.Store(hash, &helpers.SchemaCache{
-		Schema:         schema,
-		RenderedInline: renderedInline,
-		RenderedJSON:   renderedJSON,
-		CompiledSchema: compiledSchema,
-	})
 }
 
 // warmParameterSchema warms the cache for a parameter schema
 func warmParameterSchema(param *v3.Parameter, cache *sync.Map, options *config.ValidationOptions) {
-	if param == nil {
-		return
-	}
+	if param != nil {
+		var schema *base.Schema
+		var hash [32]byte
 
-	var schema *base.Schema
-	var hash [32]byte
-
-	// Parameters can have schemas in two places: schema property or content property
-	if param.Schema != nil {
-		schema = param.Schema.Schema()
-		if schema != nil {
-			hash = param.GoLow().Schema.Value.Hash()
-		}
-	} else if param.Content != nil {
-		// Check content for schema
-		for contentPair := param.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
-			mediaType := contentPair.Value()
-			if mediaType.Schema != nil {
-				schema = mediaType.Schema.Schema()
-				if schema != nil {
-					hash = mediaType.GoLow().Schema.Value.Hash()
+		// Parameters can have schemas in two places: schema property or content property
+		if param.Schema != nil {
+			schema = param.Schema.Schema()
+			if schema != nil {
+				hash = param.GoLow().Schema.Value.Hash()
+			}
+		} else if param.Content != nil {
+			// Check content for schema
+			for contentPair := param.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+				mediaType := contentPair.Value()
+				if mediaType.Schema != nil {
+					schema = mediaType.Schema.Schema()
+					if schema != nil {
+						hash = mediaType.GoLow().Schema.Value.Hash()
+					}
+					break // Only process first content type
 				}
-				break // Only process first content type
+			}
+		}
+
+		if schema != nil {
+			if _, exists := cache.Load(hash); !exists {
+				renderedInline, _ := schema.RenderInline()
+				renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+				if len(renderedInline) > 0 {
+					compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
+
+					// Store in cache using the shared SchemaCache type
+					cache.Store(hash, &helpers.SchemaCache{
+						Schema:         schema,
+						RenderedInline: renderedInline,
+						RenderedJSON:   renderedJSON,
+						CompiledSchema: compiledSchema,
+					})
+				}
 			}
 		}
 	}
-
-	if schema == nil {
-		return
-	}
-
-	if _, exists := cache.Load(hash); exists {
-		return
-	}
-
-	renderedInline, _ := schema.RenderInline()
-	renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
-	if len(renderedInline) == 0 {
-		return
-	}
-
-	compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
-
-	// Store in cache using the shared SchemaCache type
-	cache.Store(hash, &helpers.SchemaCache{
-		Schema:         schema,
-		RenderedInline: renderedInline,
-		RenderedJSON:   renderedJSON,
-		CompiledSchema: compiledSchema,
-	})
 }

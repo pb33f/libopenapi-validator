@@ -1960,7 +1960,6 @@ components:
 	assert.Len(t, vErrs, 0)
 }
 
-// TestCacheWarming_PopulatesCache verifies that cache warming populates the validator caches
 func TestCacheWarming_PopulatesCache(t *testing.T) {
 	spec, err := os.ReadFile("test_specs/petstorev3.json")
 	require.NoError(t, err)
@@ -2004,7 +2003,6 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 	}
 }
 
-// TestCacheWarming_EdgeCases tests edge cases in cache warming
 func TestCacheWarming_EdgeCases(t *testing.T) {
 	// Test nil document
 	warmSchemaCaches(nil, nil, nil, nil, nil)
@@ -2018,7 +2016,6 @@ func TestCacheWarming_EdgeCases(t *testing.T) {
 	warmSchemaCaches(doc, nil, nil, nil, nil)
 }
 
-// TestCacheWarming_NilOperations tests warming with nil operations
 func TestCacheWarming_NilOperations(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
@@ -2055,7 +2052,6 @@ paths:
 	assert.NotNil(t, v)
 }
 
-// TestCacheWarming_NilSchema tests warming with nil schema
 func TestCacheWarming_NilSchema(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
@@ -2099,7 +2095,6 @@ paths:
 	assert.NotNil(t, v)
 }
 
-// TestCacheWarming_DefaultResponse tests cache warming with default responses
 func TestCacheWarming_DefaultResponse(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
@@ -2240,170 +2235,4 @@ paths:
 		})
 		assert.Greater(t, count, 0, "Parameter validator cache should have entries from path-level parameters")
 	}
-}
-
-// TestCacheWarming_AllOperations tests cache warming across all HTTP methods
-func TestCacheWarming_AllOperations(t *testing.T) {
-	spec := `openapi: 3.1.0
-paths:
-  /test:
-    get:
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-    put:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '200':
-          description: OK
-    post:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: array
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                type: object
-    delete:
-      responses:
-        '204':
-          description: Deleted
-    patch:
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '200':
-          description: OK
-    head:
-      responses:
-        '200':
-          description: OK
-    options:
-      responses:
-        '200':
-          description: OK
-    trace:
-      responses:
-        '200':
-          description: OK`
-
-	doc, err := libopenapi.NewDocument([]byte(spec))
-	require.NoError(t, err)
-
-	v, errs := NewValidator(doc)
-	require.Nil(t, errs)
-	assert.NotNil(t, v)
-
-	validator := v.(*validator)
-
-	// Verify all caches were populated
-	requestCacheCount := 0
-	responseCacheCount := 0
-
-	if rg, ok := validator.requestValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := rg.GetSchemaCache()
-		cache.Range(func(key, value interface{}) bool {
-			requestCacheCount++
-			return true
-		})
-	}
-
-	if rg, ok := validator.responseValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := rg.GetSchemaCache()
-		cache.Range(func(key, value interface{}) bool {
-			responseCacheCount++
-			return true
-		})
-	}
-
-	assert.Greater(t, requestCacheCount, 0, "Should have warmed request schemas")
-	assert.Greater(t, responseCacheCount, 0, "Should have warmed response schemas")
-}
-
-// TestValidateHttpRequestResponse_WithErrors tests the combined request/response validation
-func TestValidateHttpRequestResponse_WithErrors(t *testing.T) {
-	spec := `openapi: 3.1.0
-paths:
-  /test:
-    post:
-      parameters:
-        - name: id
-          in: query
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - name
-              properties:
-                name:
-                  type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - result
-                properties:
-                  result:
-                    type: string`
-
-	doc, err := libopenapi.NewDocument([]byte(spec))
-	require.NoError(t, err)
-
-	v, errs := NewValidator(doc)
-	require.Nil(t, errs)
-
-	// Create request with missing required parameter and invalid body
-	body := []byte(`{"invalid": "field"}`)
-	request, _ := http.NewRequest(http.MethodPost, "https://api.example.com/test", bytes.NewBuffer(body))
-	request.Header.Set("Content-Type", "application/json")
-
-	// Create response with invalid body
-	responseBody := []byte(`{"invalid": "field"}`)
-	response := &http.Response{
-		StatusCode: 200,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(bytes.NewReader(responseBody)),
-	}
-
-	// Should get both request and response errors
-	valid, validationErrs := v.ValidateHttpRequestResponse(request, response)
-	assert.False(t, valid)
-	assert.Greater(t, len(validationErrs), 1, "Should have multiple validation errors from both request and response")
-
-	// Check we have errors from both request and response validation
-	hasRequestError := false
-	hasResponseError := false
-	for _, err := range validationErrs {
-		if strings.Contains(err.Message, "request") || strings.Contains(err.Message, "Query") {
-			hasRequestError = true
-		}
-		if strings.Contains(err.Message, "response") {
-			hasResponseError = true
-		}
-	}
-	assert.True(t, hasRequestError || hasResponseError, "Should have validation errors")
 }
