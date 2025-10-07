@@ -111,7 +111,7 @@ properties:
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			valid, errors := ValidateRequestSchema(tc.request, tc.schema, tc.renderedSchema, tc.jsonSchema, tc.version)
+			valid, errors := ValidateRequestSchema(tc.request, tc.schema, tc.renderedSchema, tc.jsonSchema, tc.version, nil)
 
 			tc.assertValidRequestSchema(t, valid)
 			assert.Len(t, errors, tc.expectedErrorsCount)
@@ -139,7 +139,7 @@ properties:
 
 	valid, errors := ValidateRequestSchema(postRequestWithBody(`{"exclusiveNumber": 13}`), &base.Schema{
 		Type: []string{"object"},
-	}, renderedSchema, jsonSchema, 3.1)
+	}, renderedSchema, jsonSchema, 3.1, nil)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)

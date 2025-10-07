@@ -29,16 +29,16 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // ValidateRequestSchema will validate a http.Request pointer against a schema.
 // If validation fails, it will return a list of validation errors as the second return value.
+// If compiledSchema is provided (non-nil), it will be used directly, skipping compilation.
 func ValidateRequestSchema(
 	request *http.Request,
 	schema *base.Schema,
 	renderedSchema,
 	jsonSchema []byte,
 	version float32,
+	compiledSchema *jsonschema.Schema,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
-	validationOptions := config.NewValidationOptions(opts...)
-
 	var validationErrors []*errors.ValidationError
 
 	var requestBody []byte
@@ -110,17 +110,26 @@ func ValidateRequestSchema(
 		return false, validationErrors
 	}
 
-	// Attempt to compile the JSON schema
-	jsch, err := helpers.NewCompiledSchemaWithVersion("requestBody", jsonSchema, validationOptions, version)
-	if err != nil {
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:    helpers.RequestBodyValidation,
-			ValidationSubType: helpers.Schema,
-			Message:           err.Error(),
-			Reason:            "Failed to compile the request body schema.",
-			Context:           string(jsonSchema),
-		})
-		return false, validationErrors
+	// Use pre-compiled schema if available, otherwise compile now (for backward compatibility)
+	var jsch *jsonschema.Schema
+	if compiledSchema != nil {
+		// Use the cached pre-compiled schema - this is the optimization!
+		jsch = compiledSchema
+	} else {
+		// Compile the schema (for direct calls to this function without pre-compilation)
+		validationOptions := config.NewValidationOptions(opts...)
+		var err error
+		jsch, err = helpers.NewCompiledSchemaWithVersion("requestBody", jsonSchema, validationOptions, version)
+		if err != nil {
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.RequestBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message:           err.Error(),
+				Reason:            "Failed to compile the request body schema.",
+				Context:           string(jsonSchema),
+			})
+			return false, validationErrors
+		}
 	}
 
 	// validate the object against the schema

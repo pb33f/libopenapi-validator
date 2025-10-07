@@ -5,6 +5,7 @@ package parameters
 
 import (
 	"net/http"
+	"sync"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -70,10 +71,16 @@ type ParameterValidator interface {
 func NewParameterValidator(document *v3.Document, opts ...config.Option) ParameterValidator {
 	options := config.NewValidationOptions(opts...)
 
-	return &paramValidator{options: options, document: document}
+	return &paramValidator{options: options, document: document, schemaCache: &sync.Map{}}
 }
 
 type paramValidator struct {
-	options  *config.ValidationOptions
-	document *v3.Document
+	options     *config.ValidationOptions
+	document    *v3.Document
+	schemaCache *sync.Map
+}
+
+// GetSchemaCache returns the internal schema cache for warming
+func (v *paramValidator) GetSchemaCache() *sync.Map {
+	return v.schemaCache
 }

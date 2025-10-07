@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
@@ -37,14 +36,13 @@ func NewRequestBodyValidator(document *v3.Document, opts ...config.Option) Reque
 	return &requestBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
 }
 
-type schemaCache struct {
-	schema         *base.Schema
-	renderedInline []byte
-	renderedJSON   []byte
-}
-
 type requestBodyValidator struct {
 	options     *config.ValidationOptions
 	document    *v3.Document
 	schemaCache *sync.Map
+}
+
+// GetSchemaCache returns the internal schema cache for warming
+func (v *requestBodyValidator) GetSchemaCache() *sync.Map {
+	return v.schemaCache
 }
