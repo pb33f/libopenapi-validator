@@ -9,29 +9,27 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-// SchemaValidationFailure is a wrapper around the jsonschema.ValidationError object, to provide a more
-// user-friendly way to break down what went wrong.
+// SchemaValidationFailure describes any failure that occurs when validating data
+// against either an OpenAPI or JSON Schema. It aims to be a more user-friendly
+// representation of the error than what is provided by the jsonschema library.
 type SchemaValidationFailure struct {
 	// Reason is a human-readable message describing the reason for the error.
 	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 
-	// Location is the XPath-like location of the validation failure
-	Location string `json:"location,omitempty" yaml:"location,omitempty"`
+	// InstancePath is the raw path segments from the root to the failing field
+	InstancePath []string `json:"instancePath,omitempty" yaml:"instancePath,omitempty"`
 
 	// FieldName is the name of the specific field that failed validation (last segment of the path)
 	FieldName string `json:"fieldName,omitempty" yaml:"fieldName,omitempty"`
 
-	// FieldPath is the JSONPath representation of the field location (e.g., "$.user.email")
+	// FieldPath is the JSONPath representation of the field location that failed validation (e.g., "$.user.email")
 	FieldPath string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
 
-	// InstancePath is the raw path segments from the root to the failing field
-	InstancePath []string `json:"instancePath,omitempty" yaml:"instancePath,omitempty"`
+	// KeywordLocation is the relative path to the JsonSchema keyword that failed validation
+	KeywordLocation string `json:"keywordLocation,omitempty" yaml:"keywordLocation,omitempty"`
 
-	// DeepLocation is the path to the validation failure as exposed by the jsonschema library.
-	DeepLocation string `json:"deepLocation,omitempty" yaml:"deepLocation,omitempty"`
-
-	// AbsoluteLocation is the absolute path to the validation failure as exposed by the jsonschema library.
-	AbsoluteLocation string `json:"absoluteLocation,omitempty" yaml:"absoluteLocation,omitempty"`
+	// AbsoluteKeywordLocation is the absolute path to the validation failure as exposed by the jsonschema library.
+	AbsoluteKeywordLocation string `json:"absoluteKeywordLocation,omitempty" yaml:"absoluteKeywordLocation,omitempty"`
 
 	// Line is the line number where the violation occurred. This may a local line number
 	// if the validation is a schema (only schemas are validated locally, so the line number will be relative to
@@ -46,14 +44,15 @@ type SchemaValidationFailure struct {
 	// ReferenceSchema is the schema that was referenced in the validation failure.
 	ReferenceSchema string `json:"referenceSchema,omitempty" yaml:"referenceSchema,omitempty"`
 
-	// ReferenceObject is the object that was referenced in the validation failure.
+	// ReferenceObject is the object that failed schema validation
 	ReferenceObject string `json:"referenceObject,omitempty" yaml:"referenceObject,omitempty"`
 
-	// ReferenceExample is an example object generated from the schema that was referenced in the validation failure.
-	ReferenceExample string `json:"referenceExample,omitempty" yaml:"referenceExample,omitempty"`
+	// The original jsonschema.ValidationError object, if the schema failure originated from the jsonschema library.
+	OriginalJsonSchemaError *jsonschema.ValidationError `json:"-" yaml:"-"`
 
-	// The original error object, which is a jsonschema.ValidationError object.
-	OriginalError *jsonschema.ValidationError `json:"-" yaml:"-"`
+	// DEPRECATED in favor of explicit use of FieldPath & InstancePath
+	// Location is the XPath-like location of the validation failure
+	Location string `json:"location,omitempty" yaml:"location,omitempty"`
 }
 
 // Error returns a string representation of the error
@@ -97,7 +96,7 @@ type ValidationError struct {
 	ParameterName string `json:"parameterName,omitempty" yaml:"parameterName,omitempty"`
 
 	// SchemaValidationErrors is a slice of SchemaValidationFailure objects that describe the validation errors
-	// This is only populated whe the validation type is against a schema.
+	// This is only populated when the validation type is against a schema.
 	SchemaValidationErrors []*SchemaValidationFailure `json:"validationErrors,omitempty" yaml:"validationErrors,omitempty"`
 
 	// Context is the object that the validation error occurred on. This is usually a pointer to a schema

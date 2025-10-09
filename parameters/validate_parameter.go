@@ -226,12 +226,12 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 		}
 
 		fail := &errors.SchemaValidationFailure{
-			Reason:        errMsg,
-			Location:      er.KeywordLocation,
-			FieldName:     helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-			FieldPath:     helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-			InstancePath:  helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-			OriginalError: scErrs,
+			Reason:                  errMsg,
+			Location:                er.KeywordLocation,
+			FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+			FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+			InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+			OriginalJsonSchemaError: scErrs,
 		}
 		if schema != nil {
 			rendered, err := schema.RenderInline()
