@@ -26,9 +26,11 @@ type SchemaValidationFailure struct {
 	FieldPath string `json:"fieldPath,omitempty" yaml:"fieldPath,omitempty"`
 
 	// KeywordLocation is the relative path to the JsonSchema keyword that failed validation
+	// This will be empty if the validation failure did not originate from JSON Schema validation
 	KeywordLocation string `json:"keywordLocation,omitempty" yaml:"keywordLocation,omitempty"`
 
 	// AbsoluteKeywordLocation is the absolute path to the validation failure as exposed by the jsonschema library.
+	// This will be empty if the validation failure did not originate from JSON Schema validation
 	AbsoluteKeywordLocation string `json:"absoluteKeywordLocation,omitempty" yaml:"absoluteKeywordLocation,omitempty"`
 
 	// Line is the line number where the violation occurred. This may a local line number
