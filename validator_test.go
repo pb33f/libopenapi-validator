@@ -2045,6 +2045,8 @@ paths:
 		pathItem.Head = nil
 		pathItem.Options = nil
 		pathItem.Trace = nil
+		pathItem.Query = nil
+		pathItem.AdditionalOperations = nil
 	}
 
 	// This should not panic even with nil operations
