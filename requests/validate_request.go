@@ -141,6 +141,10 @@ func ValidateRequestSchema(
 		// flatten the validationErrors
 		schFlatErrs := jk.BasicOutput().Errors
 		var schemaValidationErrors []*errors.SchemaValidationFailure
+
+		// re-encode the schema.
+		var renderedNode yaml.Node
+		_ = yaml.Unmarshal(renderedSchema, &renderedNode)
 		for q := range schFlatErrs {
 			er := schFlatErrs[q]
 
@@ -150,10 +154,6 @@ func ValidateRequestSchema(
 				continue // ignore this error, it's useless tbh, utter noise.
 			}
 			if er.Error != nil {
-
-				// re-encode the schema.
-				var renderedNode yaml.Node
-				_ = yaml.Unmarshal(renderedSchema, &renderedNode)
 
 				// locate the violated property in the schema
 				located := schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
