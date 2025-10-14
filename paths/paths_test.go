@@ -825,6 +825,7 @@ paths:
 	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotEmpty(t, errs)
 }
+
 func TestNewValidator_FindPathWithRegexpCache(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
