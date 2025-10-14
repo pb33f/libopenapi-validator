@@ -22,15 +22,16 @@ func TestValidateRequestSchema(t *testing.T) {
 		assertValidRequestSchema assert.BoolAssertionFunc
 		expectedErrorsCount      int
 	}{
-		"FailOnNumericExclusiveMinimum": {
+		"FailOnBooleanExclusiveMinimum": {
 			request: postRequestWithBody(`{"exclusiveNumber": 10}`),
 			schemaYAML: `type: object
 properties:
   exclusiveNumber:
     type: number
-    description: This number must be greater than 10
-    exclusiveMinimum: 10`,
-			version:                  3.1,
+    description: This number starts its journey where most numbers are too scared to begin!
+    exclusiveMinimum: true
+    minimum: 10`,
+			version:                  3.0,
 			assertValidRequestSchema: assert.False,
 			expectedErrorsCount:      1,
 		},
@@ -113,16 +114,19 @@ func postRequestWithBody(payload string) *http.Request {
 }
 
 func TestInvalidMin(t *testing.T) {
+	openAPIVersion := float32(3.0)
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
   exclusiveNumber:
     type: number
-    minimum: 20`, 3.1)
+    description: This number starts its journey where most numbers are too scared to begin!
+    exclusiveMinimum: true
+    minimum: 10`, openAPIVersion)
 
 	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
 		Request: postRequestWithBody(`{"exclusiveNumber": 13}`),
 		Schema:  schema,
-		Version: 3.1,
+		Version: openAPIVersion,
 	})
 
 	assert.False(t, valid)
@@ -130,10 +134,11 @@ properties:
 }
 
 func TestValidateRequestSchema_CachePopulation(t *testing.T) {
+	openAPIVersion := float32(3.1)
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
   name:
-    type: string`, 3.1)
+    type: string`, openAPIVersion)
 
 	// Create options with a cache
 	opts := config.NewValidationOptions()
@@ -143,7 +148,7 @@ properties:
 	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
 		Request: postRequestWithBody(`{"name": "test"}`),
 		Schema:  schema,
-		Version: 3.1,
+		Version: openAPIVersion,
 		Options: []config.Option{config.WithExistingOpts(opts)},
 	})
 

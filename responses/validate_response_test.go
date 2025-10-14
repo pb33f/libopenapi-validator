@@ -24,16 +24,17 @@ func TestValidateResponseSchema(t *testing.T) {
 		assertValidResponseSchema assert.BoolAssertionFunc
 		expectedErrorsCount       int
 	}{
-		"FailOnNumericExclusiveMinimum": {
+		"FailOnBooleanExclusiveMinimum": {
 			request:  postRequest(),
-			response: responseWithBody(`{"exclusiveNumber": 10}`),
+			response: responseWithBody(`{"exclusiveNumber": 13}`),
 			schemaYAML: `type: object
 properties:
   exclusiveNumber:
     type: number
-    description: This number must be greater than 10
-    exclusiveMinimum: 10`,
-			version:                   3.1,
+    description: This number starts its journey where most numbers are too scared to begin!
+    exclusiveMinimum: true
+    minimum: 10`,
+			version:                   3.0,
 			assertValidResponseSchema: assert.False,
 			expectedErrorsCount:       1,
 		},
@@ -116,17 +117,20 @@ properties:
 }
 
 func TestInvalidMin(t *testing.T) {
+	openAPIVersion := float32(3.0)
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
   exclusiveNumber:
     type: number
-    minimum: 20`, 3.1)
+    description: This number starts its journey where most numbers are too scared to begin!
+    exclusiveMinimum: true
+    minimum: 10`, openAPIVersion)
 
 	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
 		Request:  postRequest(),
 		Response: responseWithBody(`{"exclusiveNumber": 13}`),
 		Schema:   schema,
-		Version:  3.1,
+		Version:  openAPIVersion,
 	})
 
 	assert.False(t, valid)
