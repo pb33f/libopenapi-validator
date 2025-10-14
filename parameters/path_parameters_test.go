@@ -5,12 +5,16 @@ package parameters
 
 import (
 	"net/http"
+	"regexp"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -2037,7 +2041,7 @@ paths:
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/;burgerId=22334/locate", nil)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, nil)
 
 	valid, errors := v.ValidatePathParamsWithPathItem(request, path, pv)
 
@@ -2070,7 +2074,7 @@ paths:
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pizza/;burgerId=22334/locate", nil)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	valid, errors := v.ValidatePathParamsWithPathItem(request, path, pv)
 
@@ -2241,4 +2245,65 @@ paths:
 	valid, errors := v.ValidatePathParams(request)
 	assert.False(t, valid)
 	assert.NotEmpty(t, errors)
+}
+
+type RegexCacheWatcher struct {
+	inner      *sync.Map
+	loadCount  int64
+	storeCount int64
+}
+
+func (c *RegexCacheWatcher) Load(key any) (value any, ok bool) {
+	atomic.AddInt64(&c.loadCount, 1)
+	return c.inner.Load(key)
+}
+
+func (c *RegexCacheWatcher) Store(key, value any) {
+	atomic.AddInt64(&c.storeCount, 1)
+	c.inner.Store(key, value)
+}
+
+func TestNewValidator_CacheCompiledRegex(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /pizza:
+    get:
+      operationId: getPizza`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	cache := &RegexCacheWatcher{inner: &sync.Map{}}
+	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
+
+	compiledPizza := regexp.MustCompile("^pizza$")
+	cache.Store("pizza", compiledPizza)
+
+	assert.Equal(t, int64(1), cache.storeCount)
+	assert.Equal(t, int64(0), cache.loadCount)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pizza", nil)
+	valid, errors := v.ValidatePathParams(request)
+
+	assert.Equal(t, int64(1), cache.storeCount)
+	assert.Equal(t, int64(1), cache.loadCount)
+
+	mapLength := 0
+
+	cache.inner.Range(func(key, value any) bool {
+		mapLength += 1
+		return true
+	})
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+	assert.Equal(t, 1, mapLength)
+
+	cache.inner.Clear()
+
+	v.ValidatePathParams(request)
+
+	assert.Equal(t, int64(2), cache.storeCount)
+	assert.Equal(t, int64(2), cache.loadCount)
 }

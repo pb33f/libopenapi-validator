@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -240,7 +241,7 @@ paths:
 	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	// simulate a request/response
 	res := httptest.NewRecorder()
@@ -301,7 +302,7 @@ paths:
 	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, nil)
 
 	// simulate a request/response
 	res := httptest.NewRecorder()
@@ -644,7 +645,7 @@ paths:
 	response := res.Result()
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	// validate!
 	valid, errors := v.ValidateResponseBodyWithPathItem(request, response, path, pv)

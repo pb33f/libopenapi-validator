@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -3028,7 +3029,7 @@ paths:
 		"https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	valid, errors := v.ValidateQueryParamsWithPathItem(request, path, pv)
 	assert.False(t, valid)
@@ -3067,7 +3068,7 @@ paths:
 		"https://things.com/a/beef/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, nil)
 
 	valid, errors := v.ValidateQueryParamsWithPathItem(request, path, pv)
 	assert.False(t, valid)

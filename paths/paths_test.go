@@ -4,8 +4,11 @@
 package paths
 
 import (
+	"fmt"
 	"net/http"
 	"os"
+	"regexp"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -21,7 +24,7 @@ func TestNewValidator_BadParam(t *testing.T) {
 
 	m, _ := doc.BuildV3Model()
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 }
 
@@ -32,7 +35,7 @@ func TestNewValidator_GoodParamFloat(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(b)
 	m, _ := doc.BuildV3Model()
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 }
 
@@ -43,7 +46,7 @@ func TestNewValidator_GoodParamInt(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(b)
 
 	m, _ := doc.BuildV3Model()
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 }
 
@@ -61,7 +64,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/1,2,3,4,5/locate", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 }
@@ -80,7 +83,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/bish=bosh,wish=wash/locate", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 }
@@ -98,7 +101,7 @@ paths:
 	m, _ := doc.BuildV3Model()
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/.1.2.3.4.5/locate", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 }
@@ -112,7 +115,7 @@ func TestNewValidator_FindPathPost(t *testing.T) {
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pet/12334", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 }
 
@@ -124,7 +127,7 @@ func TestNewValidator_FindPathDelete(t *testing.T) {
 	m, _ := doc.BuildV3Model()
 	request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pet/12334", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 }
 
@@ -141,7 +144,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 }
@@ -159,7 +162,7 @@ paths:
 	m, _ := doc.BuildV3Model()
 	request, _ := http.NewRequest(http.MethodOptions, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Options.OperationId)
 }
@@ -177,7 +180,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Trace.OperationId)
 }
@@ -196,7 +199,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Put.OperationId)
 }
@@ -214,7 +217,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodHead, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Head.OperationId)
 }
@@ -236,19 +239,19 @@ paths:
 
 	// check against base1
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/base1/user", nil)
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 
 	// check against base2
 	request, _ = http.NewRequest(http.MethodPost, "https://things.com/base2/user", nil)
-	pathItem, _, _ = FindPath(request, &m.Model)
+	pathItem, _, _ = FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 
 	// check against a deeper base
 	request, _ = http.NewRequest(http.MethodPost, "https://things.com/base3/base4/base5/base6/user", nil)
-	pathItem, _, _ = FindPath(request, &m.Model)
+	pathItem, _, _ = FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 }
@@ -268,7 +271,7 @@ paths:
 
 	// check against a deeper base
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/base3/base4/base5/base6/user/1234/thing/abcd", nil)
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 }
@@ -287,7 +290,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodHead, "https://things.com/not/here", nil)
 
-	pathItem, errs, _ := FindPath(request, &m.Model)
+	pathItem, errs, _ := FindPath(request, &m.Model, nil)
 	assert.Nil(t, pathItem)
 	assert.NotNil(t, errs)
 	assert.Equal(t, "HEAD Path '/not/here' not found", errs[0].Message)
@@ -307,7 +310,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/burgers/12345", nil)
 
-	pathItem, errs, _ := FindPath(request, &m.Model)
+	pathItem, errs, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.NotNil(t, errs)
 	assert.Equal(t, "PUT Path '/burgers/12345' not found", errs[0].Message)
@@ -323,7 +326,7 @@ func TestNewValidator_GetLiteralMatch(t *testing.T) {
 
 	m, _ := doc.BuildV3Model()
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 0)
 }
@@ -337,7 +340,7 @@ func TestNewValidator_PostLiteralMatch(t *testing.T) {
 
 	m, _ := doc.BuildV3Model()
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 0)
 }
@@ -354,7 +357,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 0)
 }
@@ -377,7 +380,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -401,7 +404,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -419,7 +422,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 0)
 }
@@ -442,7 +445,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -460,7 +463,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 0)
 }
@@ -477,7 +480,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodOptions, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 0)
 }
@@ -494,7 +497,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodHead, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 0)
 }
@@ -511,7 +514,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 0)
 }
@@ -534,7 +537,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -558,7 +561,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -582,7 +585,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "PUT Path '/pizza/1234' not found", errs[0].Message)
@@ -604,13 +607,13 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/hashy#one", nil)
 
-	pathItem, errs, _ := FindPath(request, &m.Model)
+	pathItem, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.Len(t, errs, 0)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Post.OperationId)
 
 	request, _ = http.NewRequest(http.MethodPost, "https://things.com/hashy#two", nil)
-	pathItem, errs, _ = FindPath(request, &m.Model)
+	pathItem, errs, _ = FindPath(request, &m.Model, &sync.Map{})
 	assert.Len(t, errs, 0)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "two", pathItem.Post.OperationId)
@@ -634,7 +637,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/not_here", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, nil)
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "GET Path '/not_here' not found", errs[0].Message)
 }
@@ -690,7 +693,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/something/pkg%3Agithub%2Frs%2Fzerolog%40v1.18.0", nil)
 
-	pathItem, errs, _ := FindPath(request, &m.Model)
+	pathItem, errs, _ := FindPath(request, &m.Model, nil)
 
 	assert.Equal(t, 0, len(errs), "Errors found: %v", errs)
 	assert.NotNil(t, pathItem)
@@ -730,19 +733,72 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model)
+	pathItem, _, _ := FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 
 	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='1234',ValidityEndDate=datetime'1492041600000')", nil)
 
-	pathItem, _, _ = FindPath(request, &m.Model)
+	pathItem, _, _ = FindPath(request, &m.Model, nil)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 
 	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='dummy',ValidityEndDate=datetime'1492041600000')", nil)
 
-	pathItem, _, _ = FindPath(request, &m.Model)
+	pathItem, _, _ = FindPath(request, &m.Model, nil)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+}
+
+func TestNewValidator_ODataFormattedOpenAPISpecsWithRegexCache(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /entities('{Entity}'):
+    parameters:
+    - description: 'key: Entity'
+      in: path
+      name: Entity
+      required: true
+      schema:
+        type: integer
+    get:
+      operationId: one
+  /orders(RelationshipNumber='{RelationshipNumber}',ValidityEndDate=datetime'{ValidityEndDate}'):
+    parameters:
+    - name: RelationshipNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+    - name: ValidityEndDate
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      operationId: one
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
+
+	regexCache := &sync.Map{}
+
+	pathItem, _, _ := FindPath(request, &m.Model, regexCache)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='1234',ValidityEndDate=datetime'1492041600000')", nil)
+
+	pathItem, _, _ = FindPath(request, &m.Model, regexCache)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "one", pathItem.Get.OperationId)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='dummy',ValidityEndDate=datetime'1492041600000')", nil)
+
+	pathItem, _, _ = FindPath(request, &m.Model, regexCache)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 }
@@ -766,6 +822,39 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
 
-	_, errs, _ := FindPath(request, &m.Model)
+	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
 	assert.NotEmpty(t, errs)
+}
+func TestNewValidator_FindPathWithRegexpCache(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /pizza/{sauce}/{fill}/hamburger/pizza:
+    head:
+      operationId: locateBurger`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodHead, "https://things.com/pizza/tomato/pepperoni/hamburger/pizza", nil)
+
+	syncMap := sync.Map{}
+
+	_, errs, _ := FindPath(request, &m.Model, &syncMap)
+
+	keys := []string{}
+	addresses := make(map[string]bool)
+
+	syncMap.Range(func(key, value any) bool {
+		keys = append(keys, key.(string))
+		addresses[fmt.Sprintf("%p", value)] = true
+		return true
+	})
+
+	cached, found := syncMap.Load("pizza")
+
+	assert.True(t, found)
+	assert.True(t, cached.(*regexp.Regexp).MatchString("pizza"))
+	assert.Len(t, errs, 0)
+	assert.Len(t, keys, 4)
+	assert.Len(t, addresses, 3)
 }
