@@ -329,3 +329,18 @@ func TestWithCustomFormat(t *testing.T) {
 	assert.Contains(t, opts.Formats, "test-format")
 	assert.NotNil(t, opts.Formats["test-format"])
 }
+
+func TestWithSchemaCache(t *testing.T) {
+	// Test with nil cache (disables caching)
+	opts := NewValidationOptions(WithSchemaCache(nil))
+	assert.Nil(t, opts.SchemaCache)
+
+	// Test with default cache by creating a new options object
+	optsDefault := NewValidationOptions()
+	assert.NotNil(t, optsDefault.SchemaCache, "Default options should have a cache")
+
+	// Test setting a custom cache
+	customCache := optsDefault.SchemaCache // Use default cache as custom
+	optsCustom := NewValidationOptions(WithSchemaCache(customCache))
+	assert.Equal(t, customCache, optsCustom.SchemaCache)
+}

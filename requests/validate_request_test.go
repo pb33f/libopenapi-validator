@@ -194,3 +194,33 @@ func indentLines(s string, indent string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func TestValidateRequestSchema_NilSchema(t *testing.T) {
+	// Test when schema is nil
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"name": "test"}`),
+		Schema:  nil,
+		Version: 3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "schema is nil", errors[0].Message)
+	assert.Equal(t, "The schema to validate against is nil", errors[0].Reason)
+}
+
+func TestValidateRequestSchema_NilSchemaGoLow(t *testing.T) {
+	// Test when schema.GoLow() is nil by creating a schema without low-level data
+	schema := &base.Schema{} // Empty schema without GoLow() data
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"name": "test"}`),
+		Schema:  schema,
+		Version: 3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "schema cannot be rendered", errors[0].Message)
+	assert.Contains(t, errors[0].Reason, "does not have low-level information")
+}
