@@ -7,9 +7,11 @@ import (
 	"strings"
 )
 
-var baseDefaultPattern = "[^/]*"
-var DefaultPatternRegex = regexp.MustCompile("^([^/]*)$")
-var DefaultPatternRegexString = DefaultPatternRegex.String()
+var (
+	baseDefaultPattern        = "[^/]*"
+	DefaultPatternRegex       = regexp.MustCompile("^([^/]*)$")
+	DefaultPatternRegexString = DefaultPatternRegex.String()
+)
 
 // GetRegexForPath returns a compiled regular expression for the given path template.
 //
