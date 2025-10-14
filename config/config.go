@@ -1,6 +1,9 @@
 package config
 
-import "github.com/santhosh-tekuri/jsonschema/v6"
+import (
+	"github.com/pb33f/libopenapi-validator/cache"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+)
 
 // ValidationOptions A container for validation configuration.
 //
@@ -13,6 +16,7 @@ type ValidationOptions struct {
 	OpenAPIMode         bool // Enable OpenAPI-specific vocabulary validation
 	AllowScalarCoercion bool // Enable string->boolean/number coercion
 	Formats             map[string]func(v any) error
+	SchemaCache         cache.SchemaCache // Optional cache for compiled schemas
 }
 
 // Option Enables an 'Options pattern' approach
@@ -25,7 +29,8 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 		FormatAssertions:   false,
 		ContentAssertions:  false,
 		SecurityValidation: true,
-		OpenAPIMode:        true, // Enable OpenAPI vocabulary by default
+		OpenAPIMode:        true,                    // Enable OpenAPI vocabulary by default
+		SchemaCache:        cache.NewDefaultCache(), // Enable caching by default
 	}
 
 	// Apply any supplied overrides
@@ -50,6 +55,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.OpenAPIMode = options.OpenAPIMode
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
+			o.SchemaCache = options.SchemaCache
 		}
 	}
 }
@@ -113,5 +119,14 @@ func WithoutOpenAPIMode() Option {
 func WithScalarCoercion() Option {
 	return func(o *ValidationOptions) {
 		o.AllowScalarCoercion = true
+	}
+}
+
+// WithSchemaCache sets a custom cache implementation or disables caching if nil.
+// Pass nil to disable schema caching and skip cache warming during validator initialization.
+// The default cache is a thread-safe sync.Map wrapper.
+func WithSchemaCache(cache cache.SchemaCache) Option {
+	return func(o *ValidationOptions) {
+		o.SchemaCache = cache
 	}
 }

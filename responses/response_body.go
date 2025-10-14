@@ -5,7 +5,6 @@ package responses
 
 import (
 	"net/http"
-	"sync"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -33,16 +32,10 @@ type ResponseBodyValidator interface {
 func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) ResponseBodyValidator {
 	options := config.NewValidationOptions(opts...)
 
-	return &responseBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
+	return &responseBodyValidator{options: options, document: document}
 }
 
 type responseBodyValidator struct {
-	options     *config.ValidationOptions
-	document    *v3.Document
-	schemaCache *sync.Map
-}
-
-// GetSchemaCache returns the internal schema cache for warming
-func (v *responseBodyValidator) GetSchemaCache() *sync.Map {
-	return v.schemaCache
+	options  *config.ValidationOptions
+	document *v3.Document
 }

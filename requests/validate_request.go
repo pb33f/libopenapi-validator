@@ -13,33 +13,122 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v6"
-	"go.yaml.in/yaml/v4"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/utils"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"go.yaml.in/yaml/v4"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
+// ValidateRequestSchemaInput contains parameters for request schema validation.
+type ValidateRequestSchemaInput struct {
+	Request *http.Request   // Required: The HTTP request to validate
+	Schema  *base.Schema    // Required: The OpenAPI schema to validate against
+	Version float32         // Required: OpenAPI version (3.0 or 3.1)
+	Options []config.Option // Optional: Functional options (defaults applied if empty/nil)
+}
+
 // ValidateRequestSchema will validate a http.Request pointer against a schema.
 // If validation fails, it will return a list of validation errors as the second return value.
-// If compiledSchema is provided (non-nil), it will be used directly, skipping compilation.
-func ValidateRequestSchema(
-	request *http.Request,
-	schema *base.Schema,
-	renderedSchema,
-	jsonSchema []byte,
-	version float32,
-	compiledSchema *jsonschema.Schema,
-	opts ...config.Option,
-) (bool, []*errors.ValidationError) {
+// The schema will be stored and reused from cache if available, otherwise it will be compiled on each call.
+func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.ValidationError) {
+	validationOptions := config.NewValidationOptions(input.Options...)
 	var validationErrors []*errors.ValidationError
+	var renderedSchema, jsonSchema []byte
+	var compiledSchema *jsonschema.Schema
+
+	if input.Schema == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           "schema is nil",
+			Reason:            "The schema to validate against is nil",
+		}}
+	} else if input.Schema.GoLow() == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           "schema cannot be rendered",
+			Reason:            "The schema does not have low-level information and cannot be rendered. Please ensure the schema is loaded from a document.",
+		}}
+	}
+
+	if validationOptions.SchemaCache != nil {
+		hash := input.Schema.GoLow().Hash()
+		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
+			renderedSchema = cached.RenderedInline
+			jsonSchema = cached.RenderedJSON
+			compiledSchema = cached.CompiledSchema
+		}
+	}
+
+	// Cache miss or no cache - render and compile
+	if compiledSchema == nil {
+		var renderErr error
+		renderedSchema, renderErr = input.Schema.RenderInline()
+		if renderErr != nil {
+			// Rendering failed (possibly circular reference)
+			// Return error without caching
+			return false, []*errors.ValidationError{{
+				ValidationType:    helpers.RequestBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message:           "schema render failure",
+				Reason:            fmt.Sprintf("Failed to render schema: %s", renderErr.Error()),
+			}}
+		}
+		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
+
+		var err error
+		schemaName := fmt.Sprintf("%x", input.Schema.GoLow().Hash())
+		compiledSchema, err = helpers.NewCompiledSchemaWithVersion(
+			schemaName,
+			jsonSchema,
+			validationOptions,
+			input.Version,
+		)
+
+		if err != nil {
+			violation := &errors.SchemaValidationFailure{
+				Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
+				Location:        "schema compilation",
+				ReferenceSchema: string(renderedSchema),
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.RequestBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%s request body for '%s' failed schema compilation",
+					input.Request.Method, input.Request.URL.Path),
+				Reason:                 fmt.Sprintf("The request schema failed to compile: %s", err.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               "check the request schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+				Context:                string(renderedSchema),
+			})
+			return false, validationErrors
+		}
+
+		if validationOptions.SchemaCache != nil {
+			hash := input.Schema.GoLow().Hash()
+			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+				Schema:         input.Schema,
+				RenderedInline: renderedSchema,
+				RenderedJSON:   jsonSchema,
+				CompiledSchema: compiledSchema,
+			})
+		}
+	}
+
+	request := input.Request
+	schema := input.Schema
 
 	var requestBody []byte
 	if request != nil && request.Body != nil {
@@ -110,30 +199,8 @@ func ValidateRequestSchema(
 		return false, validationErrors
 	}
 
-	// Use pre-compiled schema if available, otherwise compile now (for backward compatibility)
-	var jsch *jsonschema.Schema
-	if compiledSchema != nil {
-		// Use the cached pre-compiled schema - this is the optimization!
-		jsch = compiledSchema
-	} else {
-		// Compile the schema (for direct calls to this function without pre-compilation)
-		validationOptions := config.NewValidationOptions(opts...)
-		var err error
-		jsch, err = helpers.NewCompiledSchemaWithVersion("requestBody", jsonSchema, validationOptions, version)
-		if err != nil {
-			validationErrors = append(validationErrors, &errors.ValidationError{
-				ValidationType:    helpers.RequestBodyValidation,
-				ValidationSubType: helpers.Schema,
-				Message:           err.Error(),
-				Reason:            "Failed to compile the request body schema.",
-				Context:           string(jsonSchema),
-			})
-			return false, validationErrors
-		}
-	}
-
 	// validate the object against the schema
-	scErrs := jsch.Validate(decodedObj)
+	scErrs := compiledSchema.Validate(decodedObj)
 	if scErrs != nil {
 
 		jk := scErrs.(*jsonschema.ValidationError)

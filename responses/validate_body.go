@@ -9,11 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"github.com/pb33f/libopenapi/utils"
-	"github.com/santhosh-tekuri/jsonschema/v6"
-	"go.yaml.in/yaml/v4"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -141,73 +137,18 @@ func (v *responseBodyValidator) checkResponseSchema(
 	if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
 		// extract schema from media type
 		if mediaType.Schema != nil {
+			schema := mediaType.Schema.Schema()
 
-			var schema *base.Schema
-			var renderedInline, renderedJSON []byte
-
-			// have we seen this schema before? let's hash it and check the cache.
-			hash := mediaType.GoLow().Schema.Value.Hash()
-
-			// Check cache for pre-rendered and pre-compiled schema
-			var compiledSchema *jsonschema.Schema
-			if cacheHit, ch := v.schemaCache.Load(hash); ch {
-				// got a hit, use cached values
-				if cached, ok := cacheHit.(*helpers.SchemaCache); ok {
-					schema = cached.Schema
-					renderedInline = cached.RenderedInline
-					renderedJSON = cached.RenderedJSON
-					compiledSchema = cached.CompiledSchema
-				}
-			} else {
-				// render the schema inline and perform the intensive work of rendering and converting
-				// this is only performed once per schema and cached in the validator.
-				schemaP := mediaType.Schema
-				marshalled, mErr := schemaP.MarshalYAMLInline()
-
-				if mErr != nil {
-					validationErrors = append(validationErrors, &errors.ValidationError{
-						Reason:            mErr.Error(),
-						Message:           fmt.Sprintf("unable to marshal schema for %s", contentType),
-						ValidationType:    helpers.ResponseBodyValidation,
-						ValidationSubType: helpers.Schema,
-						SpecLine:          mediaType.Schema.GetSchemaKeyNode().Line,
-						SpecCol:           mediaType.Schema.GetSchemaKeyNode().Column,
-						RequestPath:       request.URL.Path,
-						RequestMethod:     request.Method,
-						HowToFix:          "ensure schema is valid and does not contain circular references",
-					})
-				} else {
-					schema = schemaP.Schema()
-					renderedInline, _ = yaml.Marshal(marshalled)
-					renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-
-					// Compile the schema and cache it (so future requests don't need to compile)
-					var err error
-					compiledSchema, err = helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, v.options)
-					if err != nil {
-						// Compilation failed - cache with nil compiledSchema so we don't re-render
-						// ValidateResponseSchema will handle nil and report the compilation error
-						compiledSchema = nil
-					}
-
-					// Always cache (even if compilation failed) to avoid re-rendering on every request
-					v.schemaCache.Store(hash, &helpers.SchemaCache{
-						Schema:         schema,
-						RenderedInline: renderedInline,
-						RenderedJSON:   renderedJSON,
-						CompiledSchema: compiledSchema, // may be nil if compilation failed
-					})
-				}
-			}
-
-			// Validate if we have valid schema data
-			// ValidateResponseSchema will handle nil compiledSchema and report all validation errors
-			if len(renderedInline) > 0 && len(renderedJSON) > 0 && schema != nil {
-				// render the schema, to be used for validation
-				valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, helpers.VersionToFloat(v.document.Version), compiledSchema, config.WithRegexEngine(v.options.RegexEngine))
-				if !valid {
-					validationErrors = append(validationErrors, vErrs...)
-				}
+			// Validate response schema
+			valid, vErrs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+				Request:  request,
+				Response: response,
+				Schema:   schema,
+				Version:  helpers.VersionToFloat(v.document.Version),
+				Options:  []config.Option{config.WithExistingOpts(v.options)},
+			})
+			if !valid {
+				validationErrors = append(validationErrors, vErrs...)
 			}
 		}
 	}
