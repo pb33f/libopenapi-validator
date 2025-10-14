@@ -138,7 +138,7 @@ func (v *validator) ValidateHttpResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -162,7 +162,7 @@ func (v *validator) ValidateHttpRequestResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -180,7 +180,7 @@ func (v *validator) ValidateHttpRequestResponse(
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model)
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -287,7 +287,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model)
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}

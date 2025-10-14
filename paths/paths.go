@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pb33f/libopenapi/orderedmap"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -23,7 +25,7 @@ import (
 // that were picked up when locating the path.
 // The third return value will be the path that was found in the document, as it pertains to the contract, so all path
 // parameters will not have been replaced with their values from the request - allowing model lookups.
-func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*errors.ValidationError, string) {
+func FindPath(request *http.Request, document *v3.Document, regexCache config.RegexCache) (*v3.PathItem, []*errors.ValidationError, string) {
 	basePaths := getBasePaths(document)
 	stripped := StripRequestPath(request, document)
 
@@ -51,7 +53,7 @@ func FindPath(request *http.Request, document *v3.Document) (*v3.PathItem, []*er
 			segs = segs[1:]
 		}
 
-		ok := comparePaths(segs, reqPathSegments, basePaths)
+		ok := comparePaths(segs, reqPathSegments, basePaths, regexCache)
 		if !ok {
 			continue
 		}
@@ -188,18 +190,36 @@ func stripBaseFromPath(path string, basePaths []string) string {
 	return path
 }
 
-func comparePaths(mapped, requested, basePaths []string) bool {
+func comparePaths(mapped, requested, basePaths []string, regexCache config.RegexCache) bool {
 	if len(mapped) != len(requested) {
 		return false // short circuit out
 	}
 	var imploded []string
 	for i, seg := range mapped {
 		s := seg
-		r, err := helpers.GetRegexForPath(seg)
-		if err != nil {
-			return false
+		var rgx *regexp.Regexp
+
+		if regexCache != nil {
+			if cachedRegex, found := regexCache.Load(s); found {
+				rgx = cachedRegex.(*regexp.Regexp)
+			}
 		}
-		if r.MatchString(requested[i]) {
+
+		if rgx == nil {
+			r, err := helpers.GetRegexForPath(seg)
+
+			if err != nil {
+				return false
+			}
+
+			rgx = r
+
+			if regexCache != nil {
+				regexCache.Store(seg, r)
+			}
+		}
+
+		if rgx.MatchString(requested[i]) {
 			s = requested[i]
 		}
 		imploded = append(imploded, s)
