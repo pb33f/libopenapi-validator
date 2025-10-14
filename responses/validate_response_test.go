@@ -33,7 +33,7 @@ properties:
     type: number
     description: This number starts its journey where most numbers are too scared to begin!
     exclusiveMinimum: true
-    minimum: 10`,
+    minimum: !!float 10`,
 			version:                   3.0,
 			assertValidResponseSchema: assert.False,
 			expectedErrorsCount:       1,

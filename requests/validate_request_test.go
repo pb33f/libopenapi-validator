@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ properties:
     type: number
     description: This number starts its journey where most numbers are too scared to begin!
     exclusiveMinimum: true
-    minimum: 10`,
+    minimum: !!float 10`,
 			version:                  3.0,
 			assertValidRequestSchema: assert.False,
 			expectedErrorsCount:      1,
@@ -108,11 +109,6 @@ properties:
 	}
 }
 
-func postRequestWithBody(payload string) *http.Request {
-	req, _ := http.NewRequest(http.MethodPost, "/test", io.NopCloser(strings.NewReader(payload)))
-	return req
-}
-
 func TestInvalidMin(t *testing.T) {
 	openAPIVersion := float32(3.0)
 	schema := parseSchemaFromSpec(t, `type: object
@@ -165,6 +161,44 @@ properties:
 	assert.NotNil(t, cached.RenderedJSON, "JSON schema should be cached")
 }
 
+func TestValidateRequestSchema_NilSchema(t *testing.T) {
+	// Test when schema is nil
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"name": "test"}`),
+		Schema:  nil,
+		Version: 3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "schema is nil", errors[0].Message)
+	assert.Equal(t, "The schema to validate against is nil", errors[0].Reason)
+}
+
+func TestValidateRequestSchema_NilSchemaGoLow(t *testing.T) {
+	// Test when schema.GoLow() is nil by creating a schema without low-level data
+	schema := &base.Schema{} // Empty schema without GoLow() data
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"name": "test"}`),
+		Schema:  schema,
+		Version: 3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "schema cannot be rendered", errors[0].Message)
+	assert.Contains(t, errors[0].Reason, "does not have low-level information")
+}
+
+func postRequestWithBody(payload string) *http.Request {
+	return &http.Request{
+		Method: http.MethodPost,
+		URL:    &url.URL{Path: "/test"},
+		Body:   io.NopCloser(strings.NewReader(payload)),
+	}
+}
+
 // parseSchemaFromSpec creates a base.Schema from an OpenAPI spec YAML string.
 // This ensures that we're using the native libopenapi logic for generating the schema.
 func parseSchemaFromSpec(t *testing.T, schemaYAML string, version float32) *base.Schema {
@@ -198,34 +232,4 @@ func indentLines(s string, indent string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
-}
-
-func TestValidateRequestSchema_NilSchema(t *testing.T) {
-	// Test when schema is nil
-	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
-		Request: postRequestWithBody(`{"name": "test"}`),
-		Schema:  nil,
-		Version: 3.1,
-	})
-
-	assert.False(t, valid)
-	require.Len(t, errors, 1)
-	assert.Equal(t, "schema is nil", errors[0].Message)
-	assert.Equal(t, "The schema to validate against is nil", errors[0].Reason)
-}
-
-func TestValidateRequestSchema_NilSchemaGoLow(t *testing.T) {
-	// Test when schema.GoLow() is nil by creating a schema without low-level data
-	schema := &base.Schema{} // Empty schema without GoLow() data
-
-	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
-		Request: postRequestWithBody(`{"name": "test"}`),
-		Schema:  schema,
-		Version: 3.1,
-	})
-
-	assert.False(t, valid)
-	require.Len(t, errors, 1)
-	assert.Equal(t, "schema cannot be rendered", errors[0].Message)
-	assert.Contains(t, errors[0].Reason, "does not have low-level information")
 }
