@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sync"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -276,20 +274,4 @@ func transformTypeForCoercion(schemaType interface{}) interface{} {
 	default:
 		return schemaType
 	}
-}
-
-// SchemaCache represents a cached schema with all its compiled forms.
-// This is used by validators to cache rendered and compiled schemas.
-type SchemaCache struct {
-	Schema         *base.Schema
-	RenderedInline []byte
-	RenderedJSON   []byte
-	CompiledSchema *jsonschema.Schema
-}
-
-// SchemaCacheAccessor provides access to a validator's schema cache.
-// This interface is implemented by all validators (request, response, parameter)
-// to allow testing and inspection of their internal schema caches.
-type SchemaCacheAccessor interface {
-	GetSchemaCache() *sync.Map
 }

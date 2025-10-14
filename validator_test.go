@@ -17,6 +17,8 @@ import (
 	"testing"
 	"unicode"
 
+	"github.com/pb33f/libopenapi-validator/cache"
+
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -1973,47 +1975,30 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 	validator := v.(*validator)
 
 	// Check that caches were populated
-	// Check request validator cache
-	if rg, ok := validator.requestValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := rg.GetSchemaCache()
-		count := 0
-		cache.Range(func(key, value interface{}) bool {
-			count++
-			// Verify the cache entry has a compiled schema
-			if cached, ok := value.(*helpers.SchemaCache); ok {
-				assert.NotNil(t, cached.CompiledSchema, "Cache entry should have compiled schema")
-			}
-			return true
-		})
-		assert.Greater(t, count, 0, "Request validator cache should have entries")
-	}
+	// Access cache directly from validator options
+	require.NotNil(t, validator.options)
+	require.NotNil(t, validator.options.SchemaCache)
 
-	// Check response validator cache
-	if rg, ok := validator.responseValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := rg.GetSchemaCache()
-		count := 0
-		cache.Range(func(key, value interface{}) bool {
-			count++
-			if cached, ok := value.(*helpers.SchemaCache); ok {
-				assert.NotNil(t, cached.CompiledSchema, "Cache entry should have compiled schema")
-			}
-			return true
-		})
-		assert.Greater(t, count, 0, "Response validator cache should have entries")
-	}
+	count := 0
+	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+		count++
+		assert.NotNil(t, value.CompiledSchema, "Cache entry should have compiled schema")
+		return true
+	})
+	assert.Greater(t, count, 0, "Schema cache should have entries from request and response bodies")
 }
 
 func TestCacheWarming_EdgeCases(t *testing.T) {
 	// Test nil document
-	warmSchemaCaches(nil, nil, nil, nil, nil)
+	warmSchemaCaches(nil, nil)
 
 	// Test empty document
 	doc := &v3.Document{}
-	warmSchemaCaches(doc, nil, nil, nil, nil)
+	warmSchemaCaches(doc, nil)
 
 	// Test document with nil PathItems
 	doc = &v3.Document{Paths: &v3.Paths{}}
-	warmSchemaCaches(doc, nil, nil, nil, nil)
+	warmSchemaCaches(doc, nil)
 }
 
 func TestCacheWarming_NilOperations(t *testing.T) {
@@ -2122,15 +2107,15 @@ paths:
 	validator := v.(*validator)
 
 	// Check that response cache was populated with default response schema
-	if rg, ok := validator.responseValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := rg.GetSchemaCache()
-		count := 0
-		cache.Range(func(key, value interface{}) bool {
-			count++
-			return true
-		})
-		assert.Greater(t, count, 0, "Response validator cache should have entries from default response")
-	}
+	require.NotNil(t, validator.options)
+	require.NotNil(t, validator.options.SchemaCache)
+
+	count := 0
+	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Greater(t, count, 0, "Schema cache should have entries from default response")
 }
 
 // TestCacheWarming_InvalidSchema tests cache warming gracefully skips invalid schemas
@@ -2191,15 +2176,15 @@ paths:
 	validator := v.(*validator)
 
 	// Check that parameter cache was populated with content schema
-	if pg, ok := validator.paramValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := pg.GetSchemaCache()
-		count := 0
-		cache.Range(func(key, value interface{}) bool {
-			count++
-			return true
-		})
-		assert.Greater(t, count, 0, "Parameter validator cache should have entries from content property")
-	}
+	require.NotNil(t, validator.options)
+	require.NotNil(t, validator.options.SchemaCache)
+
+	count := 0
+	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Greater(t, count, 0, "Schema cache should have entries from parameter content property")
 }
 
 // TestCacheWarming_PathLevelParameters tests cache warming for path-level parameters
@@ -2228,13 +2213,13 @@ paths:
 	validator := v.(*validator)
 
 	// Check that parameter cache was populated with path-level parameter
-	if pg, ok := validator.paramValidator.(helpers.SchemaCacheAccessor); ok {
-		cache := pg.GetSchemaCache()
-		count := 0
-		cache.Range(func(key, value interface{}) bool {
-			count++
-			return true
-		})
-		assert.Greater(t, count, 0, "Parameter validator cache should have entries from path-level parameters")
-	}
+	require.NotNil(t, validator.options)
+	require.NotNil(t, validator.options.SchemaCache)
+
+	count := 0
+	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Greater(t, count, 0, "Schema cache should have entries from path-level parameters")
 }

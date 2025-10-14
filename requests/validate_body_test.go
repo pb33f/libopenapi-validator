@@ -8,12 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1494,82 +1492,4 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Equal(t, "'test' is not valid email: missing @", errors[0].SchemaValidationErrors[0].Reason)
-}
-
-// TestGetSchemaCache tests the GetSchemaCache method
-func TestGetSchemaCache(t *testing.T) {
-	spec, err := os.ReadFile("../test_specs/petstorev3.json")
-	require.NoError(t, err)
-
-	doc, _ := libopenapi.NewDocument(spec)
-	m, _ := doc.BuildV3Model()
-
-	validator := NewRequestBodyValidator(&m.Model)
-
-	// Verify validator implements SchemaCacheAccessor interface
-	accessor, ok := validator.(helpers.SchemaCacheAccessor)
-	require.True(t, ok, "Validator should implement helpers.SchemaCacheAccessor interface")
-
-	cache := accessor.GetSchemaCache()
-	assert.NotNil(t, cache, "Cache should not be nil")
-}
-
-// TestValidateBody_CompilationFailureCached tests that failed compilations are cached with nil
-func TestValidateBody_CompilationFailureCached(t *testing.T) {
-	// Create a spec with an intentionally invalid schema that will fail JSON schema compilation
-	spec := `openapi: 3.1.0
-paths:
-  /test:
-    post:
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                value:
-                  type: string
-                  pattern: "[invalid regex("
-      responses:
-        '200':
-          description: OK`
-
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-	m, _ := doc.BuildV3Model()
-	v := NewRequestBodyValidator(&m.Model)
-
-	bodyBytes := []byte(`{"value": "test"}`)
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/test", bytes.NewBuffer(bodyBytes))
-	request.Header.Set("Content-Type", "application/json")
-
-	// First call - schema compilation will fail
-	valid, errors := v.ValidateRequestBody(request)
-	assert.False(t, valid)
-	assert.NotEmpty(t, errors)
-
-	// Verify the schema was cached (even though compilation failed)
-	accessor, ok := v.(helpers.SchemaCacheAccessor)
-	require.True(t, ok)
-	cache := accessor.GetSchemaCache()
-
-	foundCache := false
-	cache.Range(func(key, value interface{}) bool {
-		if cached, ok := value.(*helpers.SchemaCache); ok {
-			// Should have cached the schema, rendered inline/JSON, but CompiledSchema may be nil
-			assert.NotNil(t, cached.Schema)
-			assert.NotEmpty(t, cached.RenderedInline)
-			assert.NotEmpty(t, cached.RenderedJSON)
-			// CompiledSchema might be nil if compilation failed, which is OK
-			foundCache = true
-		}
-		return true
-	})
-	assert.True(t, foundCache, "Schema should be cached even if compilation failed")
-
-	// Second call - should use cached values (not re-render)
-	// This tests the cache hit path with nil CompiledSchema
-	valid2, errors2 := v.ValidateRequestBody(request)
-	assert.False(t, valid2)
-	assert.NotEmpty(t, errors2)
 }

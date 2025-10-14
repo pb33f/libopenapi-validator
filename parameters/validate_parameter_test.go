@@ -2,7 +2,6 @@ package parameters
 
 import (
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -574,29 +573,5 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 	} else {
 		// no validation errors - schema compiled and validated successfully
 		t.Logf("Schema compiled and validated successfully")
-	}
-}
-
-// TestGetSchemaCache tests the GetSchemaCache method
-func TestGetSchemaCache(t *testing.T) {
-	spec, err := os.ReadFile("../test_specs/petstorev3.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	doc, _ := libopenapi.NewDocument(spec)
-	m, _ := doc.BuildV3Model()
-
-	validator := NewParameterValidator(&m.Model)
-
-	// Verify validator implements SchemaCacheAccessor interface
-	accessor, ok := validator.(helpers.SchemaCacheAccessor)
-	if !ok {
-		t.Fatal("Validator should implement helpers.SchemaCacheAccessor interface")
-	}
-
-	cache := accessor.GetSchemaCache()
-	if cache == nil {
-		t.Error("Cache should not be nil")
 	}
 }
