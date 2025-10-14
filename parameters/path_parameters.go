@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -62,8 +61,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					continue
 				}
 
-				re := regexp.MustCompile(r.String())
-				matches := re.FindStringSubmatch(submittedSegments[x])
+				matches := r.FindStringSubmatch(submittedSegments[x])
 				matches = matches[1:]
 
 				// Check if it is well-formed.
