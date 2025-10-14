@@ -94,7 +94,6 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			validationOptions,
 			input.Version,
 		)
-
 		if err != nil {
 			violation := &errors.SchemaValidationFailure{
 				Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
