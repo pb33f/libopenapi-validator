@@ -207,7 +207,6 @@ func comparePaths(mapped, requested, basePaths []string, regexCache config.Regex
 
 		if rgx == nil {
 			r, err := helpers.GetRegexForPath(seg)
-
 			if err != nil {
 				return false
 			}
