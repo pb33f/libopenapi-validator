@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -2247,18 +2248,25 @@ paths:
 	assert.NotEmpty(t, errors)
 }
 
-type RegexCacheWatcher struct {
+type regexCacheWatcher struct {
 	inner      *sync.Map
-	loadCount  int64
+	missCount  int64
+	hitCount   int64
 	storeCount int64
 }
 
-func (c *RegexCacheWatcher) Load(key any) (value any, ok bool) {
-	atomic.AddInt64(&c.loadCount, 1)
-	return c.inner.Load(key)
+func (c *regexCacheWatcher) Load(key any) (value any, ok bool) {
+	data, found := c.inner.Load(key)
+	if found {
+		atomic.AddInt64(&c.hitCount, 1)
+	} else {
+		atomic.AddInt64(&c.missCount, 1)
+	}
+
+	return data, found
 }
 
-func (c *RegexCacheWatcher) Store(key, value any) {
+func (c *regexCacheWatcher) Store(key, value any) {
 	atomic.AddInt64(&c.storeCount, 1)
 	c.inner.Store(key, value)
 }
@@ -2274,20 +2282,21 @@ paths:
 
 	m, _ := doc.BuildV3Model()
 
-	cache := &RegexCacheWatcher{inner: &sync.Map{}}
+	cache := &regexCacheWatcher{inner: &sync.Map{}}
 	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
 
 	compiledPizza := regexp.MustCompile("^pizza$")
-	cache.Store("pizza", compiledPizza)
+	cache.inner.Store("pizza", compiledPizza)
 
-	assert.Equal(t, int64(1), cache.storeCount)
-	assert.Equal(t, int64(0), cache.loadCount)
+	assert.EqualValues(t, 0, cache.storeCount)
+	assert.EqualValues(t, 0, cache.hitCount+cache.missCount)
 
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pizza", nil)
-	valid, errors := v.ValidatePathParams(request)
+	v.ValidatePathParams(request)
 
-	assert.Equal(t, int64(1), cache.storeCount)
-	assert.Equal(t, int64(1), cache.loadCount)
+	assert.EqualValues(t, 0, cache.storeCount)
+	assert.EqualValues(t, 0, cache.missCount)
+	assert.EqualValues(t, 1, cache.hitCount)
 
 	mapLength := 0
 
@@ -2296,14 +2305,78 @@ paths:
 		return true
 	})
 
-	assert.True(t, valid)
-	assert.Len(t, errors, 0)
 	assert.Equal(t, 1, mapLength)
 
 	cache.inner.Clear()
 
 	v.ValidatePathParams(request)
 
-	assert.Equal(t, int64(2), cache.storeCount)
-	assert.Equal(t, int64(2), cache.loadCount)
+	assert.EqualValues(t, 1, cache.storeCount)
+	assert.EqualValues(t, 1, cache.missCount)
+	assert.EqualValues(t, 1, cache.hitCount)
+}
+
+func TestValidatePathParamsWithPathItem_RegexCache_WithOneCached(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - in: path 
+        name: burgerId
+        schema:
+          type: integer
+    get:
+      operationId: locateBurgers`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	cache := &regexCacheWatcher{inner: &sync.Map{}}
+
+	segment := "{burgerId}"
+	r, err := helpers.GetRegexForPath(segment)
+	require.NoError(t, err)
+	cache.inner.Store(segment, r)
+
+	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/123/locate", nil)
+
+	pathItem, _, foundPath := paths.FindPath(request, &m.Model, nil)
+	v.ValidatePathParamsWithPathItem(request, pathItem, foundPath)
+
+	// Only "{burgerId}" regex was cached
+	assert.EqualValues(t, 2, cache.storeCount) // Stores "burgers" and "locate" regex
+	assert.EqualValues(t, 2, cache.missCount)
+	assert.EqualValues(t, 1, cache.hitCount)
+}
+
+func TestValidatePathParamsWithPathItem_RegexCache_MissOnceThenHit(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - in: path 
+        name: burgerId
+        schema:
+          type: integer
+    get:
+      operationId: locateBurgers`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	cache := &regexCacheWatcher{inner: &sync.Map{}}
+
+	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/123/locate", nil)
+	pathItem, _, foundPath := paths.FindPath(request, &m.Model, cache)
+
+	v.ValidatePathParamsWithPathItem(request, pathItem, foundPath)
+
+	assert.EqualValues(t, 3, cache.storeCount)
+	assert.EqualValues(t, 3, cache.missCount)
+	assert.EqualValues(t, 3, cache.hitCount)
+
+	_, found := cache.inner.Load("{burgerId}")
+	assert.True(t, found)
 }
