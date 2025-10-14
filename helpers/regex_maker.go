@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+var baseDefaultPattern = "[^/]*"
+var DefaultPatternRegex = regexp.MustCompile("^([^/]*)$")
+var DefaultPatternRegexString = DefaultPatternRegex.String()
+
 // GetRegexForPath returns a compiled regular expression for the given path template.
 //
 // This function takes a path template string `tpl` and generates a regular expression
@@ -42,9 +46,6 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 	// Backup the original.
 	template := tpl
 
-	// Now let's parse it.
-	defaultPattern := "[^/]*"
-
 	pattern := bytes.NewBufferString("^")
 	var end int
 
@@ -55,7 +56,7 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 		end = idxs[i+1]
 		parts := strings.SplitN(tpl[idxs[i]+1:end-1], ":", 2)
 		name := parts[0]
-		patt := defaultPattern
+		patt := baseDefaultPattern
 		if len(parts) == 2 {
 			patt = parts[1]
 		}
@@ -79,8 +80,14 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 
 	pattern.WriteByte('$')
 
+	patternString := pattern.String()
+
+	if patternString == DefaultPatternRegexString {
+		return DefaultPatternRegex, nil
+	}
+
 	// Compile full regexp.
-	reg, errCompile := regexp.Compile(pattern.String())
+	reg, errCompile := regexp.Compile(patternString)
 	if errCompile != nil {
 		return nil, errCompile
 	}

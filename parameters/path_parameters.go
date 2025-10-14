@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -20,7 +21,7 @@ import (
 )
 
 func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -56,12 +57,29 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					continue
 				}
 
-				r, err := helpers.GetRegexForPath(pathSegments[x])
-				if err != nil {
-					continue
+				var rgx *regexp.Regexp
+
+				if v.options.RegexCache != nil {
+					if cachedRegex, found := v.options.RegexCache.Load(pathSegments[x]); found {
+						rgx = cachedRegex.(*regexp.Regexp)
+					}
 				}
 
-				matches := r.FindStringSubmatch(submittedSegments[x])
+				if rgx == nil {
+
+					r, err := helpers.GetRegexForPath(pathSegments[x])
+					if err != nil {
+						continue
+					}
+
+					rgx = r
+
+					if v.options.RegexCache != nil {
+						v.options.RegexCache.Store(pathSegments[x], r)
+					}
+				}
+
+				matches := rgx.FindStringSubmatch(submittedSegments[x])
 				matches = matches[1:]
 
 				// Check if it is well-formed.
