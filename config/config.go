@@ -5,11 +5,21 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
+// RegexCache can be set to enable compiled regex caching.
+// It can be just a sync.Map, or a custom implementation with possible cleanup.
+//
+// Be aware that the cache should be thread safe
+type RegexCache interface {
+	Load(key any) (value any, ok bool) // Get a compiled regex from the cache
+	Store(key, value any)              // Set a compiled regex to the cache
+}
+
 // ValidationOptions A container for validation configuration.
 //
 // Generally fluent With... style functions are used to establish the desired behavior.
 type ValidationOptions struct {
 	RegexEngine         jsonschema.RegexpEngine
+	RegexCache          RegexCache // Enable compiled regex caching
 	FormatAssertions    bool
 	ContentAssertions   bool
 	SecurityValidation  bool
@@ -49,6 +59,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 	return func(o *ValidationOptions) {
 		if options != nil {
 			o.RegexEngine = options.RegexEngine
+			o.RegexCache = options.RegexCache
 			o.FormatAssertions = options.FormatAssertions
 			o.ContentAssertions = options.ContentAssertions
 			o.SecurityValidation = options.SecurityValidation
@@ -64,6 +75,14 @@ func WithExistingOpts(options *ValidationOptions) Option {
 func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
 	return func(o *ValidationOptions) {
 		o.RegexEngine = engine
+	}
+}
+
+// WithRegexCache assigns a cache for compiled regular expressions.
+// A sync.Map should be sufficient for most use cases. It does not implement any cleanup
+func WithRegexCache(regexCache RegexCache) Option {
+	return func(o *ValidationOptions) {
+		o.RegexCache = regexCache
 	}
 }
 
