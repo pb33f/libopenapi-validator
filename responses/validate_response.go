@@ -75,18 +75,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		var renderErr error
-		renderedSchema, renderErr = input.Schema.RenderInline()
-		if renderErr != nil {
-			// Rendering failed (possibly circular reference)
-			// Return error without caching
-			return false, []*errors.ValidationError{{
-				ValidationType:    helpers.ResponseBodyValidation,
-				ValidationSubType: helpers.Schema,
-				Message:           "schema render failure",
-				Reason:            fmt.Sprintf("Failed to render schema: %s", renderErr.Error()),
-			}}
-		}
+		renderedSchema, _ = input.Schema.RenderInline()
 		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
 
 		var err error
