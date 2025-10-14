@@ -1672,6 +1672,36 @@ func TestNewValidator_PetStore_InvalidPath_Response(t *testing.T) {
 	assert.Equal(t, "POST Path '/missing' not found", errors[0].Message)
 }
 
+func TestNewValidator_PetStore_InvalidPath_RequestResponse(t *testing.T) {
+	// create a new document from the petstore spec
+	doc, _ := libopenapi.NewDocument(petstoreBytes)
+
+	// create a doc
+	v, _ := NewValidator(doc)
+
+	// create a new put request with an invalid path
+	request, _ := http.NewRequest(http.MethodPost,
+		"https://hyperspace-superherbs.com/nonexistent", nil)
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+		w.WriteHeader(http.StatusOK)
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// validate both request and response - should fail because path not found
+	valid, errors := v.ValidateHttpRequestResponse(request, res.Result())
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST Path '/nonexistent' not found", errors[0].Message)
+}
+
 func TestNewValidator_PetStore_PetFindByStatusGet200_Valid_responseOnly(t *testing.T) {
 	// create a new document from the petstore spec
 	doc, _ := libopenapi.NewDocument(petstoreBytes)
