@@ -5,6 +5,7 @@ package parameters
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -717,7 +718,7 @@ paths:
 	request.Header.Set("coffeecups", "1200") // that's a lot of cups dude, we only have one dishwasher.
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, nil)
 
 	valid, errors := v.ValidateHeaderParamsWithPathItem(request, path, pv)
 
@@ -748,7 +749,7 @@ paths:
 	request.Header.Set("coffeecups", "1200") // that's a lot of cups dude, we only have one dishwasher.
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	valid, errors := v.ValidateHeaderParamsWithPathItem(request, path, pv)
 
