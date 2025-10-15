@@ -2,6 +2,8 @@ package helpers
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetRegexForPath(t *testing.T) {
@@ -60,6 +62,12 @@ func TestGetRegexForPath(t *testing.T) {
 			tpl:      "/entities('{id:[0-9]+}')",
 			wantErr:  false,
 			wantExpr: "^/entities\\('([0-9]+)'\\)$",
+		},
+		{
+			name:     "get default pattern",
+			tpl:      "/{param}",
+			wantErr:  false,
+			wantExpr: "^/([^/]*)$",
 		},
 	}
 
@@ -126,6 +134,14 @@ func TestBraceIndices(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultPatternCompileCache(t *testing.T) {
+	res, err := GetRegexForPath("{param}")
+
+	assert.Nil(t, err)
+	assert.Equal(t, res, DefaultPatternRegex)
+	assert.Equal(t, res.String(), DefaultPatternRegexString)
 }
 
 func equal(a, b []int) bool {

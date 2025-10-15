@@ -5,6 +5,7 @@ package parameters
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -690,7 +691,7 @@ paths:
 	request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "2500"}) // too many dude.
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	valid, errors := v.ValidateCookieParamsWithPathItem(request, path, pv)
 
@@ -720,7 +721,7 @@ paths:
 	request.AddCookie(&http.Cookie{Name: "PattyPreference", Value: "2500"}) // too many dude.
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model)
+	path, _, pv := paths.FindPath(request, &m.Model, nil)
 
 	valid, errors := v.ValidateCookieParamsWithPathItem(request, path, pv)
 

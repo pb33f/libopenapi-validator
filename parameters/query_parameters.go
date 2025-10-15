@@ -26,7 +26,7 @@ const rx = `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
 var rxRxp = regexp.MustCompile(rx)
 
 func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
