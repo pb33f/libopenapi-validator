@@ -247,14 +247,14 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				}
 
 				violation := &errors.SchemaValidationFailure{
-					Reason:          errMsg,
-					Location:        er.KeywordLocation,
-					FieldName:       helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-					FieldPath:       helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-					InstancePath:    helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-					ReferenceSchema: string(renderedSchema),
-					ReferenceObject: referenceObject,
-					OriginalError:   jk,
+					Reason:                  errMsg,
+					Location:                er.KeywordLocation,
+					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+					ReferenceSchema:         string(renderedSchema),
+					ReferenceObject:         referenceObject,
+					OriginalJsonSchemaError: jk,
 				}
 				// if we have a location within the schema, add it to the error
 				if located != nil {
