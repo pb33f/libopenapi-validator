@@ -71,7 +71,6 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
 			renderedSchema = cached.RenderedInline
 			referenceSchema = cached.ReferenceSchema
-			jsonSchema = cached.RenderedJSON
 			compiledSchema = cached.CompiledSchema
 		}
 	}
