@@ -468,15 +468,17 @@ func warmMediaTypeSchema(mediaType *v3.MediaType, schemaCache cache.SchemaCache,
 			schema := mediaType.Schema.Schema()
 			if schema != nil {
 				renderedInline, _ := schema.RenderInline()
+				referenceSchema := string(renderedInline)
 				renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
 				if len(renderedInline) > 0 {
 					compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
 
 					schemaCache.Store(hash, &cache.SchemaCacheEntry{
-						Schema:         schema,
-						RenderedInline: renderedInline,
-						RenderedJSON:   renderedJSON,
-						CompiledSchema: compiledSchema,
+						Schema:          schema,
+						RenderedInline:  renderedInline,
+						ReferenceSchema: referenceSchema,
+						RenderedJSON:    renderedJSON,
+						CompiledSchema:  compiledSchema,
 					})
 				}
 			}
@@ -513,16 +515,18 @@ func warmParameterSchema(param *v3.Parameter, schemaCache cache.SchemaCache, opt
 		if schema != nil {
 			if _, exists := schemaCache.Load(hash); !exists {
 				renderedInline, _ := schema.RenderInline()
+				referenceSchema := string(renderedInline)
 				renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
 				if len(renderedInline) > 0 {
 					compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
 
 					// Store in cache using the shared SchemaCache type
 					schemaCache.Store(hash, &cache.SchemaCacheEntry{
-						Schema:         schema,
-						RenderedInline: renderedInline,
-						RenderedJSON:   renderedJSON,
-						CompiledSchema: compiledSchema,
+						Schema:          schema,
+						RenderedInline:  renderedInline,
+						ReferenceSchema: referenceSchema,
+						RenderedJSON:    renderedJSON,
+						CompiledSchema:  compiledSchema,
 					})
 				}
 			}
