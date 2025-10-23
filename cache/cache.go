@@ -13,8 +13,8 @@ import (
 type SchemaCacheEntry struct {
 	Schema          *base.Schema
 	RenderedInline  []byte
+	ReferenceSchema string // String version of RenderedInline
 	RenderedJSON    []byte
-	ReferenceSchema string // String version of RenderedInline, cached to avoid repeated conversions
 	CompiledSchema  *jsonschema.Schema
 }
 
