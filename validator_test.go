@@ -2013,6 +2013,8 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
 		count++
 		assert.NotNil(t, value.CompiledSchema, "Cache entry should have compiled schema")
+		assert.NotEmpty(t, value.ReferenceSchema, "Cache entry should have pre-converted ReferenceSchema string")
+		assert.Equal(t, string(value.RenderedInline), value.ReferenceSchema, "ReferenceSchema should match string conversion of RenderedInline")
 		return true
 	})
 	assert.Greater(t, count, 0, "Schema cache should have entries from request and response bodies")
