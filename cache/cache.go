@@ -11,10 +11,11 @@ import (
 // SchemaCacheEntry holds a compiled schema and its intermediate representations.
 // This is stored in the cache to avoid re-rendering and re-compiling schemas on each request.
 type SchemaCacheEntry struct {
-	Schema         *base.Schema
-	RenderedInline []byte
-	RenderedJSON   []byte
-	CompiledSchema *jsonschema.Schema
+	Schema          *base.Schema
+	RenderedInline  []byte
+	RenderedJSON    []byte
+	ReferenceSchema string // String version of RenderedInline, cached to avoid repeated conversions
+	CompiledSchema  *jsonschema.Schema
 }
 
 // SchemaCache defines the interface for schema caching implementations.
