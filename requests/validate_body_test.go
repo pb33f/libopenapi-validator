@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -355,7 +356,7 @@ paths:
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("Content-Type", "application/json")
 
-	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model)
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model, nil)
 	assert.Len(t, validationErrors, 0)
 
 	request2, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/createBurger",
@@ -451,7 +452,7 @@ paths:
 		bytes.NewBuffer(bodyBytes))
 	request.Header.Set("content-type", "application/not-json")
 
-	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model)
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model, nil)
 	assert.Len(t, validationErrors, 0)
 	valid, errors := v.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 
@@ -494,7 +495,7 @@ paths:
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
 		bytes.NewBuffer(bodyBytes))
 
-	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model)
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model, &sync.Map{})
 	assert.Len(t, validationErrors, 0)
 	valid, errors := v.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 
@@ -689,7 +690,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Nutrients:
@@ -706,7 +707,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       allOf:
@@ -755,7 +756,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Nutrients:
@@ -772,7 +773,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       allOf:
@@ -822,7 +823,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Uncooked:
@@ -855,7 +856,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       oneOf:
@@ -909,7 +910,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     Uncooked:
@@ -942,7 +943,7 @@ components:
             - beef
             - pork
             - lamb
-            - vegetables      
+            - vegetables
     TestBody:
       type: object
       oneOf:
@@ -997,7 +998,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1050,7 +1051,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1154,7 +1155,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1278,7 +1279,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/TestBody' 
+              $ref: '#/components/schema_validation/TestBody'
 components:
   schema_validation:
     TestBody:
@@ -1455,7 +1456,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schema_validation/V1_UserRequest' 
+              $ref: '#/components/schema_validation/V1_UserRequest'
 components:
   schema_validation:
     V1_UserRequest:

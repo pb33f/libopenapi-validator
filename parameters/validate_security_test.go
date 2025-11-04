@@ -5,6 +5,7 @@ package parameters
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -358,7 +359,7 @@ paths:
 	v := NewParameterValidator(&m.Model)
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
-	pathItem, errs, pv := paths.FindPath(request, &m.Model)
+	pathItem, errs, pv := paths.FindPath(request, &m.Model, nil)
 	assert.Nil(t, errs)
 
 	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)
@@ -380,7 +381,7 @@ paths:
 	v := NewParameterValidator(&m.Model)
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/beef", nil)
-	pathItem, _, pv := paths.FindPath(request, &m.Model)
+	pathItem, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 
 	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)
 	assert.False(t, valid)
@@ -643,7 +644,7 @@ components:
 	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
-	pathItem, errs, pv := paths.FindPath(request, &m.Model)
+	pathItem, errs, pv := paths.FindPath(request, &m.Model, &sync.Map{})
 	assert.Nil(t, errs)
 
 	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)

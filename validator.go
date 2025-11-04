@@ -4,15 +4,19 @@
 package validator
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/pb33f/libopenapi"
-
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/utils"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/requests"
@@ -92,6 +96,10 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	// create a response body validator
 	v.responseValidator = responses.NewResponseBodyValidator(m, opts...)
 
+	// warm the schema caches by pre-compiling all schemas in the document
+	// (warmSchemaCaches checks for nil cache and skips if disabled)
+	warmSchemaCaches(m, options)
+
 	return v
 }
 
@@ -138,7 +146,7 @@ func (v *validator) ValidateHttpResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -162,7 +170,7 @@ func (v *validator) ValidateHttpRequestResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model)
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -180,7 +188,7 @@ func (v *validator) ValidateHttpRequestResponse(
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model)
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -287,7 +295,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model)
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -362,3 +370,166 @@ type (
 	validationFunction      func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 	validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
 )
+
+// warmSchemaCaches pre-compiles all schemas in the OpenAPI document and stores them in the validator caches.
+// This frontloads the compilation cost so that runtime validation doesn't need to compile schemas.
+func warmSchemaCaches(
+	doc *v3.Document,
+	options *config.ValidationOptions,
+) {
+	// Skip warming if cache is nil (explicitly disabled via WithSchemaCache(nil))
+	if doc == nil || doc.Paths == nil || doc.Paths.PathItems == nil || options.SchemaCache == nil {
+		return
+	}
+
+	schemaCache := options.SchemaCache
+
+	// Walk through all paths and operations
+	for pathPair := doc.Paths.PathItems.First(); pathPair != nil; pathPair = pathPair.Next() {
+		pathItem := pathPair.Value()
+
+		// Get all operations for this path (handles all HTTP methods including OpenAPI 3.2+ extensions)
+		operations := pathItem.GetOperations()
+		if operations == nil {
+			continue
+		}
+
+		for opPair := operations.First(); opPair != nil; opPair = opPair.Next() {
+			operation := opPair.Value()
+			if operation == nil {
+				continue
+			}
+
+			// Warm request body schemas
+			if operation.RequestBody != nil && operation.RequestBody.Content != nil {
+				for contentPair := operation.RequestBody.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+					mediaType := contentPair.Value()
+					if mediaType.Schema != nil {
+						warmMediaTypeSchema(mediaType, schemaCache, options)
+					}
+				}
+			}
+
+			// Warm response body schemas
+			if operation.Responses != nil {
+				// Warm status code responses
+				if operation.Responses.Codes != nil {
+					for codePair := operation.Responses.Codes.First(); codePair != nil; codePair = codePair.Next() {
+						response := codePair.Value()
+						if response != nil && response.Content != nil {
+							for contentPair := response.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+								mediaType := contentPair.Value()
+								if mediaType.Schema != nil {
+									warmMediaTypeSchema(mediaType, schemaCache, options)
+								}
+							}
+						}
+					}
+				}
+
+				// Warm default response schemas
+				if operation.Responses.Default != nil && operation.Responses.Default.Content != nil {
+					for contentPair := operation.Responses.Default.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+						mediaType := contentPair.Value()
+						if mediaType.Schema != nil {
+							warmMediaTypeSchema(mediaType, schemaCache, options)
+						}
+					}
+				}
+			}
+
+			// Warm parameter schemas
+			if operation.Parameters != nil {
+				for _, param := range operation.Parameters {
+					if param != nil {
+						warmParameterSchema(param, schemaCache, options)
+					}
+				}
+			}
+		}
+
+		// Warm path-level parameters
+		if pathItem.Parameters != nil {
+			for _, param := range pathItem.Parameters {
+				if param != nil {
+					warmParameterSchema(param, schemaCache, options)
+				}
+			}
+		}
+	}
+}
+
+// warmMediaTypeSchema warms the cache for a media type schema
+func warmMediaTypeSchema(mediaType *v3.MediaType, schemaCache cache.SchemaCache, options *config.ValidationOptions) {
+	if mediaType != nil && mediaType.Schema != nil {
+		hash := mediaType.GoLow().Schema.Value.Hash()
+
+		if _, exists := schemaCache.Load(hash); !exists {
+			schema := mediaType.Schema.Schema()
+			if schema != nil {
+				renderedInline, _ := schema.RenderInline()
+				referenceSchema := string(renderedInline)
+				renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+				if len(renderedInline) > 0 {
+					compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
+
+					schemaCache.Store(hash, &cache.SchemaCacheEntry{
+						Schema:          schema,
+						RenderedInline:  renderedInline,
+						ReferenceSchema: referenceSchema,
+						RenderedJSON:    renderedJSON,
+						CompiledSchema:  compiledSchema,
+					})
+				}
+			}
+		}
+	}
+}
+
+// warmParameterSchema warms the cache for a parameter schema
+func warmParameterSchema(param *v3.Parameter, schemaCache cache.SchemaCache, options *config.ValidationOptions) {
+	if param != nil {
+		var schema *base.Schema
+		var hash [32]byte
+
+		// Parameters can have schemas in two places: schema property or content property
+		if param.Schema != nil {
+			schema = param.Schema.Schema()
+			if schema != nil {
+				hash = param.GoLow().Schema.Value.Hash()
+			}
+		} else if param.Content != nil {
+			// Check content for schema
+			for contentPair := param.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+				mediaType := contentPair.Value()
+				if mediaType.Schema != nil {
+					schema = mediaType.Schema.Schema()
+					if schema != nil {
+						hash = mediaType.GoLow().Schema.Value.Hash()
+					}
+					break // Only process first content type
+				}
+			}
+		}
+
+		if schema != nil {
+			if _, exists := schemaCache.Load(hash); !exists {
+				renderedInline, _ := schema.RenderInline()
+				referenceSchema := string(renderedInline)
+				renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+				if len(renderedInline) > 0 {
+					compiledSchema, _ := helpers.NewCompiledSchema(fmt.Sprintf("%x", hash), renderedJSON, options)
+
+					// Store in cache using the shared SchemaCache type
+					schemaCache.Store(hash, &cache.SchemaCacheEntry{
+						Schema:          schema,
+						RenderedInline:  renderedInline,
+						ReferenceSchema: referenceSchema,
+						RenderedJSON:    renderedJSON,
+						CompiledSchema:  compiledSchema,
+					})
+				}
+			}
+		}
+	}
+}

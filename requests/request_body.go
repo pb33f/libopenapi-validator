@@ -5,10 +5,8 @@ package requests
 
 import (
 	"net/http"
-	"sync"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
@@ -34,17 +32,10 @@ type RequestBodyValidator interface {
 func NewRequestBodyValidator(document *v3.Document, opts ...config.Option) RequestBodyValidator {
 	options := config.NewValidationOptions(opts...)
 
-	return &requestBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
-}
-
-type schemaCache struct {
-	schema         *base.Schema
-	renderedInline []byte
-	renderedJSON   []byte
+	return &requestBodyValidator{options: options, document: document}
 }
 
 type requestBodyValidator struct {
-	options     *config.ValidationOptions
-	document    *v3.Document
-	schemaCache *sync.Map
+	options  *config.ValidationOptions
+	document *v3.Document
 }

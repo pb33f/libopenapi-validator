@@ -2,6 +2,7 @@ package parameters
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -202,7 +203,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 // https://github.com/pb33f/libopenapi-validator/issues/168
 func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 	bytes := []byte(`{
-  "openapi": "3.0.0", 
+  "openapi": "3.0.0",
   "info": {
     "title": "API Spec With Format Validation",
     "version": "1.0.0"
@@ -213,7 +214,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
         "parameters": [
           {
             "name": "email_param",
-            "in": "query", 
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string",
@@ -271,7 +272,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 // for both basic validation errors and JSONSchema validation errors
 func TestParameterNameFieldPopulation(t *testing.T) {
 	bytes := []byte(`{
-  "openapi": "3.0.0", 
+  "openapi": "3.0.0",
   "info": {
     "title": "Parameter Name Test",
     "version": "1.0.0"
@@ -282,7 +283,7 @@ func TestParameterNameFieldPopulation(t *testing.T) {
         "parameters": [
           {
             "name": "integer_param",
-            "in": "query", 
+            "in": "query",
             "required": true,
             "schema": {
               "type": "integer"
@@ -333,11 +334,11 @@ func TestHeaderSchemaStringNoJSON(t *testing.T) {
     "/api-endpoint": {
       "get": {
         "summary": "Restricted API Endpoint",
-        
+
         "responses": {
           "200": {
             "description": "Successful response",
-             "headers": { 
+             "headers": {
                "chicken-nuggets": {
 				"required": true,
 				"schema": {
@@ -573,5 +574,109 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 	} else {
 		// no validation errors - schema compiled and validated successfully
 		t.Logf("Schema compiled and validated successfully")
+	}
+}
+
+func preparePathsBenchmark(b *testing.B, cache config.RegexCache) (ParameterValidator, *http.Request) {
+	bytes := []byte(`{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API Spec With Complex Regex Pattern",
+    "version": "1.0.0"
+  },
+  "paths": {
+  "/test/other/path": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+     "/static/test/{imageName}": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+     "/request/to/my/image.png": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+     "/api/v2/{url}/{other}/{oncemore}/{url}": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+     "/api/v1/{path}": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+     "/each/url/{is}/{a_new_regex}": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+     "/my-test/with-so-many/urls": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+    "/test/other/path": {
+      "get": {"responses": {"200": {"description": "test"}}}
+    },
+    "/api/endpoint/{address}/{domain}": {
+      "get": {
+        "summary": "API Endpoint with complex regex",
+        "parameters": [
+          {
+            "name": "complexParam",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[\\w\\W]{1,1024}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	doc, err := libopenapi.NewDocument(bytes)
+	if err != nil {
+		b.Fatalf("error while creating open api spec document: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", "/api/endpoint/127.0.0.1/domain.com?complexParam=testvalue", nil)
+	if err != nil {
+		b.Fatalf("error while creating request: %v", err)
+	}
+
+	v3Model, errs := doc.BuildV3Model()
+	if errs != nil {
+		b.Fatalf("error while building v3 model: %v", errs)
+	}
+
+	validator := NewParameterValidator(&v3Model.Model, config.WithRegexCache(cache))
+
+	return validator, req
+}
+
+func BenchmarkValidationWithoutCache(b *testing.B) {
+	validator, req := preparePathsBenchmark(b, nil)
+
+	b.ResetTimer()
+
+	for b.Loop() {
+		validator.ValidateHeaderParams(req)
+		validator.ValidateCookieParams(req)
+		validator.ValidateQueryParams(req)
+		validator.ValidateSecurity(req)
+		validator.ValidatePathParams(req)
+	}
+}
+
+func BenchmarkValidationWithRegexCache(b *testing.B) {
+	validator, req := preparePathsBenchmark(b, &sync.Map{})
+
+	b.ResetTimer()
+
+	for b.Loop() {
+		validator.ValidateHeaderParams(req)
+		validator.ValidateCookieParams(req)
+		validator.ValidateQueryParams(req)
+		validator.ValidateSecurity(req)
+		validator.ValidatePathParams(req)
 	}
 }

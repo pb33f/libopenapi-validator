@@ -8,9 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/utils"
-
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -20,7 +17,7 @@ import (
 )
 
 func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -81,34 +78,14 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	}
 
 	// extract schema from media type
-	var schema *base.Schema
-	var renderedInline, renderedJSON []byte
+	schema := mediaType.Schema.Schema()
 
-	// have we seen this schema before? let's hash it and check the cache.
-	hash := mediaType.GoLow().Schema.Value.Hash()
-
-	// perform work only once and cache the result in the validator.
-	if cacheHit, ch := v.schemaCache.Load(hash); ch {
-		// got a hit, use cached values
-		schema = cacheHit.(*schemaCache).schema
-		renderedInline = cacheHit.(*schemaCache).renderedInline
-		renderedJSON = cacheHit.(*schemaCache).renderedJSON
-
-	} else {
-
-		// render the schema inline and perform the intensive work of rendering and converting
-		// this is only performed once per schema and cached in the validator.
-		schema = mediaType.Schema.Schema()
-		renderedInline, _ = schema.RenderInline()
-		renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-		v.schemaCache.Store(hash, &schemaCache{
-			schema:         schema,
-			renderedInline: renderedInline,
-			renderedJSON:   renderedJSON,
-		})
-	}
-
-	validationSucceeded, validationErrors := ValidateRequestSchema(request, schema, renderedInline, renderedJSON, config.WithExistingOpts(v.options))
+	validationSucceeded, validationErrors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: request,
+		Schema:  schema,
+		Version: helpers.VersionToFloat(v.document.Version),
+		Options: []config.Option{config.WithExistingOpts(v.options)},
+	})
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
 

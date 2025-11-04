@@ -5,9 +5,6 @@ package responses
 
 import (
 	"net/http"
-	"sync"
-
-	"github.com/pb33f/libopenapi/datamodel/high/base"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -35,17 +32,10 @@ type ResponseBodyValidator interface {
 func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) ResponseBodyValidator {
 	options := config.NewValidationOptions(opts...)
 
-	return &responseBodyValidator{options: options, document: document, schemaCache: &sync.Map{}}
-}
-
-type schemaCache struct {
-	schema         *base.Schema
-	renderedInline []byte
-	renderedJSON   []byte
+	return &responseBodyValidator{options: options, document: document}
 }
 
 type responseBodyValidator struct {
-	options     *config.ValidationOptions
-	document    *v3.Document
-	schemaCache *sync.Map
+	options  *config.ValidationOptions
+	document *v3.Document
 }

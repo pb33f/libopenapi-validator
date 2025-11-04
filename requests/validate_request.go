@@ -13,32 +13,114 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v6"
-	"go.yaml.in/yaml/v4"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
-
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/utils"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"go.yaml.in/yaml/v4"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
+// ValidateRequestSchemaInput contains parameters for request schema validation.
+type ValidateRequestSchemaInput struct {
+	Request *http.Request   // Required: The HTTP request to validate
+	Schema  *base.Schema    // Required: The OpenAPI schema to validate against
+	Version float32         // Required: OpenAPI version (3.0 or 3.1)
+	Options []config.Option // Optional: Functional options (defaults applied if empty/nil)
+}
+
 // ValidateRequestSchema will validate a http.Request pointer against a schema.
 // If validation fails, it will return a list of validation errors as the second return value.
-func ValidateRequestSchema(
-	request *http.Request,
-	schema *base.Schema,
-	renderedSchema,
-	jsonSchema []byte,
-	opts ...config.Option,
-) (bool, []*errors.ValidationError) {
-	validationOptions := config.NewValidationOptions(opts...)
-
+// The schema will be stored and reused from cache if available, otherwise it will be compiled on each call.
+func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.ValidationError) {
+	validationOptions := config.NewValidationOptions(input.Options...)
 	var validationErrors []*errors.ValidationError
+	var renderedSchema, jsonSchema []byte
+	var referenceSchema string
+	var compiledSchema *jsonschema.Schema
+
+	if input.Schema == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           "schema is nil",
+			Reason:            "The schema to validate against is nil",
+		}}
+	} else if input.Schema.GoLow() == nil {
+		return false, []*errors.ValidationError{{
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           "schema cannot be rendered",
+			Reason:            "The schema does not have low-level information and cannot be rendered. Please ensure the schema is loaded from a document.",
+		}}
+	}
+
+	if validationOptions.SchemaCache != nil {
+		hash := input.Schema.GoLow().Hash()
+		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
+			renderedSchema = cached.RenderedInline
+			referenceSchema = cached.ReferenceSchema
+			jsonSchema = cached.RenderedJSON
+			compiledSchema = cached.CompiledSchema
+		}
+	}
+
+	// Cache miss or no cache - render and compile
+	if compiledSchema == nil {
+		renderedSchema, _ = input.Schema.RenderInline()
+		referenceSchema = string(renderedSchema)
+		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
+
+		var err error
+		schemaName := fmt.Sprintf("%x", input.Schema.GoLow().Hash())
+		compiledSchema, err = helpers.NewCompiledSchemaWithVersion(
+			schemaName,
+			jsonSchema,
+			validationOptions,
+			input.Version,
+		)
+		if err != nil {
+			violation := &errors.SchemaValidationFailure{
+				Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
+				Location:        "schema compilation",
+				ReferenceSchema: referenceSchema,
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.RequestBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%s request body for '%s' failed schema compilation",
+					input.Request.Method, input.Request.URL.Path),
+				Reason:                 fmt.Sprintf("The request schema failed to compile: %s", err.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               "check the request schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+				Context:                referenceSchema,
+			})
+			return false, validationErrors
+		}
+
+		if validationOptions.SchemaCache != nil {
+			hash := input.Schema.GoLow().Hash()
+			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+				Schema:          input.Schema,
+				RenderedInline:  renderedSchema,
+				ReferenceSchema: referenceSchema,
+				RenderedJSON:    jsonSchema,
+				CompiledSchema:  compiledSchema,
+			})
+		}
+	}
+
+	request := input.Request
+	schema := input.Schema
 
 	var requestBody []byte
 	if request != nil && request.Body != nil {
@@ -59,7 +141,7 @@ func ValidateRequestSchema(
 			violation := &errors.SchemaValidationFailure{
 				Reason:          err.Error(),
 				Location:        "unavailable",
-				ReferenceSchema: string(renderedSchema),
+				ReferenceSchema: referenceSchema,
 				ReferenceObject: string(requestBody),
 			}
 			validationErrors = append(validationErrors, &errors.ValidationError{
@@ -72,7 +154,7 @@ func ValidateRequestSchema(
 				SpecCol:                0,
 				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
 				HowToFix:               errors.HowToFixInvalidSchema,
-				Context:                string(renderedSchema), // attach the rendered schema to the error
+				Context:                referenceSchema, // attach the rendered schema to the error
 			})
 			return false, validationErrors
 		}
@@ -91,7 +173,7 @@ func ValidateRequestSchema(
 		// cannot decode the request body, so it's not valid
 		violation := &errors.SchemaValidationFailure{
 			Reason:          "request body is empty, but there is a schema defined",
-			ReferenceSchema: string(renderedSchema),
+			ReferenceSchema: referenceSchema,
 			ReferenceObject: string(requestBody),
 		}
 		validationErrors = append(validationErrors, &errors.ValidationError{
@@ -104,26 +186,13 @@ func ValidateRequestSchema(
 			SpecCol:                col,
 			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
 			HowToFix:               errors.HowToFixInvalidSchema,
-			Context:                string(renderedSchema), // attach the rendered schema to the error
-		})
-		return false, validationErrors
-	}
-
-	// Attempt to compile the JSON schema
-	jsch, err := helpers.NewCompiledSchema("requestBody", jsonSchema, validationOptions)
-	if err != nil {
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:    helpers.RequestBodyValidation,
-			ValidationSubType: helpers.Schema,
-			Message:           err.Error(),
-			Reason:            "Failed to compile the request body schema.",
-			Context:           string(jsonSchema),
+			Context:                referenceSchema, // attach the rendered schema to the error
 		})
 		return false, validationErrors
 	}
 
 	// validate the object against the schema
-	scErrs := jsch.Validate(decodedObj)
+	scErrs := compiledSchema.Validate(decodedObj)
 	if scErrs != nil {
 
 		jk := scErrs.(*jsonschema.ValidationError)
@@ -131,6 +200,10 @@ func ValidateRequestSchema(
 		// flatten the validationErrors
 		schFlatErrs := jk.BasicOutput().Errors
 		var schemaValidationErrors []*errors.SchemaValidationFailure
+
+		// re-encode the schema.
+		var renderedNode yaml.Node
+		_ = yaml.Unmarshal(renderedSchema, &renderedNode)
 		for q := range schFlatErrs {
 			er := schFlatErrs[q]
 
@@ -140,10 +213,6 @@ func ValidateRequestSchema(
 				continue // ignore this error, it's useless tbh, utter noise.
 			}
 			if er.Error != nil {
-
-				// re-encode the schema.
-				var renderedNode yaml.Node
-				_ = yaml.Unmarshal(renderedSchema, &renderedNode)
 
 				// locate the violated property in the schema
 				located := schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
@@ -172,7 +241,7 @@ func ValidateRequestSchema(
 					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
 					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
 					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-					ReferenceSchema:         string(renderedSchema),
+					ReferenceSchema:         referenceSchema,
 					ReferenceObject:         referenceObject,
 					OriginalJsonSchemaError: jk,
 				}
@@ -215,7 +284,7 @@ func ValidateRequestSchema(
 			SpecCol:                col,
 			SchemaValidationErrors: schemaValidationErrors,
 			HowToFix:               errors.HowToFixInvalidSchema,
-			Context:                string(renderedSchema), // attach the rendered schema to the error
+			Context:                referenceSchema, // attach the rendered schema to the error
 		})
 	}
 	if len(validationErrors) > 0 {

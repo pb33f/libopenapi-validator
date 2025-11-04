@@ -21,7 +21,7 @@ import (
 )
 
 func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}

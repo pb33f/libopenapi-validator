@@ -1,18 +1,32 @@
 package config
 
-import "github.com/santhosh-tekuri/jsonschema/v6"
+import (
+	"github.com/pb33f/libopenapi-validator/cache"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+)
+
+// RegexCache can be set to enable compiled regex caching.
+// It can be just a sync.Map, or a custom implementation with possible cleanup.
+//
+// Be aware that the cache should be thread safe
+type RegexCache interface {
+	Load(key any) (value any, ok bool) // Get a compiled regex from the cache
+	Store(key, value any)              // Set a compiled regex to the cache
+}
 
 // ValidationOptions A container for validation configuration.
 //
 // Generally fluent With... style functions are used to establish the desired behavior.
 type ValidationOptions struct {
 	RegexEngine         jsonschema.RegexpEngine
+	RegexCache          RegexCache // Enable compiled regex caching
 	FormatAssertions    bool
 	ContentAssertions   bool
 	SecurityValidation  bool
 	OpenAPIMode         bool // Enable OpenAPI-specific vocabulary validation
 	AllowScalarCoercion bool // Enable string->boolean/number coercion
 	Formats             map[string]func(v any) error
+	SchemaCache         cache.SchemaCache // Optional cache for compiled schemas
 }
 
 // Option Enables an 'Options pattern' approach
@@ -25,7 +39,8 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 		FormatAssertions:   false,
 		ContentAssertions:  false,
 		SecurityValidation: true,
-		OpenAPIMode:        true, // Enable OpenAPI vocabulary by default
+		OpenAPIMode:        true,                    // Enable OpenAPI vocabulary by default
+		SchemaCache:        cache.NewDefaultCache(), // Enable caching by default
 	}
 
 	// Apply any supplied overrides
@@ -44,12 +59,14 @@ func WithExistingOpts(options *ValidationOptions) Option {
 	return func(o *ValidationOptions) {
 		if options != nil {
 			o.RegexEngine = options.RegexEngine
+			o.RegexCache = options.RegexCache
 			o.FormatAssertions = options.FormatAssertions
 			o.ContentAssertions = options.ContentAssertions
 			o.SecurityValidation = options.SecurityValidation
 			o.OpenAPIMode = options.OpenAPIMode
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
+			o.SchemaCache = options.SchemaCache
 		}
 	}
 }
@@ -58,6 +75,14 @@ func WithExistingOpts(options *ValidationOptions) Option {
 func WithRegexEngine(engine jsonschema.RegexpEngine) Option {
 	return func(o *ValidationOptions) {
 		o.RegexEngine = engine
+	}
+}
+
+// WithRegexCache assigns a cache for compiled regular expressions.
+// A sync.Map should be sufficient for most use cases. It does not implement any cleanup
+func WithRegexCache(regexCache RegexCache) Option {
+	return func(o *ValidationOptions) {
+		o.RegexCache = regexCache
 	}
 }
 
@@ -113,5 +138,14 @@ func WithoutOpenAPIMode() Option {
 func WithScalarCoercion() Option {
 	return func(o *ValidationOptions) {
 		o.AllowScalarCoercion = true
+	}
+}
+
+// WithSchemaCache sets a custom cache implementation or disables caching if nil.
+// Pass nil to disable schema caching and skip cache warming during validator initialization.
+// The default cache is a thread-safe sync.Map wrapper.
+func WithSchemaCache(cache cache.SchemaCache) Option {
+	return func(o *ValidationOptions) {
+		o.SchemaCache = cache
 	}
 }

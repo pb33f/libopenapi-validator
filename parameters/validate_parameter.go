@@ -37,13 +37,13 @@ func ValidateSingleParameterSchema(
 	// Get the JSON Schema for the parameter definition.
 	jsonSchema, err := buildJsonRender(schema)
 	if err != nil {
-		return
+		return validationErrors
 	}
 
 	// Attempt to compile the JSON Schema
 	jsch, err := helpers.NewCompiledSchema(name, jsonSchema, o)
 	if err != nil {
-		return
+		return validationErrors
 	}
 
 	// Validate the object and report any errors.

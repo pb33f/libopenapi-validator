@@ -9,10 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"github.com/pb33f/libopenapi/utils"
-	"go.yaml.in/yaml/v4"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
@@ -26,7 +23,7 @@ func (v *responseBodyValidator) ValidateResponseBody(
 	request *http.Request,
 	response *http.Response,
 ) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.document)
+	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options.RegexCache)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -140,56 +137,18 @@ func (v *responseBodyValidator) checkResponseSchema(
 	if strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
 		// extract schema from media type
 		if mediaType.Schema != nil {
+			schema := mediaType.Schema.Schema()
 
-			var schema *base.Schema
-			var renderedInline, renderedJSON []byte
-
-			// have we seen this schema before? let's hash it and check the cache.
-			hash := mediaType.GoLow().Schema.Value.Hash()
-
-			if cacheHit, ch := v.schemaCache.Load(hash); ch {
-				// got a hit, use cached values
-				schema = cacheHit.(*schemaCache).schema
-				renderedInline = cacheHit.(*schemaCache).renderedInline
-				renderedJSON = cacheHit.(*schemaCache).renderedJSON
-
-			} else {
-
-				// render the schema inline and perform the intensive work of rendering and converting
-				// this is only performed once per schema and cached in the validator.
-				schemaP := mediaType.Schema
-				marshalled, mErr := schemaP.MarshalYAMLInline()
-
-				if mErr != nil {
-					validationErrors = append(validationErrors, &errors.ValidationError{
-						Reason:            mErr.Error(),
-						Message:           fmt.Sprintf("unable to marshal schema for %s", contentType),
-						ValidationType:    helpers.ResponseBodyValidation,
-						ValidationSubType: helpers.Schema,
-						SpecLine:          mediaType.Schema.GetSchemaKeyNode().Line,
-						SpecCol:           mediaType.Schema.GetSchemaKeyNode().Column,
-						RequestPath:       request.URL.Path,
-						RequestMethod:     request.Method,
-						HowToFix:          "ensure schema is valid and does not contain circular references",
-					})
-				} else {
-					schema = schemaP.Schema()
-					renderedInline, _ = yaml.Marshal(marshalled)
-					renderedJSON, _ = utils.ConvertYAMLtoJSON(renderedInline)
-					v.schemaCache.Store(hash, &schemaCache{
-						schema:         schema,
-						renderedInline: renderedInline,
-						renderedJSON:   renderedJSON,
-					})
-				}
-			}
-
-			if len(renderedInline) > 0 && len(renderedJSON) > 0 && schema != nil {
-				// render the schema, to be used for validation
-				valid, vErrs := ValidateResponseSchema(request, response, schema, renderedInline, renderedJSON, config.WithRegexEngine(v.options.RegexEngine))
-				if !valid {
-					validationErrors = append(validationErrors, vErrs...)
-				}
+			// Validate response schema
+			valid, vErrs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+				Request:  request,
+				Response: response,
+				Schema:   schema,
+				Version:  helpers.VersionToFloat(v.document.Version),
+				Options:  []config.Option{config.WithExistingOpts(v.options)},
+			})
+			if !valid {
+				validationErrors = append(validationErrors, vErrs...)
 			}
 		}
 	}
