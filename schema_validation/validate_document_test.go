@@ -132,8 +132,8 @@ func TestValidateDocument_CompilationFailure(t *testing.T) {
 	valid, errors := ValidateOpenAPIDocument(doc)
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "failed to compile OpenAPI schema")
+	assert.Contains(t, errors[0].Reason, "The OpenAPI schema failed to compile")
+	assert.Nil(t, errors[0].SchemaValidationErrors, "Compilation errors should not have SchemaValidationErrors")
 }
 
 func TestValidateSchema_ValidateLicenseIdentifier(t *testing.T) {
