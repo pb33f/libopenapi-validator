@@ -345,13 +345,13 @@ components:
 
 		foundCompilationError := false
 		for _, err := range errors {
-			if err.SchemaValidationErrors != nil {
-				for _, schErr := range err.SchemaValidationErrors {
-					if schErr.Location == "unavailable" && schErr.Reason == "schema render failure, circular reference: `#/components/schemas/b`" {
-						foundCompilationError = true
-					}
-				}
+			if err.Message == "schema does not pass validation" &&
+				err.Reason != "" &&
+				(err.Reason == "The schema cannot be decoded: schema render failure, circular reference: `#/components/schemas/b`" ||
+					err.Reason == "The schema cannot be decoded: schema render failure, circular reference: `#/components/schemas/Node`") {
+				foundCompilationError = true
 			}
+			assert.Nil(t, err.SchemaValidationErrors, "Rendering errors should not have SchemaValidationErrors")
 		}
 		assert.True(t, foundCompilationError, "Should have schema compilation error for circular references")
 	})
