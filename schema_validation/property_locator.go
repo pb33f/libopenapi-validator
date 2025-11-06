@@ -58,17 +58,27 @@ func extractPropertyNameFromError(ve *jsonschema.ValidationError) *PropertyNameI
 // This is extracted as a separate function to avoid duplication and improve testability.
 func checkErrorForPropertyInfo(ve *jsonschema.ValidationError) *PropertyNameInfo {
 	errMsg := ve.Error()
+	return checkErrorMessageForPropertyInfo(errMsg, ve.InstanceLocation, ve)
+}
 
+// checkErrorMessageForPropertyInfo extracts property name info from an error message string.
+// This is separated to improve testability while keeping validation error traversal logic intact.
+func checkErrorMessageForPropertyInfo(errMsg string, instanceLocation []string, ve *jsonschema.ValidationError) *PropertyNameInfo {
 	// Check for "invalid propertyName 'X'" first (most specific error message)
 	if matches := invalidPropertyNameRegex.FindStringSubmatch(errMsg); len(matches) > 1 {
 		propertyName := matches[1]
 		info := &PropertyNameInfo{
 			PropertyName:   propertyName,
-			ParentLocation: ve.InstanceLocation,
+			ParentLocation: instanceLocation,
 		}
 
-		// try to extract pattern information from deeper causes
-		if pattern := extractPatternFromCauses(ve); pattern != "" {
+		// try to extract pattern information from deeper causes if available
+		var pattern string
+		if ve != nil {
+			pattern = extractPatternFromCauses(ve)
+		}
+
+		if pattern != "" {
 			info.Pattern = pattern
 			info.EnhancedReason = buildEnhancedReason(propertyName, pattern)
 		} else {
@@ -82,7 +92,7 @@ func checkErrorForPropertyInfo(ve *jsonschema.ValidationError) *PropertyNameInfo
 	if matches := patternMismatchRegex.FindStringSubmatch(errMsg); len(matches) > 2 {
 		return &PropertyNameInfo{
 			PropertyName:   matches[1],
-			ParentLocation: ve.InstanceLocation,
+			ParentLocation: instanceLocation,
 			Pattern:        matches[2],
 			EnhancedReason: buildEnhancedReason(matches[1], matches[2]),
 		}
