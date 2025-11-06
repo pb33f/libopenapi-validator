@@ -67,7 +67,7 @@ func checkErrorForPropertyInfo(ve *jsonschema.ValidationError) *PropertyNameInfo
 			ParentLocation: ve.InstanceLocation,
 		}
 
-		// Try to extract pattern information from deeper causes
+		// try to extract pattern information from deeper causes
 		if pattern := extractPatternFromCauses(ve); pattern != "" {
 			info.Pattern = pattern
 			info.EnhancedReason = buildEnhancedReason(propertyName, pattern)
@@ -110,7 +110,7 @@ func extractPatternFromCauses(ve *jsonschema.ValidationError) string {
 // buildEnhancedReason constructs a detailed error message with property name and pattern
 func buildEnhancedReason(propertyName, pattern string) string {
 	var buf strings.Builder
-	buf.Grow(len(propertyName) + len(pattern) + 50) // Pre-allocate to avoid reallocation
+	buf.Grow(len(propertyName) + len(pattern) + 50) // pre-allocate to avoid reallocation
 	buf.WriteString("invalid propertyName '")
 	buf.WriteString(propertyName)
 	buf.WriteString("': does not match pattern '")
@@ -172,11 +172,11 @@ func findMapKeyValue(mappingNode *yaml.Node, keyName string) *yaml.Node {
 		return nil
 	}
 
-	// Mapping nodes have key-value pairs: [key1, value1, key2, value2, ...]
+	// mapping nodes have key-value pairs: [key1, value1, key2, value2, ...]
 	for i := 0; i < len(mappingNode.Content); i += 2 {
 		keyNode := mappingNode.Content[i]
 		if keyNode.Value == keyName {
-			// Return the value node (i+1)
+			// return the value node (i+1)
 			if i+1 < len(mappingNode.Content) {
 				return mappingNode.Content[i+1]
 			}
@@ -192,7 +192,7 @@ func findMapKeyNode(mappingNode *yaml.Node, keyName string) *yaml.Node {
 		return nil
 	}
 
-	// If it's a document node, unwrap to content
+	// if it's a document node, unwrap to content
 	if mappingNode.Kind == yaml.DocumentNode && len(mappingNode.Content) > 0 {
 		mappingNode = mappingNode.Content[0]
 	}
@@ -201,7 +201,7 @@ func findMapKeyNode(mappingNode *yaml.Node, keyName string) *yaml.Node {
 		return nil
 	}
 
-	// Mapping nodes have key-value pairs: [key1, value1, key2, value2, ...]
+	// mapping nodes have key-value pairs: [key1, value1, key2, value2, ...]
 	for i := 0; i < len(mappingNode.Content); i += 2 {
 		keyNode := mappingNode.Content[i]
 		if keyNode.Value == keyName {
@@ -240,8 +240,8 @@ func applyPropertyNameFallback(
 // location information by searching the YAML tree when the standard location is empty.
 //
 // This function:
-// 1. Searches YAML tree for the property key in various locations
-// 2. Updates Line, Column, Reason, and other fields if found
+// 1. searches YAML tree for the property key in various locations
+// 2. updates Line, Column, Reason, and other fields if found
 //
 // Returns true if enrichment was performed, false otherwise.
 func enrichSchemaValidationFailure(
@@ -259,26 +259,23 @@ func enrichSchemaValidationFailure(
 		return false
 	}
 
-	// Search for the property key in the YAML tree
-	// Try different parent locations since InstanceLocation may be empty for property name errors
+	// search for the property key in the YAML tree with multiple fallback locations
+	// since InstanceLocation may be empty for property name errors
 	var foundNode *yaml.Node
 
-	// Try with the provided parent location first
+	// try with the provided parent location first
 	if len(failure.ParentLocation) > 0 {
 		foundNode = findPropertyKeyNodeInYAML(rootNode, failure.PropertyName, failure.ParentLocation)
 	}
 
-	// Common fallback locations for OpenAPI property name errors
+	// common fallback locations for OpenAPI property name errors
 	if foundNode == nil {
-		// Try components/schemas (most common for schema property names)
 		foundNode = findPropertyKeyNodeInYAML(rootNode, failure.PropertyName, []string{"components", "schemas"})
 	}
 	if foundNode == nil {
-		// Try just components
 		foundNode = findPropertyKeyNodeInYAML(rootNode, failure.PropertyName, []string{"components"})
 	}
 	if foundNode == nil {
-		// Try root level
 		foundNode = findPropertyKeyNodeInYAML(rootNode, failure.PropertyName, []string{})
 	}
 
@@ -286,19 +283,17 @@ func enrichSchemaValidationFailure(
 		return false
 	}
 
-	// Update line and column
+	// populate location metadata from YAML node
 	*line = foundNode.Line
 	*column = foundNode.Column
 
-	// Update reason with enhanced message
 	if failure.EnhancedReason != "" {
 		*reason = failure.EnhancedReason
 	}
 
-	// Update additional fields
 	*fieldName = failure.PropertyName
 
-	// Build field path (JSONPath style)
+	// construct JSONPath from parent location segments
 	if len(failure.ParentLocation) > 0 {
 		*fieldPath = helpers.ExtractJSONPathFromStringLocation("/" + strings.Join(failure.ParentLocation, "/") + "/" + failure.PropertyName)
 		*location = "/" + strings.Join(failure.ParentLocation, "/")
