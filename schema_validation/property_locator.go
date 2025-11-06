@@ -29,29 +29,20 @@ var (
 	patternMismatchRegex = regexp.MustCompile(`'([^']+)' does not match pattern '([^']+)'`)
 )
 
-// extractPropertyNameFromError recursively walks a jsonschema.ValidationError cause chain
-// to extract property name information when BasicOutput doesn't provide useful InstanceLocation.
+// extractPropertyNameFromError extracts property name information from a jsonschema.ValidationError
+// when BasicOutput doesn't provide useful InstanceLocation.
 // This handles Priority 1 (invalid propertyName) and Priority 2 (pattern mismatch) cases.
 //
 // Returns PropertyNameInfo with extracted details, or nil if no relevant information found.
+// Note: ValidationError.Error() includes all cause information in the formatted string,
+// so we only need to check the root error message.
 func extractPropertyNameFromError(ve *jsonschema.ValidationError) *PropertyNameInfo {
 	if ve == nil {
 		return nil
 	}
 
-	// Check current error for patterns
-	if info := checkErrorForPropertyInfo(ve); info != nil {
-		return info
-	}
-
-	// Recursively check causes
-	for _, cause := range ve.Causes {
-		if info := extractPropertyNameFromError(cause); info != nil {
-			return info
-		}
-	}
-
-	return nil
+	// Check error message for patterns (Error() includes all cause information)
+	return checkErrorForPropertyInfo(ve)
 }
 
 // checkErrorForPropertyInfo examines a single ValidationError for property name patterns.
@@ -101,19 +92,19 @@ func checkErrorMessageForPropertyInfo(errMsg string, instanceLocation []string, 
 	return nil
 }
 
-// extractPatternFromCauses looks through error causes to find pattern violation details
+// extractPatternFromCauses looks through error causes to find pattern violation details.
+// Since ValidationError.Error() includes all cause information, we check the formatted error string.
 func extractPatternFromCauses(ve *jsonschema.ValidationError) string {
 	if ve == nil {
 		return ""
 	}
-	for _, cause := range ve.Causes {
-		if matches := patternMismatchRegex.FindStringSubmatch(cause.Error()); len(matches) > 2 {
-			return matches[2]
-		}
-		if pattern := extractPatternFromCauses(cause); pattern != "" {
-			return pattern
-		}
+
+	// Check the error message which includes all cause information
+	errMsg := ve.Error()
+	if matches := patternMismatchRegex.FindStringSubmatch(errMsg); len(matches) > 2 {
+		return matches[2]
 	}
+
 	return ""
 }
 
