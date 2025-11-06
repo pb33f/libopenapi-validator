@@ -267,6 +267,9 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	payload []byte, jk *jsonschema.ValidationError,
 	schemaValidationErrors []*liberrors.SchemaValidationFailure,
 ) []*liberrors.SchemaValidationFailure {
+	// Extract property name info once before processing errors (performance optimization)
+	propertyInfo := extractPropertyNameFromError(jk)
+
 	for q := range schFlatErrs {
 		er := schFlatErrs[q]
 
@@ -325,6 +328,9 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 				// location of the violation within the rendered schema.
 				violation.Line = line
 				violation.Column = located.Column
+			} else {
+				// handles property name validation errors that don't provide useful InstanceLocation
+				applyPropertyNameFallback(propertyInfo, renderedNode.Content[0], violation)
 			}
 			schemaValidationErrors = append(schemaValidationErrors, violation)
 		}
