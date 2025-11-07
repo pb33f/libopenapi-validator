@@ -29,7 +29,7 @@ import (
 )
 
 // SchemaValidator is an interface that defines the methods for validating a *base.Schema (V3+ Only) object.
-// There are 6 methods for validating a schema:
+// There are 8 methods for validating a schema:
 //
 //	ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 //	ValidateSchemaObject accepts a schema object to validate against, and an object, created from unmarshalled JSON/YAML.
@@ -37,6 +37,8 @@ import (
 //	ValidateSchemaStringWithVersion - version-aware validation that allows OpenAPI 3.0 keywords when version is specified.
 //	ValidateSchemaObjectWithVersion - version-aware validation that allows OpenAPI 3.0 keywords when version is specified.
 //	ValidateSchemaBytesWithVersion - version-aware validation that allows OpenAPI 3.0 keywords when version is specified.
+//	ValidateXMLString - validates XML string against schema, applying OpenAPI xml object transformations.
+//	ValidateXMLStringWithVersion - version-aware XML validation.
 type SchemaValidator interface {
 	// ValidateSchemaString accepts a schema object to validate against, and a JSON/YAML blob that is defined as a string.
 	// Uses OpenAPI 3.1+ validation by default (strict JSON Schema compliance).
@@ -65,6 +67,14 @@ type SchemaValidator interface {
 	// When version is 3.0, OpenAPI 3.0-specific keywords like 'nullable' are allowed and processed.
 	// When version is 3.1+, OpenAPI 3.0-specific keywords like 'nullable' will cause validation to fail.
 	ValidateSchemaBytesWithVersion(schema *base.Schema, payload []byte, version float32) (bool, []*liberrors.ValidationError)
+
+	// ValidateXMLString validates an XML string against an OpenAPI schema, applying xml object transformations.
+	// Uses OpenAPI 3.1+ validation by default.
+	ValidateXMLString(schema *base.Schema, xmlString string) (bool, []*liberrors.ValidationError)
+
+	// ValidateXMLStringWithVersion validates an XML string with version-specific rules.
+	// When version is 3.0, OpenAPI 3.0-specific keywords like 'nullable' are allowed.
+	ValidateXMLStringWithVersion(schema *base.Schema, xmlString string, version float32) (bool, []*liberrors.ValidationError)
 }
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
