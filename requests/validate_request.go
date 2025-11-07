@@ -87,22 +87,16 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			input.Version,
 		)
 		if err != nil {
-			violation := &errors.SchemaValidationFailure{
-				Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
-				Location:        "schema compilation",
-				ReferenceSchema: referenceSchema,
-			}
 			validationErrors = append(validationErrors, &errors.ValidationError{
 				ValidationType:    helpers.RequestBodyValidation,
 				ValidationSubType: helpers.Schema,
 				Message: fmt.Sprintf("%s request body for '%s' failed schema compilation",
 					input.Request.Method, input.Request.URL.Path),
-				Reason:                 fmt.Sprintf("The request schema failed to compile: %s", err.Error()),
-				SpecLine:               1,
-				SpecCol:                0,
-				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
-				HowToFix:               "check the request schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
-				Context:                referenceSchema,
+				Reason:   fmt.Sprintf("The request schema failed to compile: %s", err.Error()),
+				SpecLine: 1,
+				SpecCol:  0,
+				HowToFix: "check the request schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+				Context:  referenceSchema,
 			})
 			return false, validationErrors
 		}
@@ -138,23 +132,16 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 		err := json.Unmarshal(requestBody, &decodedObj)
 		if err != nil {
 			// cannot decode the request body, so it's not valid
-			violation := &errors.SchemaValidationFailure{
-				Reason:          err.Error(),
-				Location:        "unavailable",
-				ReferenceSchema: referenceSchema,
-				ReferenceObject: string(requestBody),
-			}
 			validationErrors = append(validationErrors, &errors.ValidationError{
 				ValidationType:    helpers.RequestBodyValidation,
 				ValidationSubType: helpers.Schema,
 				Message: fmt.Sprintf("%s request body for '%s' failed to validate schema",
 					request.Method, request.URL.Path),
-				Reason:                 fmt.Sprintf("The request body cannot be decoded: %s", err.Error()),
-				SpecLine:               1,
-				SpecCol:                0,
-				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
-				HowToFix:               errors.HowToFixInvalidSchema,
-				Context:                referenceSchema, // attach the rendered schema to the error
+				Reason:   fmt.Sprintf("The request body cannot be decoded: %s", err.Error()),
+				SpecLine: 1,
+				SpecCol:  0,
+				HowToFix: errors.HowToFixInvalidSchema,
+				Context:  referenceSchema, // attach the rendered schema to the error
 			})
 			return false, validationErrors
 		}
@@ -171,22 +158,16 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 		}
 
 		// cannot decode the request body, so it's not valid
-		violation := &errors.SchemaValidationFailure{
-			Reason:          "request body is empty, but there is a schema defined",
-			ReferenceSchema: referenceSchema,
-			ReferenceObject: string(requestBody),
-		}
 		validationErrors = append(validationErrors, &errors.ValidationError{
 			ValidationType:    helpers.RequestBodyValidation,
 			ValidationSubType: helpers.Schema,
 			Message: fmt.Sprintf("%s request body is empty for '%s'",
 				request.Method, request.URL.Path),
-			Reason:                 "The request body is empty but there is a schema defined",
-			SpecLine:               line,
-			SpecCol:                col,
-			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
-			HowToFix:               errors.HowToFixInvalidSchema,
-			Context:                referenceSchema, // attach the rendered schema to the error
+			Reason:   "The request body is empty but there is a schema defined",
+			SpecLine: line,
+			SpecCol:  col,
+			HowToFix: errors.HowToFixInvalidSchema,
+			Context:  referenceSchema, // attach the rendered schema to the error
 		})
 		return false, validationErrors
 	}
@@ -235,16 +216,17 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 
 				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
 
-				violation := &errors.SchemaValidationFailure{
-					Reason:                  errMsg,
-					Location:                er.KeywordLocation,
-					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-					ReferenceSchema:         referenceSchema,
-					ReferenceObject:         referenceObject,
-					OriginalJsonSchemaError: jk,
-				}
+			violation := &errors.SchemaValidationFailure{
+				Reason:                  errMsg,
+				Location:                er.InstanceLocation, // DEPRECATED
+				FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+				FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+				InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+				KeywordLocation:         er.KeywordLocation,
+				ReferenceSchema:         referenceSchema,
+				ReferenceObject:         referenceObject,
+				OriginalJsonSchemaError: jk,
+			}
 				// if we have a location within the schema, add it to the error
 				if located != nil {
 
