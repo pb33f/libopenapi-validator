@@ -137,7 +137,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 			  "allOf": [
                 {
                   "type": "boolean"
-                },
+                }
               ]
             }
           }
@@ -349,10 +349,10 @@ func TestHeaderSchemaStringNoJSON(t *testing.T) {
 					{
 					  "type": "integer"
 					}
-				  ],
+				  ]
 				}
 			  }
-			},
+			}
           }
         }
       }
