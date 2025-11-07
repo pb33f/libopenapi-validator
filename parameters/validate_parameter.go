@@ -226,7 +226,6 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 			FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
 			InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
 			KeywordLocation:         er.KeywordLocation,
-			AbsoluteKeywordLocation: er.AbsoluteKeywordLocation,
 			OriginalJsonSchemaError: scErrs,
 		}
 		if schema != nil {

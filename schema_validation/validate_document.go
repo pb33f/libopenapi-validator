@@ -77,16 +77,15 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 
 					// locate the violated property in the schema
 					located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
-					violation := &liberrors.SchemaValidationFailure{
-						Reason:                  errMsg,
-						Location:                er.InstanceLocation,
-						FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-						FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-						InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-						KeywordLocation:         er.KeywordLocation,
-						AbsoluteKeywordLocation: er.AbsoluteKeywordLocation,
-						OriginalJsonSchemaError: jk,
-					}
+				violation := &liberrors.SchemaValidationFailure{
+					Reason:                  errMsg,
+					Location:                er.InstanceLocation,
+					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+					KeywordLocation:         er.KeywordLocation,
+					OriginalJsonSchemaError: jk,
+				}
 
 					// if we have a location within the schema, add it to the error
 					if located != nil {
