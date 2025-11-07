@@ -1262,7 +1262,8 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
-	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Nil(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].Reason, "cannot be decoded")
 }
 
 func TestValidateBody_NoContentType_Valid(t *testing.T) {

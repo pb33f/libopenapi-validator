@@ -216,17 +216,17 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 
 				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
 
-			violation := &errors.SchemaValidationFailure{
-				Reason:                  errMsg,
-				Location:                er.InstanceLocation, // DEPRECATED
-				FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-				FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-				InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-				KeywordLocation:         er.KeywordLocation,
-				ReferenceSchema:         referenceSchema,
-				ReferenceObject:         referenceObject,
-				OriginalJsonSchemaError: jk,
-			}
+				violation := &errors.SchemaValidationFailure{
+					Reason:                  errMsg,
+					Location:                er.InstanceLocation, // DEPRECATED
+					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+					KeywordLocation:         er.KeywordLocation,
+					ReferenceSchema:         referenceSchema,
+					ReferenceObject:         referenceObject,
+					OriginalJsonSchemaError: jk,
+				}
 				// if we have a location within the schema, add it to the error
 				if located != nil {
 
