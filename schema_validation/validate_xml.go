@@ -16,20 +16,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
-// ValidateXMLString validates an XML string against an OpenAPI schema,
-// applying xml object transformations before validation.
-// uses openapi 3.1+ validation by default.
-func (s *schemaValidator) ValidateXMLString(schema *base.Schema, xmlString string) (bool, []*liberrors.ValidationError) {
-	return s.validateXMLWithVersion(schema, xmlString, s.logger, 3.1)
-}
-
-// ValidateXMLStringWithVersion validates an XML string with version-specific rules.
-// when version is 3.0, openapi 3.0-specific keywords like 'nullable' are allowed.
-func (s *schemaValidator) ValidateXMLStringWithVersion(schema *base.Schema, xmlString string, version float32) (bool, []*liberrors.ValidationError) {
-	return s.validateXMLWithVersion(schema, xmlString, s.logger, version)
-}
-
-func (s *schemaValidator) validateXMLWithVersion(schema *base.Schema, xmlString string, log *slog.Logger, version float32) (bool, []*liberrors.ValidationError) {
+func (x *xmlValidator) validateXMLWithVersion(schema *base.Schema, xmlString string, log *slog.Logger, version float32) (bool, []*liberrors.ValidationError) {
 	var validationErrors []*liberrors.ValidationError
 
 	if schema == nil {
@@ -58,7 +45,7 @@ func (s *schemaValidator) validateXMLWithVersion(schema *base.Schema, xmlString 
 	}
 
 	// validate transformed json against schema using existing validator
-	return s.validateSchemaWithVersion(schema, nil, transformedJSON, log, version)
+	return x.schemaValidator.validateSchemaWithVersion(schema, nil, transformedJSON, log, version)
 }
 
 // transformXMLToSchemaJSON converts xml to json structure matching openapi schema.
