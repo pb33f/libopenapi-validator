@@ -914,7 +914,7 @@ func TestIncorrectPathParamBool(t *testing.T) {
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := IncorrectPathParamBool(param, "milky", highSchema)
+	err := IncorrectPathParamBool(param, "milky", highSchema, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -945,7 +945,7 @@ items:
 	}
 	param.GoLow().Schema.Value.Schema().Enum.KeyNode = &yaml.Node{}
 
-	err := IncorrectPathParamEnum(param, "milky", highSchema)
+	err := IncorrectPathParamEnum(param, "milky", highSchema, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -970,7 +970,7 @@ func TestIncorrectPathParamNumber(t *testing.T) {
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := IncorrectPathParamNumber(param, "milky", highSchema)
+	err := IncorrectPathParamNumber(param, "milky", highSchema, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -995,7 +995,7 @@ func TestIncorrectPathParamInteger(t *testing.T) {
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := IncorrectPathParamInteger(param, "milky", highSchema)
+	err := IncorrectPathParamInteger(param, "milky", highSchema, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1021,7 +1021,7 @@ func TestIncorrectPathParamArrayNumber(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bubbles"
 
-	err := IncorrectPathParamArrayNumber(param, "milky", highSchema, nil)
+	err := IncorrectPathParamArrayNumber(param, "milky", highSchema, nil, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1047,7 +1047,7 @@ func TestIncorrectPathParamArrayInteger(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bubbles"
 
-	err := IncorrectPathParamArrayInteger(param, "milky", highSchema, nil)
+	err := IncorrectPathParamArrayInteger(param, "milky", highSchema, nil, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1073,7 +1073,7 @@ func TestIncorrectPathParamArrayBoolean(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bubbles"
 
-	err := IncorrectPathParamArrayBoolean(param, "milky", highSchema, nil)
+	err := IncorrectPathParamArrayBoolean(param, "milky", highSchema, nil, "/test-path", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1098,7 +1098,7 @@ func TestPathParameterMissing(t *testing.T) {
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := PathParameterMissing(param)
+	err := PathParameterMissing(param, "/test/{testQueryParam}", "/test/")
 
 	// Validate the error
 	require.NotNil(t, err)
