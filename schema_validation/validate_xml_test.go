@@ -42,7 +42,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pet").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 	valid, validationErrors := validator.ValidateXMLString(schema, "<Cat><nice>true</nice></Cat>")
 
 	assert.True(t, valid)
@@ -72,7 +72,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pet").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// empty xml should fail
 	valid, validationErrors := validator.ValidateXMLString(schema, "")
@@ -112,7 +112,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pet").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 	valid, validationErrors := validator.ValidateXMLString(schema, `<Cat id="123"><name>Fluffy</name></Cat>`)
 
 	assert.True(t, valid)
@@ -145,7 +145,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pet").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid integer
 	valid, validationErrors := validator.ValidateXMLString(schema, "<Cat><age>5</age></Cat>")
@@ -195,7 +195,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pets").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid wrapped array
 	validXML := `<Pets><pets><pet><name>Fluffy</name><age>3</age></pet><pet><name>Spot</name><age>5</age></pet></pets></Pets>`
@@ -246,7 +246,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/user").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid xml with custom element names
 	validXML := `<User><id>42</id><username>johndoe</username><email>john@example.com</email></User>`
@@ -293,7 +293,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/book").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid xml with both attributes and elements
 	validXML := `<Book id="1" isbn="978-3-16-148410-0"><title>Go Programming</title><author>John Doe</author><price>29.99</price></Book>`
@@ -340,7 +340,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/order").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid nested xml
 	validXML := `<Order><orderId>123</orderId><customer><name>Jane Doe</name><address><street>123 Main St</street><city>Springfield</city></address></customer></Order>`
@@ -381,7 +381,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/data").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// goxml2json should coerce numeric strings to numbers
 	validXML := `<Data><intValue>42</intValue><floatValue>3.14</floatValue><stringValue>hello</stringValue><boolValue>true</boolValue></Data>`
@@ -423,7 +423,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/product").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// missing required property 'name'
 	invalidXML := `<Product><productId>123</productId></Product>`
@@ -481,7 +481,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/api").Post.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/soap+xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid soap-like xml
 	validXML := `<Response requestId="req-12345"><status>success</status><timestamp>1699372800</timestamp><data><value>result</value></data></Response>`
@@ -516,7 +516,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/test").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid xml with whitespace
 	validXML := `<Test>
@@ -561,7 +561,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/message").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid xml with namespace (goxml2json strips namespace prefixes)
 	validXML := `<msg:Message xmlns:msg="http://example.com/message"><msg:subject>Hello</msg:subject><msg:body>World</msg:body></msg:Message>`
@@ -601,7 +601,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/config").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// xml has wrong element names (should be 'enabled' and 'maxRetries')
 	// this should fail because required properties are missing
@@ -645,7 +645,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/item").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid - attributes are integers
 	validXML := `<Item id="123" quantity="5"><name>Widget</name></Item>`
@@ -690,7 +690,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/measurement").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// valid xml with float values
 	validXML := `<Measurement><temperature>23.456</temperature><humidity>65.2</humidity><pressure>1013.25</pressure></Measurement>`
@@ -732,7 +732,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/item").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// test with version 3.0 - should allow nullable keyword
 	valid, validationErrors := validator.ValidateXMLStringWithVersion(schema, "<Item><value>test</value></Item>", 3.0)
@@ -741,7 +741,7 @@ paths:
 }
 
 func TestValidateXML_NilSchema(t *testing.T) {
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// test with nil schema - should return false with empty errors
 	valid, validationErrors := validator.ValidateXMLString(nil, "<Test>value</Test>")
@@ -798,7 +798,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/empty").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// schema with no properties should still validate
 	valid, validationErrors := validator.ValidateXMLString(schema, "<Empty><anything>value</anything></Empty>")
@@ -829,7 +829,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/simple").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// primitive value (non-object) should work
 	valid, validationErrors := validator.ValidateXMLString(schema, "<Value>hello world</Value>")
@@ -865,7 +865,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/items").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// array without wrapped - items are direct siblings
 	validXML := `<Items><items>one</items><items>two</items><items>three</items></Items>`
@@ -909,7 +909,7 @@ paths:
 	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/collection").Get.Responses.Codes.GetOrZero("200").
 		Content.GetOrZero("application/xml").Schema.Schema()
 
-	validator := NewSchemaValidator()
+	validator := NewXMLValidator()
 
 	// wrapper contains items with wrong name (item instead of record)
 	// this tests the fallback path where unwrapped element is not found
