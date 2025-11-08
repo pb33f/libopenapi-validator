@@ -965,7 +965,6 @@ func TestTransformXMLToSchemaJSON_EmptyString(t *testing.T) {
 	assert.Contains(t, err.Error(), "empty xml")
 }
 
-
 func TestApplyXMLTransformations_NoXMLName(t *testing.T) {
 	// test schema without xml.name - data stays wrapped
 	schema := &base.Schema{
