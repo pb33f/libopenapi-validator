@@ -23,6 +23,8 @@ func ValidateResponseHeaders(
 	request *http.Request,
 	response *http.Response,
 	headers *orderedmap.Map[string, *v3.Header],
+	pathTemplate string,
+	statusCode string,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
 	options := config.NewValidationOptions(opts...)
@@ -53,6 +55,14 @@ func ValidateResponseHeaders(
 	for name, header := range headers.FromOldest() {
 		if header.Required {
 			if _, ok := locatedHeaders[strings.ToLower(name)]; !ok {
+				// Construct full OpenAPI path for KeywordLocation
+				// e.g., /paths/~1health/get/responses/200/headers/chicken-nuggets/required
+				escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
+				escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
+				method := strings.ToLower(request.Method)
+				keywordLocation := fmt.Sprintf("/paths/%s/%s/responses/%s/headers/%s/required",
+					escapedPath, method, statusCode, name)
+
 				validationErrors = append(validationErrors, &errors.ValidationError{
 					ValidationType:    helpers.ResponseBodyValidation,
 					ValidationSubType: helpers.ParameterValidationHeader,
@@ -63,6 +73,12 @@ func ValidateResponseHeaders(
 					HowToFix:          errors.HowToFixMissingHeader,
 					RequestPath:       request.URL.Path,
 					RequestMethod:     request.Method,
+					SchemaValidationErrors: []*errors.SchemaValidationFailure{{
+						Reason:          fmt.Sprintf("Required header '%s' is missing", name),
+						FieldName:       name,
+						InstancePath:    []string{name},
+						KeywordLocation: keywordLocation,
+					}},
 				})
 			}
 		}
