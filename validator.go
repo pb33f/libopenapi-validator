@@ -10,8 +10,9 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/utils"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"

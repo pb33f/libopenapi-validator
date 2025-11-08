@@ -17,8 +17,6 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/pb33f/libopenapi-validator/cache"
-
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -27,6 +25,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )

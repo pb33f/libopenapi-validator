@@ -9,8 +9,9 @@ import (
 	"log/slog"
 	"strings"
 
-	xj "github.com/basgys/goxml2json"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+
+	xj "github.com/basgys/goxml2json"
 
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"

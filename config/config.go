@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+
+	"github.com/pb33f/libopenapi-validator/cache"
 )
 
 // RegexCache can be set to enable compiled regex caching.

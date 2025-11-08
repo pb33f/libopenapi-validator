@@ -12,10 +12,11 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/config"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/paths"
 )
 
 func TestValidateBody_NotRequiredBody(t *testing.T) {
