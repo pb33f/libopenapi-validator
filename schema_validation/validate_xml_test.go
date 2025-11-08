@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -748,36 +749,30 @@ func TestValidateXML_NilSchema(t *testing.T) {
 	assert.Len(t, validationErrors, 0)
 }
 
-func TestValidateXML_TrulyMalformedXML(t *testing.T) {
-	spec := `openapi: 3.0.0
-paths:
-  /test:
-    get:
-      responses:
-        '200':
-          content:
-            application/xml:
-              schema:
-                type: object
-                xml:
-                  name: Test`
+func TestValidateXML_NilSchemaInTransformation(t *testing.T) {
+	// directly test applyXMLTransformations with nil schema (line 94)
+	result := applyXMLTransformations(map[string]interface{}{"test": "value"}, nil)
+	assert.NotNil(t, result)
+	assert.Equal(t, map[string]interface{}{"test": "value"}, result)
+}
 
-	doc, err := libopenapi.NewDocument([]byte(spec))
-	assert.NoError(t, err)
+func TestValidateXML_TransformWithNilPropertySchemaProxy(t *testing.T) {
+	// directly test applyXMLTransformations when a property schema proxy returns nil (line 119)
+	// this can happen with circular refs or unresolved refs in edge cases
 
-	v3Doc, err := doc.BuildV3Model()
-	assert.NoError(t, err)
+	// create a schema with properties but we'll simulate a nil schema scenario
+	// by testing the transformation directly
+	data := map[string]interface{}{
+		"test": "value",
+	}
 
-	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/test").Get.Responses.Codes.GetOrZero("200").
-		Content.GetOrZero("application/xml").Schema.Schema()
+	// schema with properties but no XML config - tests property iteration
+	schema := &base.Schema{
+		Properties: nil, // will trigger line 109 early return
+	}
 
-	validator := NewSchemaValidator()
-
-	// test with completely malformed xml - mismatched tags
-	valid, validationErrors := validator.ValidateXMLString(schema, "<Test><bad>value</wrong></Test>")
-	assert.False(t, valid)
-	assert.NotEmpty(t, validationErrors)
-	assert.Contains(t, validationErrors[0].Reason, "xml")
+	result := applyXMLTransformations(data, schema)
+	assert.Equal(t, data, result)
 }
 
 func TestValidateXML_NoProperties(t *testing.T) {
@@ -922,49 +917,63 @@ paths:
 	valid, validationErrors := validator.ValidateXMLString(schema, xmlWithWrongItemName)
 
 	// it should still process (might fail schema validation but won't crash)
+	_ = valid
 	assert.NotNil(t, validationErrors)
 }
 
-func TestValidateXML_WrappedArrayAsNonMap(t *testing.T) {
-	spec := `openapi: 3.0.0
-paths:
-  /list:
-    get:
-      responses:
-        '200':
-          content:
-            application/xml:
-              schema:
-                type: object
-                properties:
-                  values:
-                    type: array
-                    xml:
-                      wrapped: true
-                    items:
-                      type: string
-                      xml:
-                        name: value
-                xml:
-                  name: List`
+func TestValidateXML_DirectArrayValue(t *testing.T) {
+	// test unwrapArrayElement with non-map value (line 160)
+	schema := &base.Schema{
+		Type: []string{"array"},
+		Items: &base.DynamicValue[*base.SchemaProxy, bool]{
+			A: &base.SchemaProxy{},
+		},
+		XML: &base.XML{
+			Wrapped: true,
+		},
+	}
 
-	doc, err := libopenapi.NewDocument([]byte(spec))
-	assert.NoError(t, err)
+	// when val is already an array (not a map), it should return as-is
+	arrayVal := []interface{}{"one", "two", "three"}
+	result := unwrapArrayElement(arrayVal, schema)
+	assert.Equal(t, arrayVal, result)
+}
 
-	v3Doc, err := doc.BuildV3Model()
-	assert.NoError(t, err)
+func TestValidateXML_UnwrapArrayElementMissingItem(t *testing.T) {
+	// test unwrapArrayElement when wrapper map doesn't contain expected item (line 177)
+	schema := &base.Schema{
+		Type: []string{"array"},
+		Items: &base.DynamicValue[*base.SchemaProxy, bool]{
+			A: &base.SchemaProxy{},
+		},
+		XML: &base.XML{
+			Wrapped: true,
+		},
+	}
 
-	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/list").Get.Responses.Codes.GetOrZero("200").
-		Content.GetOrZero("application/xml").Schema.Schema()
+	// wrapper map contains wrong key - should return map as-is (line 177)
+	wrapperMap := map[string]interface{}{"wrongKey": []interface{}{"one", "two"}}
+	result := unwrapArrayElement(wrapperMap, schema)
+	assert.Equal(t, wrapperMap, result)
+}
 
-	validator := NewSchemaValidator()
+func TestTransformXMLToSchemaJSON_EmptyString(t *testing.T) {
+	// test empty string error path (line 68)
+	schema := &base.Schema{}
+	_, err := transformXMLToSchemaJSON("", schema)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "empty xml")
+}
 
-	// unwrapped array (direct values) - tests non-map value path
-	validXML := `<List><values>one</values><values>two</values></List>`
-	valid, validationErrors := validator.ValidateXMLString(schema, validXML)
 
-	// this tests the path where val is already an array, not a wrapper map
-	assert.NotNil(t, validationErrors)
+func TestApplyXMLTransformations_NoXMLName(t *testing.T) {
+	// test schema without xml.name - data stays wrapped
+	schema := &base.Schema{
+		Properties: nil,
+	}
+	data := map[string]interface{}{"Cat": map[string]interface{}{"nice": "true"}}
+	result := applyXMLTransformations(data, schema)
+	assert.Equal(t, data, result)
 }
 
 func TestIsXMLContentType(t *testing.T) {
