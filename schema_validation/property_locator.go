@@ -7,10 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	liberrors "github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v4"
+
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // PropertyNameInfo contains extracted information about a property name validation error

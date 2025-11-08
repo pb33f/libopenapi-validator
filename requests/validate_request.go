@@ -13,17 +13,18 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/pb33f/libopenapi-validator/cache"
-	"github.com/pb33f/libopenapi-validator/config"
-	"github.com/pb33f/libopenapi-validator/errors"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/schema_validation"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v4"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+
+	"github.com/pb33f/libopenapi-validator/cache"
+	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
