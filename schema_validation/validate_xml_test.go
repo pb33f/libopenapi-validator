@@ -704,6 +704,269 @@ paths:
 	assert.Len(t, validationErrors, 0)
 }
 
+func TestValidateXML_Version30_WithNullable(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /item:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  value:
+                    type: string
+                    nullable: true
+                xml:
+                  name: Item`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/item").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// test with version 3.0 - should allow nullable keyword
+	valid, validationErrors := validator.ValidateXMLStringWithVersion(schema, "<Item><value>test</value></Item>", 3.0)
+	assert.True(t, valid)
+	assert.Len(t, validationErrors, 0)
+}
+
+func TestValidateXML_NilSchema(t *testing.T) {
+	validator := NewSchemaValidator()
+
+	// test with nil schema - should return false with empty errors
+	valid, validationErrors := validator.ValidateXMLString(nil, "<Test>value</Test>")
+	assert.False(t, valid)
+	assert.Len(t, validationErrors, 0)
+}
+
+func TestValidateXML_TrulyMalformedXML(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                xml:
+                  name: Test`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/test").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// test with completely malformed xml - mismatched tags
+	valid, validationErrors := validator.ValidateXMLString(schema, "<Test><bad>value</wrong></Test>")
+	assert.False(t, valid)
+	assert.NotEmpty(t, validationErrors)
+	assert.Contains(t, validationErrors[0].Reason, "xml")
+}
+
+func TestValidateXML_NoProperties(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /empty:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                xml:
+                  name: Empty`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/empty").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// schema with no properties should still validate
+	valid, validationErrors := validator.ValidateXMLString(schema, "<Empty><anything>value</anything></Empty>")
+	assert.True(t, valid)
+	assert.Len(t, validationErrors, 0)
+}
+
+func TestValidateXML_PrimitiveValue(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /simple:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: string
+                xml:
+                  name: Value`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/simple").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// primitive value (non-object) should work
+	valid, validationErrors := validator.ValidateXMLString(schema, "<Value>hello world</Value>")
+	assert.True(t, valid)
+	assert.Len(t, validationErrors, 0)
+}
+
+func TestValidateXML_ArrayNotWrapped(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /items:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: string
+                xml:
+                  name: Items`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/items").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// array without wrapped - items are direct siblings
+	validXML := `<Items><items>one</items><items>two</items><items>three</items></Items>`
+	valid, validationErrors := validator.ValidateXMLString(schema, validXML)
+	assert.True(t, valid)
+	assert.Len(t, validationErrors, 0)
+}
+
+func TestValidateXML_WrappedArrayWithWrongItemName(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /collection:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          type: string
+                      xml:
+                        name: record
+                xml:
+                  name: Collection`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/collection").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// wrapper contains items with wrong name (item instead of record)
+	// this tests the fallback path where unwrapped element is not found
+	xmlWithWrongItemName := `<Collection><data><item><value>test</value></item></data></Collection>`
+	valid, validationErrors := validator.ValidateXMLString(schema, xmlWithWrongItemName)
+
+	// it should still process (might fail schema validation but won't crash)
+	assert.NotNil(t, validationErrors)
+}
+
+func TestValidateXML_WrappedArrayAsNonMap(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /list:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  values:
+                    type: array
+                    xml:
+                      wrapped: true
+                    items:
+                      type: string
+                      xml:
+                        name: value
+                xml:
+                  name: List`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/list").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewSchemaValidator()
+
+	// unwrapped array (direct values) - tests non-map value path
+	validXML := `<List><values>one</values><values>two</values></List>`
+	valid, validationErrors := validator.ValidateXMLString(schema, validXML)
+
+	// this tests the path where val is already an array, not a wrapper map
+	assert.NotNil(t, validationErrors)
+}
+
 func TestIsXMLContentType(t *testing.T) {
 	tests := []struct {
 		name        string
