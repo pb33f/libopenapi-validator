@@ -47,6 +47,9 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 	submittedSegments := strings.Split(paths.StripRequestPath(request, v.document), helpers.Slash)
 	pathSegments := strings.Split(pathValue, helpers.Slash)
 
+	// get the operation method for error reporting
+	operation := strings.ToLower(request.Method)
+
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
 	var validationErrors []*errors.ValidationError
@@ -185,6 +188,8 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 										helpers.ParameterValidation,
 										helpers.ParameterValidationPath,
 										v.options,
+										pathValue,
+										operation,
 									)...)
 
 							case helpers.Integer:
@@ -208,6 +213,8 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 									helpers.ParameterValidation,
 									helpers.ParameterValidationPath,
 									v.options,
+									pathValue,
+									operation,
 								)...)
 
 							case helpers.Number:
@@ -231,6 +238,8 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 									helpers.ParameterValidation,
 									helpers.ParameterValidationPath,
 									v.options,
+									pathValue,
+									operation,
 								)...)
 
 							case helpers.Boolean:

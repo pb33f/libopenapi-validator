@@ -282,7 +282,7 @@ func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, 
 		}
 	}
 
-	return ValidateSingleParameterSchemaWithPath(
+	return ValidateSingleParameterSchema(
 		sch,
 		parsedParam,
 		"Query parameter",

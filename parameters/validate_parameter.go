@@ -33,19 +33,6 @@ func ValidateSingleParameterSchema(
 	validationType string,
 	subValType string,
 	o *config.ValidationOptions,
-) (validationErrors []*errors.ValidationError) {
-	return ValidateSingleParameterSchemaWithPath(schema, rawObject, entity, reasonEntity, name, validationType, subValType, o, "", "")
-}
-
-func ValidateSingleParameterSchemaWithPath(
-	schema *base.Schema,
-	rawObject any,
-	entity string,
-	reasonEntity string,
-	name string,
-	validationType string,
-	subValType string,
-	o *config.ValidationOptions,
 	pathTemplate string,
 	operation string,
 ) (validationErrors []*errors.ValidationError) {

@@ -183,7 +183,9 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 					validationErrors = append(validationErrors, ValidateSingleParameterSchema(sch,
 						param,
 						p.Name,
-						lowbase.SchemaLabel, p.Name, helpers.ParameterValidation, helpers.ParameterValidationHeader, v.options)...)
+						lowbase.SchemaLabel, p.Name, helpers.ParameterValidation, helpers.ParameterValidationHeader, v.options,
+						pathValue,
+						operation)...)
 				}
 			} else {
 				if p.Required != nil && *p.Required {
