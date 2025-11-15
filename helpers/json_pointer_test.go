@@ -147,4 +147,3 @@ func TestConstructResponseHeaderJSONPointer(t *testing.T) {
 		})
 	}
 }
-

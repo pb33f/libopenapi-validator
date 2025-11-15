@@ -469,7 +469,7 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 		found := false
 		for _, err := range valErrs {
 			if err.ParameterName == "complexParam" &&
-				(err.SchemaValidationErrors == nil || len(err.SchemaValidationErrors) == 0) {
+				len(err.SchemaValidationErrors) == 0 {
 				// Schema compilation errors don't have SchemaValidationFailure objects
 				if strings.Contains(err.Reason, "failed to compile JSON schema") {
 					found = true
@@ -554,7 +554,7 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 		for _, validationError := range validationErrors {
 			if validationError.ParameterName == "failParam" &&
 				validationError.ValidationSubType == helpers.ParameterValidationQuery &&
-				(validationError.SchemaValidationErrors == nil || len(validationError.SchemaValidationErrors) == 0) {
+				len(validationError.SchemaValidationErrors) == 0 {
 				// Schema compilation errors don't have SchemaValidationFailure objects
 				if strings.Contains(validationError.Reason, "failed to compile JSON schema") {
 					assert.Contains(t, validationError.Reason, "failed to compile JSON schema")

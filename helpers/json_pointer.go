@@ -38,4 +38,3 @@ func ConstructResponseHeaderJSONPointer(pathTemplate, method, statusCode, header
 	method = strings.ToLower(method)
 	return fmt.Sprintf("/paths/%s/%s/responses/%s/headers/%s/%s", escapedPath, method, statusCode, headerName, keyword)
 }
-

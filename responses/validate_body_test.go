@@ -1488,7 +1488,7 @@ paths:
 		found := false
 		for _, err := range validationErrors {
 			if err.ValidationSubType == helpers.Schema &&
-				(err.SchemaValidationErrors == nil || len(err.SchemaValidationErrors) == 0) {
+				len(err.SchemaValidationErrors) == 0 {
 				// Schema compilation errors don't have SchemaValidationFailure objects
 				if strings.Contains(err.Reason, "failed to compile JSON schema") {
 					found = true
