@@ -4,6 +4,7 @@
 package parameters
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -43,6 +44,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
 	var validationErrors []*errors.ValidationError
+	operation := strings.ToLower(request.Method)
 	for _, p := range params {
 		if p.In == helpers.Cookie {
 			for _, cookie := range request.Cookies() {
@@ -52,6 +54,15 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 					if p.Schema != nil {
 						sch = p.Schema.Schema()
 					}
+
+					// Render schema once for ReferenceSchema field in errors
+					var renderedSchema string
+					if sch != nil {
+						rendered, _ := sch.RenderInline()
+						schemaBytes, _ := json.Marshal(rendered)
+						renderedSchema = string(schemaBytes)
+					}
+
 					pType := sch.Type
 
 					for _, ty := range pType {
@@ -59,7 +70,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 						case helpers.Integer:
 							if _, err := strconv.ParseInt(cookie.Value, 10, 64); err != nil {
 								validationErrors = append(validationErrors,
-									errors.InvalidCookieParamInteger(p, strings.ToLower(cookie.Value), sch))
+									errors.InvalidCookieParamInteger(p, strings.ToLower(cookie.Value), sch, pathValue, operation, renderedSchema))
 								break
 							}
 							// check if enum is in range
@@ -73,13 +84,13 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 								}
 								if !matchFound {
 									validationErrors = append(validationErrors,
-										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch, pathValue, operation, renderedSchema))
 								}
 							}
 						case helpers.Number:
 							if _, err := strconv.ParseFloat(cookie.Value, 64); err != nil {
 								validationErrors = append(validationErrors,
-									errors.InvalidCookieParamNumber(p, strings.ToLower(cookie.Value), sch))
+									errors.InvalidCookieParamNumber(p, strings.ToLower(cookie.Value), sch, pathValue, operation, renderedSchema))
 								break
 							}
 							// check if enum is in range
@@ -93,13 +104,13 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 								}
 								if !matchFound {
 									validationErrors = append(validationErrors,
-										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch, pathValue, operation, renderedSchema))
 								}
 							}
 						case helpers.Boolean:
 							if _, err := strconv.ParseBool(cookie.Value); err != nil {
 								validationErrors = append(validationErrors,
-									errors.IncorrectCookieParamBool(p, strings.ToLower(cookie.Value), sch))
+									errors.IncorrectCookieParamBool(p, strings.ToLower(cookie.Value), sch, pathValue, operation, renderedSchema))
 							}
 						case helpers.Object:
 							if !p.IsExploded() {
@@ -125,7 +136,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 								// only check if items is a schema, not a boolean
 								if sch.Items.IsA() {
 									validationErrors = append(validationErrors,
-										ValidateCookieArray(sch, p, cookie.Value)...)
+										ValidateCookieArray(sch, p, cookie.Value, pathValue, operation, renderedSchema)...)
 								}
 							}
 
@@ -143,7 +154,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 								}
 								if !matchFound {
 									validationErrors = append(validationErrors,
-										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+										errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch, pathValue, operation, renderedSchema))
 								}
 							}
 						}
