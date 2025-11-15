@@ -62,20 +62,16 @@ func validateOpenAPIDocumentWithMalformedSchema(loadedSchema string, decodedDocu
 	_, err := helpers.NewCompiledSchema("schema", []byte(loadedSchema), options)
 	if err != nil {
 		// schema compilation failed, return validation error instead of panicking
-		violation := &liberrors.SchemaValidationFailure{
-			Reason:          fmt.Sprintf("failed to compile OpenAPI schema: %s", err.Error()),
-			ReferenceSchema: loadedSchema,
-		}
+		// NO SchemaValidationFailure for pre-validation errors like compilation failures
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:         "schema",
-			ValidationSubType:      "compilation",
-			Message:                "OpenAPI document schema compilation failed",
-			Reason:                 fmt.Sprintf("The OpenAPI schema failed to compile: %s", err.Error()),
-			SpecLine:               1,
-			SpecCol:                0,
-			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-			HowToFix:               "check the OpenAPI schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
-			Context:                loadedSchema,
+			ValidationType:    "schema",
+			ValidationSubType: "compilation",
+			Message:           "OpenAPI document schema compilation failed",
+			Reason:            fmt.Sprintf("The OpenAPI schema failed to compile: %s", err.Error()),
+			SpecLine:          1,
+			SpecCol:           0,
+			HowToFix:          "check the OpenAPI schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+			Context:           loadedSchema,
 		})
 		return false, validationErrors
 	}

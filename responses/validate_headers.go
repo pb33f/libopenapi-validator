@@ -40,7 +40,9 @@ func ValidateResponseHeaders(
 	// iterate through the response headers
 	for name, v := range response.Header {
 		// check if the model is in the spec
-		for k, header := range headers.FromOldest() {
+		for pair := headers.First(); pair != nil; pair = pair.Next() {
+			k := pair.Key()
+			header := pair.Value()
 			if strings.EqualFold(k, name) {
 				locatedHeaders[strings.ToLower(name)] = headerPair{
 					name:  k,
@@ -52,7 +54,9 @@ func ValidateResponseHeaders(
 	}
 
 	// determine if any required headers are missing from the response
-	for name, header := range headers.FromOldest() {
+	for pair := headers.First(); pair != nil; pair = pair.Next() {
+		name := pair.Key()
+		header := pair.Value()
 		if header.Required {
 			if _, ok := locatedHeaders[strings.ToLower(name)]; !ok {
 				keywordLocation := helpers.ConstructResponseHeaderJSONPointer(pathTemplate, request.Method, statusCode, name, "required")

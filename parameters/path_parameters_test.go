@@ -440,7 +440,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: minimum: got 1, want 10, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 1, want 10", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_SimpleEncodedPath_MinimumInteger(t *testing.T) {
@@ -495,7 +495,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: maximum: got 11, want 10, Location: /maximum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: maximum: got 11, want 10", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_SimpleEncodedPath_MaximumInteger(t *testing.T) {
@@ -577,7 +577,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: minimum: got 1.3, want 10.2, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 1.3, want 10.2", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_SimpleEncodedPath_MinimumNumber(t *testing.T) {
@@ -632,7 +632,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: maximum: got 11.2, want 10.2, Location: /maximum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: maximum: got 11.2, want 10.2", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_SimpleEncodedPath_MaximumNumber(t *testing.T) {
@@ -741,7 +741,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: minimum: got 3, want 10, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 3, want 10", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_LabelEncodedPath_MaximumIntegerViolation(t *testing.T) {
@@ -771,7 +771,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: maximum: got 32, want 10, Location: /maximum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: maximum: got 32, want 10", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_LabelEncodedPath_InvalidBoolean(t *testing.T) {
@@ -1278,7 +1278,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: minimum: got 3, want 5, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 3, want 5", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_MatrixEncodedPath_MaximumIntegerViolation(t *testing.T) {
@@ -1308,7 +1308,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: maximum: got 30, want 5, Location: /maximum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: maximum: got 30, want 5", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_MatrixEncodedPath_InvalidNumber(t *testing.T) {
@@ -1365,7 +1365,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: minimum: got 3, want 5, Location: /minimum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minimum: got 3, want 5", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_MatrixEncodedPath_MaximumNumberViolation(t *testing.T) {
@@ -1395,7 +1395,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: maximum: got 30, want 5, Location: /maximum", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: maximum: got 30, want 5", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_MatrixEncodedPath_ValidPrimitiveBoolean(t *testing.T) {
@@ -1796,7 +1796,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: minLength: got 3, want 4, Location: /minLength", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: minLength: got 3, want 4", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_PathParamStringMaxLengthViolation(t *testing.T) {
@@ -1825,7 +1825,7 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Path parameter 'burgerId' failed to validate", errors[0].Message)
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "Reason: maxLength: got 3, want 1, Location: /maxLength", errors[0].SchemaValidationErrors[0].Error())
+	assert.Equal(t, "Reason: maxLength: got 3, want 1", errors[0].SchemaValidationErrors[0].Error())
 }
 
 func TestNewValidator_PathParamIntegerEnumValid(t *testing.T) {
