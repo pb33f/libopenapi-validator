@@ -119,7 +119,7 @@ func TestQueryParameterMissing(t *testing.T) {
 	param := createMockParameterWithSchema()
 
 	// Call the function
-	err := QueryParameterMissing(param)
+	err := QueryParameterMissing(param, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -223,7 +223,7 @@ func TestIncorrectQueryParamArrayBoolean(t *testing.T) {
 	schema := base.NewSchema(s)
 
 	// Call the function with an invalid boolean value in the array
-	err := IncorrectQueryParamArrayBoolean(param, "notBoolean", schema, schema.Items.A.Schema())
+	err := IncorrectQueryParamArrayBoolean(param, "notBoolean", schema, schema.Items.A.Schema(), "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -375,7 +375,7 @@ func TestIncorrectQueryParamArrayInteger(t *testing.T) {
 	itemsSchema := base.NewSchema(baseSchema.Items.Value.A.Schema())
 
 	// Call the function with an invalid number value in the array
-	err := IncorrectQueryParamArrayInteger(param, "notNumber", s, itemsSchema)
+	err := IncorrectQueryParamArrayInteger(param, "notNumber", s, itemsSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -394,7 +394,7 @@ func TestIncorrectQueryParamArrayNumber(t *testing.T) {
 	itemsSchema := base.NewSchema(baseSchema.Items.Value.A.Schema())
 
 	// Call the function with an invalid number value in the array
-	err := IncorrectQueryParamArrayNumber(param, "notNumber", s, itemsSchema)
+	err := IncorrectQueryParamArrayNumber(param, "notNumber", s, itemsSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -531,7 +531,7 @@ func TestIncorrectParamEncodingJSON(t *testing.T) {
 	baseSchema := createMockLowBaseSchema()
 
 	// Call the function with an invalid JSON value
-	err := IncorrectParamEncodingJSON(param, "invalidJSON", base.NewSchema(baseSchema))
+	err := IncorrectParamEncodingJSON(param, "invalidJSON", base.NewSchema(baseSchema), "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -560,7 +560,7 @@ func TestIncorrectQueryParamBool(t *testing.T) {
 	})
 
 	// Call the function with an invalid boolean value
-	err := IncorrectQueryParamBool(param, "notBoolean", base.NewSchema(baseSchema))
+	err := IncorrectQueryParamBool(param, "notBoolean", base.NewSchema(baseSchema), "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -576,7 +576,7 @@ func TestInvalidQueryParamNumber(t *testing.T) {
 	baseSchema := createMockLowBaseSchema()
 
 	// Call the function with an invalid number value
-	err := InvalidQueryParamNumber(param, "notNumber", base.NewSchema(baseSchema))
+	err := InvalidQueryParamNumber(param, "notNumber", base.NewSchema(baseSchema), "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -592,7 +592,7 @@ func TestInvalidQueryParamInteger(t *testing.T) {
 	baseSchema := createMockLowBaseSchema()
 
 	// Call the function with an invalid number value
-	err := InvalidQueryParamInteger(param, "notNumber", base.NewSchema(baseSchema))
+	err := InvalidQueryParamInteger(param, "notNumber", base.NewSchema(baseSchema), "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -617,7 +617,7 @@ func TestIncorrectQueryParamEnum(t *testing.T) {
 	param.GoLow().Schema.Value.Schema().Enum.KeyNode = &yaml.Node{}
 
 	// Call the function with an invalid enum value
-	err := IncorrectQueryParamEnum(param, "invalidEnum", highSchema)
+	err := IncorrectQueryParamEnum(param, "invalidEnum", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -646,7 +646,7 @@ func TestIncorrectQueryParamEnumArray(t *testing.T) {
 	}
 
 	// Call the function with an invalid enum value
-	err := IncorrectQueryParamEnumArray(param, "invalidEnum", highSchema)
+	err := IncorrectQueryParamEnumArray(param, "invalidEnum", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -669,7 +669,7 @@ func TestIncorrectReservedValues(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "borked::?^&*"
 
-	err := IncorrectReservedValues(param, "borked::?^&*", highSchema)
+	err := IncorrectReservedValues(param, "borked::?^&*", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1124,7 +1124,7 @@ items:
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := IncorrectParamArrayMaxNumItems(param, param.Schema.Schema(), 10, 25)
+	err := IncorrectParamArrayMaxNumItems(param, param.Schema.Schema(), 10, 25, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1150,7 +1150,7 @@ items:
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := IncorrectParamArrayMinNumItems(param, param.Schema.Schema(), 10, 5)
+	err := IncorrectParamArrayMinNumItems(param, param.Schema.Schema(), 10, 5, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -1176,7 +1176,7 @@ items:
 	param.Schema = base.CreateSchemaProxy(highSchema)
 	param.GoLow().Schema.KeyNode = &yaml.Node{}
 
-	err := IncorrectParamArrayUniqueItems(param, param.Schema.Schema(), "fish, cake")
+	err := IncorrectParamArrayUniqueItems(param, param.Schema.Schema(), "fish, cake", "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)

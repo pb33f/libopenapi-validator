@@ -4,6 +4,7 @@
 package parameters
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -99,10 +100,17 @@ func ValidateHeaderArray(
 
 // ValidateQueryArray will validate a query parameter that is an array
 func ValidateQueryArray(
-	sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool, validationOptions *config.ValidationOptions,
+	sch *base.Schema, param *v3.Parameter, ef string, contentWrapped bool, validationOptions *config.ValidationOptions, pathTemplate string, operation string, renderedSchema string,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
+
+	var renderedItemsSchema string
+	if itemsSchema != nil {
+		rendered, _ := itemsSchema.RenderInline()
+		schemaBytes, _ := json.Marshal(rendered)
+		renderedItemsSchema = string(schemaBytes)
+	}
 
 	// check for an exploded bit on the schema.
 	// if it's exploded, then we need to check each item in the array
@@ -141,7 +149,7 @@ func ValidateQueryArray(
 				}
 				if !matchFound {
 					validationErrors = append(validationErrors,
-						errors.IncorrectQueryParamEnumArray(param, item, sch))
+						errors.IncorrectQueryParamEnumArray(param, item, sch, pathTemplate, operation, renderedItemsSchema))
 				}
 			}
 		}
@@ -165,7 +173,7 @@ func ValidateQueryArray(
 			case helpers.Integer:
 				if _, err := strconv.ParseInt(item, 10, 64); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectQueryParamArrayInteger(param, item, sch, itemsSchema))
+						errors.IncorrectQueryParamArrayInteger(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 					break
 				}
 				// will it blend?
@@ -173,7 +181,7 @@ func ValidateQueryArray(
 			case helpers.Number:
 				if _, err := strconv.ParseFloat(item, 64); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectQueryParamArrayNumber(param, item, sch, itemsSchema))
+						errors.IncorrectQueryParamArrayNumber(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 					break
 				}
 				// will it blend?
@@ -182,7 +190,7 @@ func ValidateQueryArray(
 			case helpers.Boolean:
 				if _, err := strconv.ParseBool(item); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectQueryParamArrayBoolean(param, item, sch, itemsSchema))
+						errors.IncorrectQueryParamArrayBoolean(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
 			case helpers.Object:
 				validationErrors = append(validationErrors,
@@ -207,14 +215,14 @@ func ValidateQueryArray(
 	if sch.MaxItems != nil {
 		if len(items) > int(*sch.MaxItems) {
 			validationErrors = append(validationErrors,
-				errors.IncorrectParamArrayMaxNumItems(param, sch, *sch.MaxItems, int64(len(items))))
+				errors.IncorrectParamArrayMaxNumItems(param, sch, *sch.MaxItems, int64(len(items)), pathTemplate, operation, renderedSchema))
 		}
 	}
 
 	if sch.MinItems != nil {
 		if len(items) < int(*sch.MinItems) {
 			validationErrors = append(validationErrors,
-				errors.IncorrectParamArrayMinNumItems(param, sch, *sch.MinItems, int64(len(items))))
+				errors.IncorrectParamArrayMinNumItems(param, sch, *sch.MinItems, int64(len(items)), pathTemplate, operation, renderedSchema))
 		}
 	}
 
@@ -222,7 +230,7 @@ func ValidateQueryArray(
 	if sch.UniqueItems != nil {
 		if *sch.UniqueItems && !uniqueItems {
 			validationErrors = append(validationErrors,
-				errors.IncorrectParamArrayUniqueItems(param, sch, strings.Join(duplicates, ", ")))
+				errors.IncorrectParamArrayUniqueItems(param, sch, strings.Join(duplicates, ", "), pathTemplate, operation, renderedSchema))
 		}
 	}
 	return validationErrors

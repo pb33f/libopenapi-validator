@@ -34,6 +34,21 @@ func ValidateSingleParameterSchema(
 	subValType string,
 	o *config.ValidationOptions,
 ) (validationErrors []*errors.ValidationError) {
+	return ValidateSingleParameterSchemaWithPath(schema, rawObject, entity, reasonEntity, name, validationType, subValType, o, "", "")
+}
+
+func ValidateSingleParameterSchemaWithPath(
+	schema *base.Schema,
+	rawObject any,
+	entity string,
+	reasonEntity string,
+	name string,
+	validationType string,
+	subValType string,
+	o *config.ValidationOptions,
+	pathTemplate string,
+	operation string,
+) (validationErrors []*errors.ValidationError) {
 	// Get the JSON Schema for the parameter definition.
 	jsonSchema, err := buildJsonRender(schema)
 	if err != nil {
@@ -50,7 +65,7 @@ func ValidateSingleParameterSchema(
 	scErrs := jsch.Validate(rawObject)
 	var werras *jsonschema.ValidationError
 	if stdError.As(scErrs, &werras) {
-		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType)
+		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType, pathTemplate, operation)
 	}
 	return validationErrors
 }
@@ -183,7 +198,7 @@ func ValidateParameterSchema(
 	}
 	var werras *jsonschema.ValidationError
 	if stdError.As(scErrs, &werras) {
-		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType)
+		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType, "", "")
 	}
 
 	// if there are no validationErrors, check that the supplied value is even JSON
@@ -207,7 +222,7 @@ func ValidateParameterSchema(
 	return validationErrors
 }
 
-func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.ValidationError, entity string, reasonEntity string, name string, validationType string, subValType string) (validationErrors []*errors.ValidationError) {
+func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.ValidationError, entity string, reasonEntity string, name string, validationType string, subValType string, pathTemplate string, operation string) (validationErrors []*errors.ValidationError) {
 	// flatten the validationErrors
 	schFlatErrs := scErrs.BasicOutput().Errors
 	var schemaValidationErrors []*errors.SchemaValidationFailure
@@ -219,19 +234,33 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 			continue // ignore this error, it's not useful
 		}
 
+		// Construct full OpenAPI path for KeywordLocation if pathTemplate and operation are provided
+		keywordLocation := er.KeywordLocation
+		if pathTemplate != "" && operation != "" && validationType == helpers.ParameterValidation {
+			// Build full OpenAPI path: /paths/{escapedPath}/{operation}/parameters/{paramName}/schema{relativeKeywordLocation}
+			escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
+			escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
+			escapedPath = strings.TrimPrefix(escapedPath, "~1") // Remove leading ~1
+			
+			// er.KeywordLocation is relative to the schema (e.g., "/minLength" or "/enum")
+			// Prepend the full OpenAPI path
+			keywordLocation = fmt.Sprintf("/paths/%s/%s/parameters/%s/schema%s", escapedPath, strings.ToLower(operation), name, er.KeywordLocation)
+		}
+
 		fail := &errors.SchemaValidationFailure{
 			Reason:                  errMsg,
 			Location:                er.KeywordLocation, // DEPRECATED
 			FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
 			FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
 			InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-			KeywordLocation:         er.KeywordLocation,
+			KeywordLocation:         keywordLocation,
 			OriginalJsonSchemaError: scErrs,
 		}
 		if schema != nil {
 			rendered, err := schema.RenderInline()
 			if err == nil && rendered != nil {
-				fail.ReferenceSchema = string(rendered)
+				renderedBytes, _ := json.Marshal(rendered)
+				fail.ReferenceSchema = string(renderedBytes)
 			}
 		}
 		schemaValidationErrors = append(schemaValidationErrors, fail)

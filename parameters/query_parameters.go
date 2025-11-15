@@ -70,6 +70,9 @@ func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, 
 		}
 	}
 
+	// Get operation from request method (lowercase for JSON Pointer)
+	operation := strings.ToLower(request.Method)
+
 	// look through the params for the query key
 doneLooking:
 	for p := range params {
@@ -101,6 +104,15 @@ doneLooking:
 							break
 						}
 					}
+
+					// Render schema once for ReferenceSchema field in errors
+					var renderedSchema string
+					if sch != nil {
+						rendered, _ := sch.RenderInline()
+						schemaBytes, _ := json.Marshal(rendered)
+						renderedSchema = string(schemaBytes)
+					}
+
 					pType := sch.Type
 
 					// for each param, check each type
@@ -113,34 +125,34 @@ doneLooking:
 						if !params[p].AllowReserved {
 							if rxRxp.MatchString(ef) && params[p].IsExploded() {
 								validationErrors = append(validationErrors,
-									errors.IncorrectReservedValues(params[p], ef, sch))
+									errors.IncorrectReservedValues(params[p], ef, sch, pathValue, operation, renderedSchema))
 							}
 						}
 						for _, ty := range pType {
 							switch ty {
 
 							case helpers.String:
-								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, ef, params[p])...)
+								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, ef, params[p], pathValue, operation, renderedSchema)...)
 							case helpers.Integer:
 								efF, err := strconv.ParseInt(ef, 10, 64)
 								if err != nil {
 									validationErrors = append(validationErrors,
-										errors.InvalidQueryParamInteger(params[p], ef, sch))
+										errors.InvalidQueryParamInteger(params[p], ef, sch, pathValue, operation, renderedSchema))
 									break
 								}
-								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, efF, params[p])...)
+								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, efF, params[p], pathValue, operation, renderedSchema)...)
 							case helpers.Number:
 								efF, err := strconv.ParseFloat(ef, 64)
 								if err != nil {
 									validationErrors = append(validationErrors,
-										errors.InvalidQueryParamNumber(params[p], ef, sch))
+										errors.InvalidQueryParamNumber(params[p], ef, sch, pathValue, operation, renderedSchema))
 									break
 								}
-								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, efF, params[p])...)
+								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, efF, params[p], pathValue, operation, renderedSchema)...)
 							case helpers.Boolean:
 								if _, err := strconv.ParseBool(ef); err != nil {
 									validationErrors = append(validationErrors,
-										errors.IncorrectQueryParamBool(params[p], ef, sch))
+										errors.IncorrectQueryParamBool(params[p], ef, sch, pathValue, operation, renderedSchema))
 								}
 							case helpers.Object:
 
@@ -165,7 +177,7 @@ doneLooking:
 											encodedObj = make(map[string]interface{})
 											if err := json.Unmarshal([]byte(ef), &encodedParams); err != nil {
 												validationErrors = append(validationErrors,
-													errors.IncorrectParamEncodingJSON(params[p], ef, sch))
+													errors.IncorrectParamEncodingJSON(params[p], ef, sch, pathValue, operation, renderedSchema))
 												break skipValues
 											}
 											encodedObj[params[p].Name] = encodedParams
@@ -195,7 +207,7 @@ doneLooking:
 								// only check if items is a schema, not a boolean
 								if sch.Items != nil && sch.Items.IsA() {
 									validationErrors = append(validationErrors,
-										ValidateQueryArray(sch, params[p], ef, contentWrapped, v.options)...)
+										ValidateQueryArray(sch, params[p], ef, contentWrapped, v.options, pathValue, operation, renderedSchema)...)
 								}
 							}
 						}
@@ -225,7 +237,23 @@ doneLooking:
 				}
 				// if there is no match, check if the param is required or not.
 				if params[p].Required != nil && *params[p].Required {
-					validationErrors = append(validationErrors, errors.QueryParameterMissing(params[p]))
+					// Render schema for missing parameter
+					var sch *base.Schema
+					if params[p].Schema != nil {
+						sch = params[p].Schema.Schema()
+					} else {
+						for pair := orderedmap.First(params[p].Content); pair != nil; pair = pair.Next() {
+							sch = pair.Value().Schema.Schema()
+							break
+						}
+					}
+					var renderedSchema string
+					if sch != nil {
+						rendered, _ := sch.RenderInline()
+						schemaBytes, _ := json.Marshal(rendered)
+						renderedSchema = string(schemaBytes)
+					}
+					validationErrors = append(validationErrors, errors.QueryParameterMissing(params[p], pathValue, operation, renderedSchema))
 				}
 			}
 		}
@@ -239,7 +267,7 @@ doneLooking:
 	return true, nil
 }
 
-func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, parsedParam any, parameter *v3.Parameter) (validationErrors []*errors.ValidationError) {
+func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, parsedParam any, parameter *v3.Parameter, pathTemplate string, operation string, renderedSchema string) (validationErrors []*errors.ValidationError) {
 	// check if the param is within an enum
 	if sch.Enum != nil {
 		matchFound := false
@@ -250,11 +278,11 @@ func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, 
 			}
 		}
 		if !matchFound {
-			return []*errors.ValidationError{errors.IncorrectQueryParamEnum(parameter, rawParam, sch)}
+			return []*errors.ValidationError{errors.IncorrectQueryParamEnum(parameter, rawParam, sch, pathTemplate, operation, renderedSchema)}
 		}
 	}
 
-	return ValidateSingleParameterSchema(
+	return ValidateSingleParameterSchemaWithPath(
 		sch,
 		parsedParam,
 		"Query parameter",
@@ -263,5 +291,7 @@ func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, 
 		helpers.ParameterValidation,
 		helpers.ParameterValidationQuery,
 		v.options,
+		pathTemplate,
+		operation,
 	)
 }
