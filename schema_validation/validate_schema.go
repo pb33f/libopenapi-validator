@@ -281,16 +281,16 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 				referenceObject = string(payload)
 			}
 
-		violation := &liberrors.SchemaValidationFailure{
-			Reason:                  errMsg,
-			FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-			FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-			InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-			KeywordLocation:         er.KeywordLocation,
-			ReferenceSchema:         string(renderedSchema),
-			ReferenceObject:         referenceObject,
-			OriginalJsonSchemaError: jk,
-		}
+			violation := &liberrors.SchemaValidationFailure{
+				Reason:                  errMsg,
+				FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+				FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+				InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+				KeywordLocation:         er.KeywordLocation,
+				ReferenceSchema:         string(renderedSchema),
+				ReferenceObject:         referenceObject,
+				OriginalJsonSchemaError: jk,
+			}
 			// if we have a location within the schema, add it to the error
 			if located != nil {
 				line := located.Line
