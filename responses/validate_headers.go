@@ -8,14 +8,15 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/parameters"
+	"github.com/pb33f/libopenapi/orderedmap"
+
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
-	"github.com/pb33f/libopenapi/orderedmap"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/parameters"
 )
 
 // ValidateResponseHeaders validates the response headers against the OpenAPI spec.

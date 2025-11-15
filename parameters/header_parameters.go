@@ -10,11 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
-
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"

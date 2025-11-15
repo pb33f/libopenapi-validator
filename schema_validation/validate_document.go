@@ -66,6 +66,9 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 			// flatten the validationErrors
 			schFlatErrs := jk.BasicOutput().Errors
 
+			// Extract property name info once before processing errors (performance optimization)
+			propertyInfo := extractPropertyNameFromError(jk)
+
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
 
@@ -100,6 +103,9 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 						// location of the violation within the rendered schema.
 						violation.Line = line
 						violation.Column = located.Column
+					} else {
+						// handles property name validation errors that don't provide useful InstanceLocation
+						applyPropertyNameFallback(propertyInfo, info.RootNode.Content[0], violation)
 					}
 					schemaValidationErrors = append(schemaValidationErrors, violation)
 				}

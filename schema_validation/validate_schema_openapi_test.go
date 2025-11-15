@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/config"
 )
 
 func TestSchemaValidator_NullableKeyword_OpenAPI30_Success(t *testing.T) {

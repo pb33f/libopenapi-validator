@@ -6,14 +6,14 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/pb33f/libopenapi-validator/config"
-	"github.com/pb33f/libopenapi-validator/helpers"
-	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
-
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
+
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
+
+	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 func Test_ForceCompilerError(t *testing.T) {
@@ -138,7 +138,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 			  "allOf": [
                 {
                   "type": "boolean"
-                },
+                }
               ]
             }
           }
@@ -351,10 +351,10 @@ func TestHeaderSchemaStringNoJSON(t *testing.T) {
 					{
 					  "type": "integer"
 					}
-				  ],
+				  ]
 				}
 			  }
-			},
+			}
           }
         }
       }
