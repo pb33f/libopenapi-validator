@@ -134,7 +134,7 @@ func TestHeaderParameterMissing(t *testing.T) {
 	param := createMockParameterWithSchema()
 
 	// Call the function
-	err := HeaderParameterMissing(param)
+	err := HeaderParameterMissing(param, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -150,7 +150,7 @@ func TestHeaderParameterCannotBeDecoded(t *testing.T) {
 	val := "malformed_header_value"
 
 	// Call the function
-	err := HeaderParameterCannotBeDecoded(param, val)
+	err := HeaderParameterCannotBeDecoded(param, val, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -187,7 +187,7 @@ func TestIncorrectHeaderParamEnum(t *testing.T) {
 	schema := base.NewSchema(s)
 
 	// Call the function with an invalid enum value
-	err := IncorrectHeaderParamEnum(param, "invalidEnum", schema)
+	err := IncorrectHeaderParamEnum(param, "invalidEnum", schema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -314,7 +314,7 @@ func TestIncorrectCookieParamArrayBoolean(t *testing.T) {
 	itemsSchema := base.NewSchema(baseSchema.Items.Value.A.Schema())
 
 	// Call the function with an invalid boolean value in the array
-	err := IncorrectCookieParamArrayBoolean(param, "notBoolean", s, itemsSchema)
+	err := IncorrectCookieParamArrayBoolean(param, "notBoolean", s, itemsSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -455,7 +455,7 @@ func TestIncorrectCookieParamArrayNumber(t *testing.T) {
 	itemsSchema := base.NewSchema(baseSchema.Items.Value.A.Schema())
 
 	// Call the function with an invalid number value in the cookie array
-	err := IncorrectCookieParamArrayNumber(param, "notNumber", s, itemsSchema)
+	err := IncorrectCookieParamArrayNumber(param, "notNumber", s, itemsSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -692,7 +692,7 @@ func TestInvalidHeaderParamInteger(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bunny"
 
-	err := InvalidHeaderParamInteger(param, "bunmy", highSchema)
+	err := InvalidHeaderParamInteger(param, "bunmy", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -715,7 +715,7 @@ func TestInvalidHeaderParamNumber(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bunny"
 
-	err := InvalidHeaderParamNumber(param, "bunmy", highSchema)
+	err := InvalidHeaderParamNumber(param, "bunmy", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -738,7 +738,7 @@ func TestInvalidCookieParamNumber(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "cookies"
 
-	err := InvalidCookieParamNumber(param, "milky", highSchema)
+	err := InvalidCookieParamNumber(param, "milky", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -761,7 +761,7 @@ func TestInvalidCookieParamInteger(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "cookies"
 
-	err := InvalidCookieParamInteger(param, "milky", highSchema)
+	err := InvalidCookieParamInteger(param, "milky", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -784,7 +784,7 @@ func TestIncorrectHeaderParamBool(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "cookies"
 
-	err := IncorrectHeaderParamBool(param, "milky", highSchema)
+	err := IncorrectHeaderParamBool(param, "milky", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -807,7 +807,7 @@ func TestIncorrectCookieParamBool(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "cookies"
 
-	err := IncorrectCookieParamBool(param, "milky", highSchema)
+	err := IncorrectCookieParamBool(param, "milky", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -837,7 +837,7 @@ items:
 	}
 	param.GoLow().Schema.Value.Schema().Enum.KeyNode = &yaml.Node{}
 
-	err := IncorrectCookieParamEnum(param, "milky", highSchema)
+	err := IncorrectCookieParamEnum(param, "milky", highSchema, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -863,7 +863,7 @@ func TestIncorrectHeaderParamArrayBoolean(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bubbles"
 
-	err := IncorrectHeaderParamArrayBoolean(param, "milky", highSchema, nil)
+	err := IncorrectHeaderParamArrayBoolean(param, "milky", highSchema, nil, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)
@@ -889,7 +889,7 @@ func TestIncorrectHeaderParamArrayNumber(t *testing.T) {
 	param := createMockParameter()
 	param.Name = "bubbles"
 
-	err := IncorrectHeaderParamArrayNumber(param, "milky", highSchema, nil)
+	err := IncorrectHeaderParamArrayNumber(param, "milky", highSchema, nil, "/test-path", "get", "{}")
 
 	// Validate the error
 	require.NotNil(t, err)

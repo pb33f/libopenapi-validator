@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
@@ -20,10 +20,17 @@ import (
 
 // ValidateCookieArray will validate a cookie parameter that is an array
 func ValidateCookieArray(
-	sch *base.Schema, param *v3.Parameter, value string,
+	sch *base.Schema, param *v3.Parameter, value string, pathTemplate string, operation string, renderedSchema string,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
+
+	var renderedItemsSchema string
+	if itemsSchema != nil {
+		rendered, _ := itemsSchema.RenderInline()
+		schemaBytes, _ := json.Marshal(rendered)
+		renderedItemsSchema = string(schemaBytes)
+	}
 
 	// header arrays can only be encoded as CSV
 	items := helpers.ExplodeQueryValue(value, helpers.DefaultDelimited)
@@ -36,18 +43,18 @@ func ValidateCookieArray(
 			case helpers.Integer, helpers.Number:
 				if _, err := strconv.ParseFloat(item, 64); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectCookieParamArrayNumber(param, item, sch, itemsSchema))
+						errors.IncorrectCookieParamArrayNumber(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
 			case helpers.Boolean:
 				if _, err := strconv.ParseBool(item); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectCookieParamArrayBoolean(param, item, sch, itemsSchema))
+						errors.IncorrectCookieParamArrayBoolean(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 					break
 				}
 				// check for edge-cases "0" and "1" which can also be parsed into valid booleans
 				if item == "0" || item == "1" {
 					validationErrors = append(validationErrors,
-						errors.IncorrectCookieParamArrayBoolean(param, item, sch, itemsSchema))
+						errors.IncorrectCookieParamArrayBoolean(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
 			case helpers.String:
 				// do nothing for now.
@@ -60,10 +67,17 @@ func ValidateCookieArray(
 
 // ValidateHeaderArray will validate a header parameter that is an array
 func ValidateHeaderArray(
-	sch *base.Schema, param *v3.Parameter, value string,
+	sch *base.Schema, param *v3.Parameter, value string, pathTemplate string, operation string, renderedSchema string,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
+
+	var renderedItemsSchema string
+	if itemsSchema != nil {
+		rendered, _ := itemsSchema.RenderInline()
+		schemaBytes, _ := json.Marshal(rendered)
+		renderedItemsSchema = string(schemaBytes)
+	}
 
 	// header arrays can only be encoded as CSV
 	items := helpers.ExplodeQueryValue(value, helpers.DefaultDelimited)
@@ -76,18 +90,18 @@ func ValidateHeaderArray(
 			case helpers.Integer, helpers.Number:
 				if _, err := strconv.ParseFloat(item, 64); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectHeaderParamArrayNumber(param, item, sch, itemsSchema))
+						errors.IncorrectHeaderParamArrayNumber(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
 			case helpers.Boolean:
 				if _, err := strconv.ParseBool(item); err != nil {
 					validationErrors = append(validationErrors,
-						errors.IncorrectHeaderParamArrayBoolean(param, item, sch, itemsSchema))
+						errors.IncorrectHeaderParamArrayBoolean(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 					break
 				}
 				// check for edge-cases "0" and "1" which can also be parsed into valid booleans
 				if item == "0" || item == "1" {
 					validationErrors = append(validationErrors,
-						errors.IncorrectHeaderParamArrayBoolean(param, item, sch, itemsSchema))
+						errors.IncorrectHeaderParamArrayBoolean(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
 			case helpers.String:
 				// do nothing for now.
