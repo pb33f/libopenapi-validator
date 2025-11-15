@@ -20,6 +20,7 @@ func EscapeJSONPointerSegment(segment string) string {
 // in the OpenAPI specification.
 // Format: /paths/{path}/{method}/parameters/{paramName}/schema/{keyword}
 // The path segment is automatically escaped according to RFC 6901.
+// The keyword can be a simple keyword like "type" or a nested path like "items/type".
 func ConstructParameterJSONPointer(pathTemplate, method, paramName, keyword string) string {
 	escapedPath := EscapeJSONPointerSegment(pathTemplate)
 	escapedPath = strings.TrimPrefix(escapedPath, "~1") // Remove leading slash encoding

@@ -247,15 +247,14 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 			keywordLocation = fmt.Sprintf("/paths/%s/%s/parameters/%s/schema%s", escapedPath, strings.ToLower(operation), name, er.KeywordLocation)
 		}
 
-		fail := &errors.SchemaValidationFailure{
-			Reason:                  errMsg,
-			Location:                er.KeywordLocation, // DEPRECATED
-			FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-			FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-			InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-			KeywordLocation:         keywordLocation,
-			OriginalJsonSchemaError: scErrs,
-		}
+	fail := &errors.SchemaValidationFailure{
+		Reason:                  errMsg,
+		FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+		FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+		InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+		KeywordLocation:         keywordLocation,
+		OriginalJsonSchemaError: scErrs,
+	}
 		if schema != nil {
 			rendered, err := schema.RenderInline()
 			if err == nil && rendered != nil {

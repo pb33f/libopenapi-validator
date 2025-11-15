@@ -77,10 +77,7 @@ func InvalidDeepObject(param *v3.Parameter, qp *helpers.QueryParam) *ValidationE
 }
 
 func QueryParameterMissing(param *v3.Parameter, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/required", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "required")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -129,10 +126,7 @@ func HeaderParameterMissing(param *v3.Parameter, pathTemplate string, operation 
 }
 
 func HeaderParameterCannotBeDecoded(param *v3.Parameter, val string, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -160,10 +154,7 @@ func IncorrectHeaderParamEnum(param *v3.Parameter, ef string, sch *base.Schema, 
 	}
 	validEnums := strings.Join(enums, ", ")
 
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/enum", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "enum")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -188,10 +179,7 @@ func IncorrectHeaderParamEnum(param *v3.Parameter, ef string, sch *base.Schema, 
 func IncorrectQueryParamArrayBoolean(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -214,10 +202,7 @@ func IncorrectQueryParamArrayBoolean(
 }
 
 func IncorrectParamArrayMaxNumItems(param *v3.Parameter, sch *base.Schema, expected, actual int64, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/maxItems", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "maxItems")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -240,10 +225,7 @@ func IncorrectParamArrayMaxNumItems(param *v3.Parameter, sch *base.Schema, expec
 }
 
 func IncorrectParamArrayMinNumItems(param *v3.Parameter, sch *base.Schema, expected, actual int64, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/minItems", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "minItems")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -266,10 +248,7 @@ func IncorrectParamArrayMinNumItems(param *v3.Parameter, sch *base.Schema, expec
 }
 
 func IncorrectParamArrayUniqueItems(param *v3.Parameter, sch *base.Schema, duplicates string, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/uniqueItems", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "uniqueItems")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -293,10 +272,7 @@ func IncorrectParamArrayUniqueItems(param *v3.Parameter, sch *base.Schema, dupli
 func IncorrectCookieParamArrayBoolean(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -321,10 +297,7 @@ func IncorrectCookieParamArrayBoolean(
 func IncorrectQueryParamArrayInteger(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -349,10 +322,7 @@ func IncorrectQueryParamArrayInteger(
 func IncorrectQueryParamArrayNumber(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -377,10 +347,7 @@ func IncorrectQueryParamArrayNumber(
 func IncorrectCookieParamArrayNumber(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -429,10 +396,7 @@ func IncorrectParamEncodingJSON(param *v3.Parameter, ef string, sch *base.Schema
 }
 
 func IncorrectQueryParamBool(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -456,10 +420,7 @@ func IncorrectQueryParamBool(param *v3.Parameter, ef string, sch *base.Schema, p
 }
 
 func InvalidQueryParamInteger(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -483,10 +444,7 @@ func InvalidQueryParamInteger(param *v3.Parameter, ef string, sch *base.Schema, 
 }
 
 func InvalidQueryParamNumber(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -516,10 +474,7 @@ func IncorrectQueryParamEnum(param *v3.Parameter, ef string, sch *base.Schema, p
 	}
 	validEnums := strings.Join(enums, ", ")
 
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/enum", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "enum")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -551,10 +506,7 @@ func IncorrectQueryParamEnumArray(param *v3.Parameter, ef string, sch *base.Sche
 	}
 	validEnums := strings.Join(enums, ", ")
 
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/enum", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/enum")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -603,10 +555,7 @@ func IncorrectReservedValues(param *v3.Parameter, ef string, sch *base.Schema, p
 }
 
 func InvalidHeaderParamInteger(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -630,10 +579,7 @@ func InvalidHeaderParamInteger(param *v3.Parameter, ef string, sch *base.Schema,
 }
 
 func InvalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -657,10 +603,7 @@ func InvalidHeaderParamNumber(param *v3.Parameter, ef string, sch *base.Schema, 
 }
 
 func InvalidCookieParamInteger(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -683,10 +626,7 @@ func InvalidCookieParamInteger(param *v3.Parameter, ef string, sch *base.Schema,
 }
 
 func InvalidCookieParamNumber(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -709,10 +649,7 @@ func InvalidCookieParamNumber(param *v3.Parameter, ef string, sch *base.Schema, 
 }
 
 func IncorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -736,10 +673,7 @@ func IncorrectHeaderParamBool(param *v3.Parameter, ef string, sch *base.Schema, 
 }
 
 func IncorrectCookieParamBool(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -768,10 +702,7 @@ func IncorrectCookieParamEnum(param *v3.Parameter, ef string, sch *base.Schema, 
 	}
 	validEnums := strings.Join(enums, ", ")
 
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/enum", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "enum")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -796,10 +727,7 @@ func IncorrectCookieParamEnum(param *v3.Parameter, ef string, sch *base.Schema, 
 func IncorrectHeaderParamArrayBoolean(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
@@ -824,10 +752,7 @@ func IncorrectHeaderParamArrayBoolean(
 func IncorrectHeaderParamArrayNumber(
 	param *v3.Parameter, item string, sch *base.Schema, itemsSchema *base.Schema, pathTemplate string, operation string, renderedItemsSchema string,
 ) *ValidationError {
-	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
-	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
-	escapedPath = strings.TrimPrefix(escapedPath, "~1")
-	keywordLocation := fmt.Sprintf("/paths/%s/%s/parameters/%s/schema/items/type", escapedPath, strings.ToLower(operation), param.Name)
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "items/type")
 
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,

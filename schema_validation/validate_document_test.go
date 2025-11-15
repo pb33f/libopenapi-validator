@@ -64,7 +64,6 @@ func validateOpenAPIDocumentWithMalformedSchema(loadedSchema string, decodedDocu
 		// schema compilation failed, return validation error instead of panicking
 		violation := &liberrors.SchemaValidationFailure{
 			Reason:          fmt.Sprintf("failed to compile OpenAPI schema: %s", err.Error()),
-			Location:        "schema compilation",
 			ReferenceSchema: loadedSchema,
 		}
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
