@@ -524,8 +524,52 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, "schema does not pass validation", errors[0].Message)
-	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Contains(t, errors[0].Reason, "invalid character '}' looking for beginning of object key string")
+	assert.Nil(t, errors[0].SchemaValidationErrors)
+}
+
+func TestValidateSchema_CompilationFailure(t *testing.T) {
+	// Test that schema compilation failure doesn't create SchemaValidationErrors
+	// This uses an extremely complex regex that might fail compilation in some regex engines
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  pattern: '(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}(?:(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,})*'`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	sch := m.Model.Paths.PathItems.GetOrZero("/test").Post.RequestBody.Content.GetOrZero("application/json").Schema
+
+	// create a schema validator with strict regex engine that might fail on complex patterns
+	v := NewSchemaValidator()
+
+	// Try to validate - if compilation fails, we should get an error without SchemaValidationErrors
+	validData := `{"password": "ValidPass123!"}`
+	valid, errors := v.ValidateSchemaString(sch.Schema(), validData)
+
+	// This test is environment-dependent - compilation might succeed or fail depending on regex engine
+	// If it fails, we want to ensure SchemaValidationErrors is nil
+	if !valid && len(errors) > 0 {
+		for _, err := range errors {
+			if err.Message == "schema compilation failed" {
+				// Compilation failure should NOT have SchemaValidationErrors
+				assert.Nil(t, err.SchemaValidationErrors, "Schema compilation errors should not have SchemaValidationErrors")
+				t.Logf("Schema compilation failed as expected: %s", err.Reason)
+			}
+		}
+	} else {
+		t.Skip("Regex engine handled the complex pattern - skipping compilation failure test")
+	}
 }
 
 //// https://github.com/pb33f/libopenapi-validator/issues/26

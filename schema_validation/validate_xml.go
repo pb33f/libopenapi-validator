@@ -28,19 +28,13 @@ func (x *xmlValidator) validateXMLWithVersion(schema *base.Schema, xmlString str
 	// parse xml and transform to json structure matching schema
 	transformedJSON, err := transformXMLToSchemaJSON(xmlString, schema)
 	if err != nil {
-		violation := &liberrors.SchemaValidationFailure{
-			Reason:          err.Error(),
-			Location:        "xml parsing",
-			ReferenceSchema: "",
-			ReferenceObject: xmlString,
-		}
+		// XML parsing is a pre-validation error - no SchemaValidationFailure
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:         helpers.RequestBodyValidation,
-			ValidationSubType:      helpers.Schema,
-			Message:                "xml example is malformed",
-			Reason:                 fmt.Sprintf("failed to parse xml: %s", err.Error()),
-			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-			HowToFix:               "ensure xml is well-formed and matches schema structure",
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           "xml example is malformed",
+			Reason:            fmt.Sprintf("failed to parse xml: %s", err.Error()),
+			HowToFix:          "ensure xml is well-formed and matches schema structure",
 		})
 		return false, validationErrors
 	}
