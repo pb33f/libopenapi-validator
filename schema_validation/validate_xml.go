@@ -50,8 +50,10 @@ func transformXMLToSchemaJSON(xmlString string, schema *base.Schema) (interface{
 		return nil, fmt.Errorf("empty xml content")
 	}
 
-	// parse xml using goxml2json
-	jsonBuf, err := xj.Convert(strings.NewReader(xmlString))
+	// parse xml using goxml2json with type conversion for numbers only
+	// note: we convert floats and ints, but not booleans, since xml content
+	// may legitimately contain "true"/"false" as string values
+	jsonBuf, err := xj.Convert(strings.NewReader(xmlString), xj.WithTypeConverter(xj.Float, xj.Int))
 	if err != nil {
 		return nil, fmt.Errorf("malformed xml: %w", err)
 	}
