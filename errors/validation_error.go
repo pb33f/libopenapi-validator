@@ -51,9 +51,6 @@ type SchemaValidationFailure struct {
 	// The original jsonschema.ValidationError object, if the schema failure originated from the jsonschema library.
 	OriginalJsonSchemaError *jsonschema.ValidationError `json:"-" yaml:"-"`
 
-	// OriginalError is an alias for OriginalJsonSchemaError for backwards compatibility
-	OriginalError *jsonschema.ValidationError `json:"-" yaml:"-"`
-
 	// Context is the raw schema object that failed validation (for programmatic access)
 	Context interface{} `json:"-" yaml:"-"`
 }
