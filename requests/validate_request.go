@@ -96,7 +96,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 				SpecLine: 1,
 				SpecCol:  0,
 				HowToFix: "check the request schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
-				Context:  referenceSchema,
+				Context:  input.Schema,
 			})
 			return false, validationErrors
 		}
@@ -141,7 +141,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 				SpecLine: 1,
 				SpecCol:  0,
 				HowToFix: errors.HowToFixInvalidSchema,
-				Context:  referenceSchema, // attach the rendered schema to the error
+				Context:  schema,
 			})
 			return false, validationErrors
 		}
@@ -167,7 +167,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			SpecLine: line,
 			SpecCol:  col,
 			HowToFix: errors.HowToFixInvalidSchema,
-			Context:  referenceSchema, // attach the rendered schema to the error
+			Context:  schema,
 		})
 		return false, validationErrors
 	}
@@ -218,7 +218,6 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 
 				violation := &errors.SchemaValidationFailure{
 					Reason:                  errMsg,
-					Location:                er.InstanceLocation, // DEPRECATED
 					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
 					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
 					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
@@ -266,7 +265,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			SpecCol:                col,
 			SchemaValidationErrors: schemaValidationErrors,
 			HowToFix:               errors.HowToFixInvalidSchema,
-			Context:                referenceSchema, // attach the rendered schema to the error
+			Context:                schema,
 		})
 	}
 	if len(validationErrors) > 0 {

@@ -75,11 +75,10 @@ func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bo
 				}
 				if errMsg != "" {
 
-					// locate the violated property in the schema
-					located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
+				// locate the violated property in the schema
+				located := LocateSchemaPropertyNodeByJSONPath(info.RootNode.Content[0], er.InstanceLocation)
 				violation := &liberrors.SchemaValidationFailure{
 					Reason:                  errMsg,
-					Location:                er.InstanceLocation,
 					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
 					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
 					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),

@@ -50,15 +50,14 @@ type SchemaValidationFailure struct {
 
 	// The original jsonschema.ValidationError object, if the schema failure originated from the jsonschema library.
 	OriginalJsonSchemaError *jsonschema.ValidationError `json:"-" yaml:"-"`
-
-	// DEPRECATED in favor of explicit use of FieldPath & InstancePath
-	// Location is the XPath-like location of the validation failure
-	Location string `json:"location,omitempty" yaml:"location,omitempty"`
 }
 
 // Error returns a string representation of the error
 func (s *SchemaValidationFailure) Error() string {
-	return fmt.Sprintf("Reason: %s, Location: %s", s.Reason, s.Location)
+	if s.FieldPath != "" {
+		return fmt.Sprintf("Reason: %s, FieldPath: %s", s.Reason, s.FieldPath)
+	}
+	return fmt.Sprintf("Reason: %s", s.Reason)
 }
 
 // ValidationError is a struct that contains all the information about a validation error.

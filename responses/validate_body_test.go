@@ -1488,16 +1488,13 @@ paths:
 		found := false
 		for _, err := range validationErrors {
 			if err.ValidationSubType == helpers.Schema &&
-				err.SchemaValidationErrors != nil &&
-				len(err.SchemaValidationErrors) > 0 {
-				for _, schemaErr := range err.SchemaValidationErrors {
-					if schemaErr.Location == "schema compilation" &&
-						schemaErr.Reason != "" {
-						found = true
-						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
-						assert.Contains(t, err.HowToFix, "complex regex patterns")
-						break
-					}
+				(err.SchemaValidationErrors == nil || len(err.SchemaValidationErrors) == 0) {
+				// Schema compilation errors don't have SchemaValidationFailure objects
+				if strings.Contains(err.Reason, "failed to compile JSON schema") {
+					found = true
+					assert.Contains(t, err.Reason, "failed to compile JSON schema")
+					assert.Contains(t, err.HowToFix, "complex regex patterns")
+					break
 				}
 			}
 		}

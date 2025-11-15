@@ -100,7 +100,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				SpecLine: 1,
 				SpecCol:  0,
 				HowToFix: "check the response schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
-				Context:  referenceSchema,
+				Context:  input.Schema,
 			})
 			return false, validationErrors
 		}
@@ -132,7 +132,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			SpecLine: 1,
 			SpecCol:  0,
 			HowToFix: "ensure response object has been set",
-			Context:  referenceSchema, // attach the rendered schema to the error
+			Context:  schema,
 		})
 		return false, validationErrors
 	}
@@ -149,7 +149,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			SpecLine: 1,
 			SpecCol:  0,
 			HowToFix: "ensure body is not empty",
-			Context:  referenceSchema, // attach the rendered schema to the error
+			Context:  schema,
 		})
 		return false, validationErrors
 	}
@@ -173,7 +173,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				SpecLine: 1,
 				SpecCol:  0,
 				HowToFix: errors.HowToFixInvalidSchema,
-				Context:  referenceSchema, // attach the rendered schema to the error
+				Context:  schema,
 			})
 			return false, validationErrors
 		}
@@ -224,17 +224,16 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 					referenceObject = string(responseBody)
 				}
 
-				violation := &errors.SchemaValidationFailure{
-					Reason:                  errMsg,
-					Location:                er.InstanceLocation, // DEPRECATED
-					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-					KeywordLocation:         er.KeywordLocation,
-					ReferenceSchema:         referenceSchema,
-					ReferenceObject:         referenceObject,
-					OriginalJsonSchemaError: jk,
-				}
+			violation := &errors.SchemaValidationFailure{
+				Reason:                  errMsg,
+				FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+				FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+				InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+				KeywordLocation:         er.KeywordLocation,
+				ReferenceSchema:         referenceSchema,
+				ReferenceObject:         referenceObject,
+				OriginalJsonSchemaError: jk,
+			}
 				// if we have a location within the schema, add it to the error
 				if located != nil {
 
@@ -274,7 +273,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			SpecCol:                col,
 			SchemaValidationErrors: schemaValidationErrors,
 			HowToFix:               errors.HowToFixInvalidSchema,
-			Context:                referenceSchema, // attach the rendered schema to the error
+			Context:                schema,
 		})
 	}
 	if len(validationErrors) > 0 {
