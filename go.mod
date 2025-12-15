@@ -1,13 +1,13 @@
 module github.com/pb33f/libopenapi-validator
 
-go 1.24.7
+go 1.25
 
 require (
 	github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/goccy/go-yaml v1.18.0
-	github.com/pb33f/jsonpath v0.1.2
-	github.com/pb33f/libopenapi v0.28.2
+	github.com/pb33f/jsonpath v0.7.0
+	github.com/pb33f/libopenapi v0.29.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v4 v4.0.0-rc.3
