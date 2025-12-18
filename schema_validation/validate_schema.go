@@ -128,9 +128,12 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 
 	// render the schema, to be used for validation, stop this from running concurrently, mutations are made to state
 	// and, it will cause async issues.
+	// Create isolated render context for this validation to prevent false positive cycle detection
+	// when multiple validations run concurrently.
+	renderCtx := base.NewInlineRenderContext()
 	s.lock.Lock()
 	var e error
-	renderedSchema, e = schema.RenderInline()
+	renderedSchema, e = schema.RenderInlineWithContext(renderCtx)
 	if e != nil {
 		// schema cannot be rendered, so it's not valid!
 		violation := &liberrors.SchemaValidationFailure{

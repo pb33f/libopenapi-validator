@@ -78,7 +78,8 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		renderedSchema, _ = input.Schema.RenderInline()
+		renderCtx := base.NewInlineRenderContext()
+		renderedSchema, _ = input.Schema.RenderInlineWithContext(renderCtx)
 		referenceSchema = string(renderedSchema)
 		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
 
