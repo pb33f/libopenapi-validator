@@ -25,6 +25,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
@@ -314,6 +315,38 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			Context:                referenceSchema, // attach the rendered schema to the error
 		})
 	}
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared properties in request body
+	if validationOptions.StrictMode && decodedObj != nil {
+		strictValidator := strict.NewValidator(validationOptions, input.Version)
+		strictResult := strictValidator.Validate(strict.Input{
+			Schema:    schema,
+			Data:      decodedObj,
+			Direction: strict.DirectionRequest,
+			Options:   validationOptions,
+			BasePath:  "$.body",
+			Version:   input.Version,
+		})
+
+		if !strictResult.Valid {
+			for _, undeclared := range strictResult.UndeclaredValues {
+				validationErrors = append(validationErrors,
+					errors.UndeclaredPropertyError(
+						undeclared.Path,
+						undeclared.Name,
+						undeclared.Value,
+						undeclared.DeclaredProperties,
+						undeclared.Direction.String(),
+						request.URL.Path,
+						request.Method,
+					))
+			}
+		}
+	}
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}
