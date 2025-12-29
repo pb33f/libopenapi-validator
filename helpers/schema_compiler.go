@@ -54,20 +54,22 @@ func NewCompiledSchema(name string, jsonSchema []byte, o *config.ValidationOptio
 // The version parameter determines which OpenAPI keywords are allowed:
 // - version 3.0: Allows OpenAPI 3.0 keywords like 'nullable'
 // - version 3.1+: Rejects OpenAPI 3.0 keywords like 'nullable' (strict JSON Schema compliance)
-func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.ValidationOptions, version float32) (*jsonschema.Schema, error) {
-	compiler := NewCompilerWithOptions(o)
+func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, options *config.ValidationOptions, version float32) (*jsonschema.Schema, error) {
+	compiler := NewCompilerWithOptions(options)
 	compiler.UseLoader(NewCompilerLoader())
 
 	// register OpenAPI vocabulary with appropriate version and coercion settings
-	if o != nil && o.OpenAPIMode {
+	if options != nil && options.OpenAPIMode {
 		var vocabVersion openapi_vocabulary.VersionType
-		if version >= 3.05 { // Use 3.05 to avoid floating point precision issues
+		if version >= 3.15 { // use 3.15 to avoid floating point precision issues (3.2+)
+			vocabVersion = openapi_vocabulary.Version32
+		} else if version >= 3.05 { // use 3.05 to avoid floating point precision issues (3.1)
 			vocabVersion = openapi_vocabulary.Version31
 		} else {
 			vocabVersion = openapi_vocabulary.Version30
 		}
 
-		vocab := openapi_vocabulary.NewOpenAPIVocabularyWithCoercion(vocabVersion, o.AllowScalarCoercion)
+		vocab := openapi_vocabulary.NewOpenAPIVocabularyWithCoercion(vocabVersion, options.AllowScalarCoercion)
 		compiler.RegisterVocabulary(vocab)
 		compiler.AssertVocabs()
 
@@ -75,7 +77,7 @@ func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, o *config.Vali
 			jsonSchema = transformOpenAPI30Schema(jsonSchema)
 		}
 
-		if o.AllowScalarCoercion {
+		if options.AllowScalarCoercion {
 			jsonSchema = transformSchemaForCoercion(jsonSchema)
 		}
 	}
