@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package validator
@@ -6,6 +6,7 @@ package validator
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 
 	"github.com/pb33f/libopenapi"
@@ -292,6 +293,10 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 
 	// wait for all the validations to complete
 	<-doneChan
+
+	// sort errors for deterministic ordering (async validation can return errors in any order)
+	sortValidationErrors(validationErrors)
+
 	return len(validationErrors) == 0, validationErrors
 }
 
@@ -371,6 +376,17 @@ type (
 	validationFunction      func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
 	validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
 )
+
+// sortValidationErrors sorts validation errors for deterministic ordering.
+// Errors are sorted by validation type first, then by message.
+func sortValidationErrors(errs []*errors.ValidationError) {
+	sort.Slice(errs, func(i, j int) bool {
+		if errs[i].ValidationType != errs[j].ValidationType {
+			return errs[i].ValidationType < errs[j].ValidationType
+		}
+		return errs[i].Message < errs[j].Message
+	})
+}
 
 // warmSchemaCaches pre-compiles all schemas in the OpenAPI document and stores them in the validator caches.
 // This frontloads the compilation cost so that runtime validation doesn't need to compile schemas.
