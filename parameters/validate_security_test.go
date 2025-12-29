@@ -717,3 +717,252 @@ components:
 	assert.True(t, valid)
 	assert.Equal(t, 0, len(errors))
 }
+
+func TestParamValidator_ValidateSecurity_ANDRequirement_BothPresent(t *testing.T) {
+	// Test AND security requirement: both schemes in same requirement must pass
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+          BasicAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with BOTH api key AND authorization header - should pass
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	request.Header.Add("X-API-Key", "1234")
+	request.Header.Add("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestParamValidator_ValidateSecurity_ANDRequirement_OnlyApiKey(t *testing.T) {
+	// Test AND security requirement: missing one scheme should fail
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+          BasicAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with ONLY api key - should fail because BasicAuth is also required
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	request.Header.Add("X-API-Key", "1234")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "Authorization header")
+}
+
+func TestParamValidator_ValidateSecurity_ANDRequirement_OnlyBasicAuth(t *testing.T) {
+	// Test AND security requirement: missing one scheme should fail
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+          BasicAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with ONLY authorization header - should fail because ApiKeyAuthHeader is also required
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	request.Header.Add("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "API Key")
+}
+
+func TestParamValidator_ValidateSecurity_ANDRequirement_NeitherPresent(t *testing.T) {
+	// Test AND security requirement: missing both schemes should return errors for both
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+          BasicAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with neither - should fail with errors for both
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 2)
+}
+
+func TestParamValidator_ValidateSecurity_ORWithAND_FirstOROptionPasses(t *testing.T) {
+	// Test mixed OR and AND: first option is single scheme, second is AND requirement
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+        - BasicAuth: []
+          BearerAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BasicAuth:
+      type: http
+      scheme: basic
+    BearerAuth:
+      type: http
+      scheme: bearer
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with only API key - should pass (first OR option)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	request.Header.Add("X-API-Key", "1234")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestParamValidator_ValidateSecurity_ORWithAND_SecondOROptionPasses(t *testing.T) {
+	// Test mixed OR and AND: second option (AND requirement) passes
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+        - BasicAuth: []
+          ApiKeyAuthQuery: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    ApiKeyAuthQuery:
+      type: apiKey
+      in: query
+      name: api_key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with basic auth AND query API key - should pass (second OR option, which is AND)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products?api_key=secret", nil)
+	request.Header.Add("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestParamValidator_ValidateSecurity_ORWithAND_PartialSecondOption(t *testing.T) {
+	// Test mixed OR and AND: partial match on second option should try both and fail
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    post:
+      security:
+        - ApiKeyAuthHeader: []
+        - BasicAuth: []
+          ApiKeyAuthQuery: []
+components:
+  securitySchemes:
+    ApiKeyAuthHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    ApiKeyAuthQuery:
+      type: apiKey
+      in: query
+      name: api_key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with only basic auth - should fail (first option needs X-API-Key header,
+	// second option needs BOTH basic auth AND api_key query param)
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
+	request.Header.Add("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	// Should have errors from both OR options
+	assert.GreaterOrEqual(t, len(errors), 1)
+}

@@ -72,6 +72,8 @@ func ExampleNewValidator_validateHttpRequest() {
 	}
 
 	// 4. Create a new *http.Request (normally, this would be where the host application will pass in the request)
+	// Note: /pet/{petId} requires api_key OR petstore_auth (OAuth2). Since OAuth2 is not validated,
+	// the security check passes. The path parameter validation fails because "NotAValidPetId" is not an integer.
 	request, _ := http.NewRequest(http.MethodGet, "/pet/NotAValidPetId", nil)
 
 	// 5. Validate!
@@ -83,8 +85,7 @@ func ExampleNewValidator_validateHttpRequest() {
 			fmt.Printf("Type: %s, Failure: %s\n", e.ValidationType, e.Message)
 		}
 	}
-	// Output: Type: security, Failure: API Key api_key not found in header
-	// Type: parameter, Failure: Path parameter 'petId' is not a valid integer
+	// Output: Type: parameter, Failure: Path parameter 'petId' is not a valid integer
 }
 
 func ExampleNewValidator_validateHttpRequestSync() {
