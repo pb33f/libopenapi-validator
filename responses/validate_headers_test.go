@@ -10,6 +10,8 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/config"
 )
 
 func TestValidateResponseHeaders(t *testing.T) {
@@ -126,6 +128,94 @@ paths:
 
 	// validate!
 	valid, errors := ValidateResponseHeaders(request, response, headers)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateResponseHeaders_StrictMode(t *testing.T) {
+	spec := `openapi: "3.0.0"
+info:
+  title: Healthcheck
+  version: '0.1.0'
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          headers:
+            x-request-id:
+              description: request ID
+              required: false
+              schema:
+                type: string
+          description: healthy response`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/health", nil)
+
+	// simulate a response with an undeclared header
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-Id", "abc-123")
+		w.Header().Set("X-Undeclared-Header", "should fail in strict mode")
+		w.WriteHeader(http.StatusOK)
+	}
+
+	handler(res, request)
+	response := res.Result()
+
+	headers := m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
+
+	// validate with strict mode - should find undeclared header
+	valid, errors := ValidateResponseHeaders(request, response, headers, config.WithStrictMode())
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "X-Undeclared-Header")
+	assert.Contains(t, errors[0].Message, "not declared")
+}
+
+func TestValidateResponseHeaders_StrictMode_NoUndeclared(t *testing.T) {
+	spec := `openapi: "3.0.0"
+info:
+  title: Healthcheck
+  version: '0.1.0'
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          headers:
+            x-request-id:
+              description: request ID
+              required: false
+              schema:
+                type: string
+          description: healthy response`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/health", nil)
+
+	// response with only declared headers (x-request-id is declared, Content-Type is default-ignored)
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-Id", "abc-123")
+		w.WriteHeader(http.StatusOK)
+	}
+
+	handler(res, request)
+	response := res.Result()
+
+	headers := m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
+
+	// validate with strict mode - should pass (no undeclared headers)
+	valid, errors := ValidateResponseHeaders(request, response, headers, config.WithStrictMode())
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)

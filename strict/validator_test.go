@@ -3219,3 +3219,506 @@ components:
 	result := v.findPropertySchemaInAllOf(nil, "name", declared)
 	assert.NotNil(t, result)
 }
+
+// Additional nil check tests
+
+func TestStrictValidator_IsPropertyDeclaredInAllOf_NilSchemaProxy(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Test with nil SchemaProxy in allOf slice
+	allOf := []*base.SchemaProxy{nil}
+	result := v.isPropertyDeclaredInAllOf(allOf, "foo")
+	assert.False(t, result)
+}
+
+func TestStrictValidator_IsPropertyDeclaredInAllOf_NilSchema(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Test with empty allOf
+	result := v.isPropertyDeclaredInAllOf(nil, "foo")
+	assert.False(t, result)
+}
+
+func TestStrictValidator_ShouldReportUndeclaredForAllOf_NilSchemaProxy(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Test:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            name:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Test")
+
+	// Manually inject a nil into allOf to test the nil check
+	schema.AllOf = append(schema.AllOf, nil)
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Should still work and return true (default behavior)
+	result := v.shouldReportUndeclaredForAllOf(schema)
+	assert.True(t, result)
+}
+
+func TestStrictValidator_FindPropertySchemaInAllOf_NilSchemaProxy(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Test with nil SchemaProxy in allOf
+	allOf := []*base.SchemaProxy{nil}
+	result := v.findPropertySchemaInAllOf(allOf, "foo", nil)
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_RecurseIntoAllOfDeclaredProperties_NilSchemaProxy(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+	allOf := []*base.SchemaProxy{nil}
+	data := map[string]any{"foo": "bar"}
+
+	result := v.recurseIntoAllOfDeclaredProperties(ctx, allOf, data, nil)
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_SelectByDiscriminator_NilDiscriminator(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Test:
+      type: object
+      properties:
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Test")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Schema has no discriminator
+	result := v.selectByDiscriminator(schema, nil, map[string]any{"foo": "bar"})
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_SelectByDiscriminator_EmptyPropertyName(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Pet:
+      type: object
+      discriminator:
+        propertyName: ""
+      oneOf:
+        - $ref: '#/components/schemas/Dog'
+    Dog:
+      type: object
+      properties:
+        bark:
+          type: boolean
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Pet")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	result := v.selectByDiscriminator(schema, schema.OneOf, map[string]any{"petType": "Dog"})
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_SelectByDiscriminator_MissingDiscriminatorValue(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Pet:
+      type: object
+      discriminator:
+        propertyName: petType
+      oneOf:
+        - $ref: '#/components/schemas/Dog'
+    Dog:
+      type: object
+      properties:
+        bark:
+          type: boolean
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Pet")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Data doesn't have the discriminator property
+	result := v.selectByDiscriminator(schema, schema.OneOf, map[string]any{"bark": true})
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_SelectByDiscriminator_NonStringValue(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Pet:
+      type: object
+      discriminator:
+        propertyName: petType
+      oneOf:
+        - $ref: '#/components/schemas/Dog'
+    Dog:
+      type: object
+      properties:
+        bark:
+          type: boolean
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Pet")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Discriminator value is not a string
+	result := v.selectByDiscriminator(schema, schema.OneOf, map[string]any{"petType": 123})
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_SelectByDiscriminator_NoMatchingVariant(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Pet:
+      type: object
+      discriminator:
+        propertyName: petType
+      oneOf:
+        - $ref: '#/components/schemas/Dog'
+    Dog:
+      type: object
+      properties:
+        bark:
+          type: boolean
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Pet")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Discriminator value doesn't match any variant
+	result := v.selectByDiscriminator(schema, schema.OneOf, map[string]any{"petType": "Cat"})
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_FindMatchingVariant_NoMatch(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Dog:
+      type: object
+      required:
+        - bark
+      properties:
+        bark:
+          type: boolean
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Dog")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Create variants with a schema that won't match the data
+	variants := []*base.SchemaProxy{base.CreateSchemaProxy(schema)}
+
+	// Data doesn't have required 'bark' property - won't match
+	result := v.findMatchingVariant(variants, map[string]any{"meow": true})
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_CollectDeclaredProperties_NilSchema(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	declared, patterns := v.collectDeclaredProperties(nil, nil)
+	assert.Empty(t, declared)
+	assert.Empty(t, patterns)
+}
+
+func TestStrictValidator_GetDeclaredPropertyNames_Empty(t *testing.T) {
+	result := getDeclaredPropertyNames(nil)
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_ShouldSkipProperty_NilSchema(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	result := v.shouldSkipProperty(nil, DirectionRequest)
+	assert.False(t, result)
+}
+
+func TestStrictValidator_ValidateObject_NilProperties(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Empty:
+      type: object
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Empty")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+	result := v.validateObject(ctx, schema, map[string]any{"foo": "bar"})
+
+	// Empty schema with no properties means anything is allowed (additionalProperties defaults to true)
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_ShouldReportUndeclared_NilSchema(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	result := v.shouldReportUndeclared(nil)
+	assert.True(t, result)
+}
+
+func TestStrictValidator_GetPatternPropertySchema_NoPatterns(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	result := v.getPatternPropertySchema(nil, "foo")
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_NilProperty(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+
+	// Create declared map with nil proxy
+	declared := make(map[string]*declaredProperty)
+	declared["name"] = &declaredProperty{proxy: nil}
+
+	data := map[string]any{"name": "test"}
+
+	result := v.recurseIntoDeclaredProperties(ctx, schema, data, declared)
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_ValidateArray_NilItems(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    List:
+      type: array
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "List")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+	result := v.validateArray(ctx, schema, []any{"foo", "bar"})
+
+	// Array with no items schema - anything is allowed
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_ValidateArray_ItemsSchemaB(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    List:
+      type: array
+      items: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "List")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+	result := v.validateArray(ctx, schema, []any{"foo", "bar"})
+
+	// items: true means all items are valid
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_ValidateArray_PrefixItemsNil(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Tuple:
+      type: array
+      prefixItems:
+        - type: string
+        - type: integer
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Tuple")
+
+	// Manually set one prefixItem to nil to test the nil check
+	schema.PrefixItems = append(schema.PrefixItems, nil)
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+	result := v.validateArray(ctx, schema, []any{"foo", 42, "extra"})
+
+	// Should handle nil prefixItems gracefully
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_FindPropertySchemaInMerged_NilProxy(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Create declared map with nil proxy
+	declared := make(map[string]*declaredProperty)
+	declared["name"] = &declaredProperty{proxy: nil}
+
+	result := v.findPropertySchemaInMerged(nil, "name", declared)
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredPropertiesWithMerged_NilProxy(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+
+	// Create parent declared with nil proxy
+	parentDeclared := make(map[string]*declaredProperty)
+	parentDeclared["name"] = &declaredProperty{proxy: nil}
+
+	// Create variant declared empty
+	variantDeclared := make(map[string]*declaredProperty)
+
+	data := map[string]any{"name": "test"}
+
+	result := v.recurseIntoDeclaredPropertiesWithMerged(ctx, data, parentDeclared, variantDeclared)
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_ValidateAnyOf_NoMatchingVariant(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    StringOrInt:
+      anyOf:
+        - type: string
+          minLength: 5
+        - type: integer
+          minimum: 10
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "StringOrInt")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+
+	// Data is an object which won't match string or integer
+	result := v.validateAnyOf(ctx, schema, map[string]any{"foo": "bar"})
+
+	// Should return empty - no matching variant means we can't validate
+	assert.Empty(t, result)
+}
+
+func TestStrictValidator_CompilePattern_InvalidPattern(t *testing.T) {
+	// Test compilePattern with an invalid regex pattern
+	result := compilePattern("[invalid")
+	assert.Nil(t, result)
+}
+
+func TestStrictValidator_GetSchemaKey_NoLowLevel(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Create a schema without low-level info
+	schema := &base.Schema{}
+
+	key := v.getSchemaKey(schema)
+	// Should return pointer-based key
+	assert.NotEmpty(t, key)
+}
