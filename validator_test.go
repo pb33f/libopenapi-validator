@@ -1493,15 +1493,10 @@ func TestNewValidator_PetStore_PetGet200_PathNotFound(t *testing.T) {
 	valid, errors := v.ValidateHttpRequestResponse(request, res.Result())
 
 	assert.False(t, valid)
-	assert.Len(t, errors, 2)
-
-	// error order is non-deterministic due to concurrent validation
-	var messages []string
-	for _, e := range errors {
-		messages = append(messages, e.Message)
-	}
-	assert.Contains(t, messages, "API Key api_key not found in header")
-	assert.Contains(t, messages, "Path parameter 'petId' is not a valid integer")
+	// Note: /pet/{petId} allows api_key OR petstore_auth (OAuth2). Since OAuth2 is not validated,
+	// security passes. Only the path parameter validation fails.
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Path parameter 'petId' is not a valid integer", errors[0].Message)
 }
 
 func TestNewValidator_PetStore_PetGet200(t *testing.T) {
