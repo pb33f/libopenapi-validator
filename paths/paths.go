@@ -25,6 +25,9 @@ import (
 // that were picked up when locating the path.
 // The third return value will be the path that was found in the document, as it pertains to the contract, so all path
 // parameters will not have been replaced with their values from the request - allowing model lookups.
+//
+// Path matching follows the OpenAPI specification: literal (concrete) paths take precedence over
+// parameterized paths, regardless of definition order in the specification.
 func FindPath(request *http.Request, document *v3.Document, regexCache config.RegexCache) (*v3.PathItem, []*errors.ValidationError, string) {
 	basePaths := getBasePaths(document)
 	stripped := StripRequestPath(request, document)
@@ -34,21 +37,15 @@ func FindPath(request *http.Request, document *v3.Document, regexCache config.Re
 		reqPathSegments = reqPathSegments[1:]
 	}
 
-	var pItem *v3.PathItem
-	var foundPath string
+	candidates := make([]pathCandidate, 0, document.Paths.PathItems.Len())
+
 	for pair := orderedmap.First(document.Paths.PathItems); pair != nil; pair = pair.Next() {
 		path := pair.Key()
 		pathItem := pair.Value()
 
-		// if the stripped path has a fragment, then use that as part of the lookup
-		// if not, then strip off any fragments from the pathItem
-		if !strings.Contains(stripped, "#") {
-			if strings.Contains(path, "#") {
-				path = strings.Split(path, "#")[0]
-			}
-		}
+		pathForMatching := normalizePathForMatching(path, stripped)
 
-		segs := strings.Split(path, "/")
+		segs := strings.Split(pathForMatching, "/")
 		if segs[0] == "" {
 			segs = segs[1:]
 		}
@@ -57,72 +54,68 @@ func FindPath(request *http.Request, document *v3.Document, regexCache config.Re
 		if !ok {
 			continue
 		}
-		pItem = pathItem
-		foundPath = path
-		switch request.Method {
-		case http.MethodGet:
-			if pathItem.Get != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodPost:
-			if pathItem.Post != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodPut:
-			if pathItem.Put != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodDelete:
-			if pathItem.Delete != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodOptions:
-			if pathItem.Options != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodHead:
-			if pathItem.Head != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodPatch:
-			if pathItem.Patch != nil {
-				return pathItem, nil, path
-			}
-		case http.MethodTrace:
-			if pathItem.Trace != nil {
-				return pathItem, nil, path
-			}
+
+		// Compute specificity score and check if method exists
+		score := computeSpecificityScore(path)
+		hasMethod := pathHasMethod(pathItem, request.Method)
+
+		candidates = append(candidates, pathCandidate{
+			pathItem:  pathItem,
+			path:      path,
+			score:     score,
+			hasMethod: hasMethod,
+		})
+	}
+
+	if len(candidates) == 0 {
+		validationErrors := []*errors.ValidationError{
+			{
+				ValidationType:    helpers.ParameterValidationPath,
+				ValidationSubType: "missing",
+				Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+				Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+					"however that path, or the %s method for that path does not exist in the specification",
+					request.Method, request.URL.Path, request.Method),
+				SpecLine: -1,
+				SpecCol:  -1,
+				HowToFix: errors.HowToFixPath,
+			},
 		}
+		errors.PopulateValidationErrors(validationErrors, request, "")
+		return nil, validationErrors, ""
 	}
-	if pItem != nil {
-		validationErrors := []*errors.ValidationError{{
-			ValidationType:    helpers.ParameterValidationPath,
-			ValidationSubType: "missingOperation",
-			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
-			Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
-				request.Method),
-			SpecLine: -1,
-			SpecCol:  -1,
-			HowToFix: errors.HowToFixPath,
-		}}
-		errors.PopulateValidationErrors(validationErrors, request, foundPath)
-		return pItem, validationErrors, foundPath
+
+	bestWithMethod, bestOverall := selectMatches(candidates)
+
+	if bestWithMethod != nil {
+		return bestWithMethod.pathItem, nil, bestWithMethod.path
 	}
-	validationErrors := []*errors.ValidationError{
-		{
-			ValidationType:    helpers.ParameterValidationPath,
-			ValidationSubType: "missing",
-			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
-			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
-				"however that path, or the %s method for that path does not exist in the specification",
-				request.Method, request.URL.Path, request.Method),
-			SpecLine: -1,
-			SpecCol:  -1,
-			HowToFix: errors.HowToFixPath,
-		},
+
+	// path matches exist but none have the required method
+	validationErrors := []*errors.ValidationError{{
+		ValidationType:    helpers.ParameterValidationPath,
+		ValidationSubType: "missingOperation",
+		Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+		Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
+			request.Method),
+		SpecLine: -1,
+		SpecCol:  -1,
+		HowToFix: errors.HowToFixPath,
+	}}
+	errors.PopulateValidationErrors(validationErrors, request, bestOverall.path)
+	return bestOverall.pathItem, validationErrors, bestOverall.path
+}
+
+// normalizePathForMatching removes the fragment from a path template unless
+// the request path itself contains a fragment.
+func normalizePathForMatching(path, requestPath string) string {
+	if strings.Contains(requestPath, "#") {
+		return path
 	}
-	errors.PopulateValidationErrors(validationErrors, request, "")
-	return nil, validationErrors, ""
+	if idx := strings.IndexByte(path, '#'); idx >= 0 {
+		return path[:idx]
+	}
+	return path
 }
 
 func getBasePaths(document *v3.Document) []string {
