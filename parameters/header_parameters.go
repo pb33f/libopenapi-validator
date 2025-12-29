@@ -17,6 +17,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -183,6 +184,26 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 	}
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared headers
+	if v.options.StrictMode {
+		undeclaredHeaders := strict.ValidateRequestHeaders(request.Header, params, v.options)
+		for _, undeclared := range undeclaredHeaders {
+			validationErrors = append(validationErrors,
+				errors.UndeclaredHeaderError(
+					undeclared.Name,
+					undeclared.Value.(string),
+					undeclared.DeclaredProperties,
+					undeclared.Direction.String(),
+					request.URL.Path,
+					request.Method,
+				))
+		}
+	}
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors

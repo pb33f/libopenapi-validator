@@ -19,6 +19,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 const rx = `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
@@ -232,6 +233,26 @@ doneLooking:
 	}
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared query parameters
+	if v.options.StrictMode {
+		undeclaredParams := strict.ValidateQueryParams(request, params, v.options)
+		for _, undeclared := range undeclaredParams {
+			validationErrors = append(validationErrors,
+				errors.UndeclaredQueryParamError(
+					undeclared.Path,
+					undeclared.Name,
+					undeclared.Value,
+					undeclared.DeclaredProperties,
+					request.URL.Path,
+					request.Method,
+				))
+		}
+	}
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors
