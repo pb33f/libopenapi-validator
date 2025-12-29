@@ -3632,3 +3632,75 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, errors[0].Reason, "The query parameter (which is an array) 'id' contains the following duplicates: 'cake, meat'")
 }
+
+func TestNewValidator_QueryParamWithBracketsInName(t *testing.T) {
+	// Test for issue #210: parameter names with brackets (e.g., match[])
+	// should be recognized when URL-encoded as match%5B%5D
+	// https://github.com/pb33f/libopenapi-validator/issues/210
+	spec := `openapi: 3.1.0
+paths:
+  /api/query:
+    get:
+      parameters:
+        - name: "match[]"
+          in: query
+          required: true
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: start
+          in: query
+          schema:
+            type: integer
+        - name: end
+          in: query
+          schema:
+            type: integer
+      operationId: queryData
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// URL with encoded brackets: match%5B%5D=up (decodes to match[]=up)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://example.com/api/query?match%5B%5D=up&start=0&end=100", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid, "Expected validation to pass, got errors: %v", errors)
+	assert.Empty(t, errors)
+}
+
+func TestNewValidator_QueryParamWithBracketsInName_Missing(t *testing.T) {
+	// Test that missing bracket parameters are still reported correctly
+	spec := `openapi: 3.1.0
+paths:
+  /api/query:
+    get:
+      parameters:
+        - name: "match[]"
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+      operationId: queryData
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request without the required match[] parameter
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://example.com/api/query?other=value", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "Query parameter 'match[]' is missing", errors[0].Message)
+}
