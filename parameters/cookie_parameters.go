@@ -16,6 +16,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 func (v *paramValidator) ValidateCookieParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -154,6 +155,26 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 	}
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared cookies
+	if v.options.StrictMode {
+		undeclaredCookies := strict.ValidateCookies(request, params, v.options)
+		for _, undeclared := range undeclaredCookies {
+			validationErrors = append(validationErrors,
+				errors.UndeclaredCookieError(
+					undeclared.Path,
+					undeclared.Name,
+					undeclared.Value,
+					undeclared.DeclaredProperties,
+					request.URL.Path,
+					request.Method,
+				))
+		}
+	}
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors
