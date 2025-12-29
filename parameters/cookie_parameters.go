@@ -159,8 +159,20 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 						if !matchFound {
 							validationErrors = append(validationErrors,
 								errors.IncorrectCookieParamEnum(p, strings.ToLower(cookie.Value), sch))
+							break
 						}
 					}
+					validationErrors = append(validationErrors,
+						ValidateSingleParameterSchema(
+							sch,
+							cookie.Value,
+							"Cookie parameter",
+							"The cookie parameter",
+							p.Name,
+							helpers.ParameterValidation,
+							helpers.ParameterValidationCookie,
+							v.options,
+						)...)
 				}
 			}
 		}

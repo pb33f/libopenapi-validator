@@ -164,8 +164,20 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 							if !matchFound {
 								validationErrors = append(validationErrors,
 									errors.IncorrectHeaderParamEnum(p, strings.ToLower(param), sch))
+								break
 							}
 						}
+						validationErrors = append(validationErrors,
+							ValidateSingleParameterSchema(
+								sch,
+								param,
+								"Header parameter",
+								"The header parameter",
+								p.Name,
+								helpers.ParameterValidation,
+								helpers.ParameterValidationHeader,
+								v.options,
+							)...)
 					}
 				}
 				if len(pType) == 0 {

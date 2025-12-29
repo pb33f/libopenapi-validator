@@ -11,6 +11,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -756,4 +757,352 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "GET Path '/buying/drinks' not found", errors[0].Message)
+}
+
+func TestNewValidator_HeaderParamStringValidPattern(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Request-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Request-ID", "550e8400-e29b-41d4-a716-446655440000")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidPattern(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Request-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Request-ID", "invalid_value")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "does not match pattern")
+}
+
+func TestNewValidator_HeaderParamStringValidFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Request-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Request-ID", "550e8400-e29b-41d4-a716-446655440000")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Request-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Request-ID", "not-a-valid-uuid")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "uuid")
+}
+
+func TestNewValidator_HeaderParamStringValidMinLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Token
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Token", "abcdefghij") // exactly 10 chars
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidMinLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Token
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Token", "short") // only 5 chars
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "minLength")
+}
+
+func TestNewValidator_HeaderParamStringValidMaxLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Token
+          in: header
+          required: true
+          schema:
+            type: string
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Token", "short") // 5 chars
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidMaxLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Token
+          in: header
+          required: true
+          schema:
+            type: string
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Token", "this-is-way-too-long") // 20 chars
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "maxLength")
+}
+
+func TestNewValidator_HeaderParamStringValidPatternAndMinMaxLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Code
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]+$'
+            minLength: 3
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Code", "ABCDEF") // 6 chars, all uppercase
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidPatternButValidLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Code
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]+$'
+            minLength: 3
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Code", "abcdef") // 6 chars, but lowercase - fails pattern
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "does not match pattern")
+}
+
+func TestNewValidator_HeaderParamStringValidEnumAndPattern(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Status
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, PENDING]`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Status", "ACTIVE")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringEmailFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-User-Email
+          in: header
+          required: true
+          schema:
+            type: string
+            format: email`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-User-Email", "user@example.com")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParamStringInvalidEmailFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-User-Email
+          in: header
+          required: true
+          schema:
+            type: string
+            format: email`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-User-Email", "not-an-email")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "email")
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
@@ -1151,4 +1152,328 @@ paths:
 	assert.False(t, valid)
 	require.Len(t, errors, 1)
 	assert.Equal(t, "Cookie parameter 'PattyPreference' is missing", errors[0].Message)
+}
+
+// Tests for string schema validation (GitHub issue #184)
+
+func TestNewValidator_CookieParamStringValidPattern(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: SessionID
+          in: cookie
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "SessionID", Value: "550e8400-e29b-41d4-a716-446655440000"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamStringInvalidPattern(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: SessionID
+          in: cookie
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "SessionID", Value: "invalid_value"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "does not match pattern")
+}
+
+func TestNewValidator_CookieParamStringValidFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: SessionID
+          in: cookie
+          required: true
+          schema:
+            type: string
+            format: uuid`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "SessionID", Value: "550e8400-e29b-41d4-a716-446655440000"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamStringInvalidFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: SessionID
+          in: cookie
+          required: true
+          schema:
+            type: string
+            format: uuid`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "SessionID", Value: "not-a-valid-uuid"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "uuid")
+}
+
+func TestNewValidator_CookieParamStringValidMinLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: Token
+          in: cookie
+          required: true
+          schema:
+            type: string
+            minLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "Token", Value: "abcdefghij"}) // exactly 10 chars
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamStringInvalidMinLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: Token
+          in: cookie
+          required: true
+          schema:
+            type: string
+            minLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "Token", Value: "short"}) // only 5 chars
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "minLength")
+}
+
+func TestNewValidator_CookieParamStringValidMaxLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: Token
+          in: cookie
+          required: true
+          schema:
+            type: string
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "Token", Value: "short"}) // 5 chars
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamStringInvalidMaxLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: Token
+          in: cookie
+          required: true
+          schema:
+            type: string
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "Token", Value: "this-is-way-too-long"}) // 20 chars
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "maxLength")
+}
+
+func TestNewValidator_CookieParamStringValidPatternAndMinMaxLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: Code
+          in: cookie
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]+$'
+            minLength: 3
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "Code", Value: "ABCDEF"}) // 6 chars, all uppercase
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamStringInvalidPatternButValidLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: Code
+          in: cookie
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z]+$'
+            minLength: 3
+            maxLength: 10`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "Code", Value: "abcdef"}) // 6 chars, but lowercase - fails pattern
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "does not match pattern")
+}
+
+func TestNewValidator_CookieParamStringEmailFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: UserEmail
+          in: cookie
+          required: true
+          schema:
+            type: string
+            format: email`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "UserEmail", Value: "user@example.com"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_CookieParamStringInvalidEmailFormat(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: UserEmail
+          in: cookie
+          required: true
+          schema:
+            type: string
+            format: email`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithFormatAssertions())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "UserEmail", Value: "not-an-email"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "email")
 }
