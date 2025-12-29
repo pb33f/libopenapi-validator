@@ -102,6 +102,19 @@ func HeaderParameterMissing(param *v3.Parameter) *ValidationError {
 	}
 }
 
+func CookieParameterMissing(param *v3.Parameter) *ValidationError {
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationCookie,
+		Message:           fmt.Sprintf("Cookie parameter '%s' is missing", param.Name),
+		Reason: fmt.Sprintf("The cookie parameter '%s' is defined as being required, "+
+			"however it's missing from the request", param.Name),
+		SpecLine: param.GoLow().Required.KeyNode.Line,
+		SpecCol:  param.GoLow().Required.KeyNode.Column,
+		HowToFix: HowToFixMissingValue,
+	}
+}
+
 func HeaderParameterCannotBeDecoded(param *v3.Parameter, val string) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.ParameterValidation,
