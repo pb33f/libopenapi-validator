@@ -27,6 +27,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
@@ -241,6 +242,145 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+func TestStrictMode_ValidateHttpRequestIntegration(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /things/{id}:
+    post:
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: header
+          name: X-Known
+          schema:
+            type: string
+        - in: cookie
+          name: session
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc, config.WithStrictMode())
+	require.Empty(t, errs)
+
+	body := map[string]any{
+		"name":  "ok",
+		"extra": "nope",
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/things/123?q=ok&extra=1", bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Known", "known")
+	request.Header.Set("X-Extra", "nope")
+	request.AddCookie(&http.Cookie{Name: "session", Value: "ok"})
+	request.AddCookie(&http.Cookie{Name: "other", Value: "nope"})
+
+	valid, valErrs := v.ValidateHttpRequest(request)
+	assert.False(t, valid)
+
+	strictSubTypes := make(map[string]bool)
+	for _, vErr := range valErrs {
+		if vErr.ValidationType == errors.StrictValidationType {
+			strictSubTypes[vErr.ValidationSubType] = true
+		}
+	}
+
+	assert.True(t, strictSubTypes[errors.StrictSubTypeProperty])
+	assert.True(t, strictSubTypes[errors.StrictSubTypeHeader])
+	assert.True(t, strictSubTypes[errors.StrictSubTypeQuery])
+	assert.True(t, strictSubTypes[errors.StrictSubTypeCookie])
+}
+
+func TestStrictMode_ValidateHttpResponseHeadersIntegration(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /things/{id}:
+    get:
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          headers:
+            X-Res:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc, config.WithStrictMode())
+	require.Empty(t, errs)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things/123", http.NoBody)
+
+	body := map[string]any{"ok": true}
+	bodyBytes, _ := json.Marshal(body)
+
+	response := &http.Response{
+		StatusCode: 200,
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+			"X-Res":        {"ok"},
+			"X-Extra":      {"nope"},
+		},
+		Body: io.NopCloser(bytes.NewBuffer(bodyBytes)),
+	}
+
+	valid, valErrs := v.ValidateHttpResponse(request, response)
+	assert.False(t, valid)
+
+	foundStrictHeader := false
+	for _, vErr := range valErrs {
+		if vErr.ValidationType == errors.StrictValidationType &&
+			vErr.ValidationSubType == errors.StrictSubTypeHeader {
+			foundStrictHeader = true
+			break
+		}
+	}
+	assert.True(t, foundStrictHeader)
 }
 
 func TestNewValidator_WithCustomFormat_FormatError(t *testing.T) {
