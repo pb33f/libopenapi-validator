@@ -16,8 +16,8 @@ type VersionType int
 const (
 	// Version30 represents OpenAPI 3.0.x
 	Version30 VersionType = iota
-	// Version31 represents OpenAPI 3.1.x (and later)
 	Version31
+	Version32
 )
 
 // NewOpenAPIVocabulary creates a vocabulary for OpenAPI-specific keywords
