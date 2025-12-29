@@ -53,9 +53,24 @@ func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, 
 	queryParams := make(map[string][]*helpers.QueryParam)
 	var validationErrors []*errors.ValidationError
 
+	// build a set of spec parameter names for exact matching
+	specParamNames := make(map[string]bool)
+	for _, p := range params {
+		if p.In == helpers.Query {
+			specParamNames[p.Name] = true
+		}
+	}
+
 	for qKey, qVal := range request.URL.Query() {
-		// check if the param is encoded as a property / deepObject
-		if strings.IndexRune(qKey, '[') > 0 && strings.IndexRune(qKey, ']') > 0 {
+		// check if the query key exactly matches a spec parameter name (e.g., "match[]")
+		// if so, store it literally without deepObject stripping
+		if specParamNames[qKey] {
+			queryParams[qKey] = append(queryParams[qKey], &helpers.QueryParam{
+				Key:    qKey,
+				Values: qVal,
+			})
+		} else if strings.IndexRune(qKey, '[') > 0 && strings.IndexRune(qKey, ']') > 0 {
+			// check if the param is encoded as a property / deepObject
 			stripped := qKey[:strings.IndexRune(qKey, '[')]
 			value := qKey[strings.IndexRune(qKey, '[')+1 : strings.IndexRune(qKey, ']')]
 			queryParams[stripped] = append(queryParams[stripped], &helpers.QueryParam{
