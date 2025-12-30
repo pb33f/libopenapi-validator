@@ -1654,6 +1654,57 @@ components:
 	assert.Len(t, result.UndeclaredValues, 2)
 }
 
+func TestStrictValidator_PrefixItems_FewerDataElements(t *testing.T) {
+	// Covers array_validator.go:41-42 - break when data has fewer elements than prefixItems
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Tuple:
+      type: array
+      prefixItems:
+        - type: object
+          properties:
+            first:
+              type: string
+        - type: object
+          properties:
+            second:
+              type: string
+        - type: object
+          properties:
+            third:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Tuple")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Only 1 data element, but 3 prefixItems - should break early at line 42
+	data := []any{
+		map[string]any{"first": "a", "extra": "undeclared"},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Only first element validated, has one undeclared property
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
+}
+
 func TestStrictValidator_PrefixItemsWithItems(t *testing.T) {
 	yml := `openapi: "3.1.0"
 info:
@@ -4954,6 +5005,7 @@ components:
 
 func TestStrictValidator_ItemsWithIgnoredPath(t *testing.T) {
 	// Covers array_validator.go:71-72 - shouldIgnore in items loop
+	// Need to ignore the ITEM PATH itself ($.body[0]) not a nested property
 	yml := `openapi: "3.1.0"
 info:
   title: Test
@@ -4972,24 +5024,21 @@ components:
 	model := buildSchemaFromYAML(t, yml)
 	schema := getSchema(t, model, "ArrayIgnore")
 
+	// Ignore the first array item entirely ($.body[0])
 	opts := config.NewValidationOptions(
 		config.WithStrictMode(),
-		config.WithStrictIgnorePaths("$.body[*].metadata"),
+		config.WithStrictIgnorePaths("$.body[0]"),
 	)
 	v := NewValidator(opts, 3.1)
 
 	data := []any{
 		map[string]any{
-			"name": "item1",
-			"metadata": map[string]any{
-				"internal": "ignored",
-			},
+			"name":  "item1",
+			"extra": "should be ignored because $.body[0] is ignored",
 		},
 		map[string]any{
-			"name": "item2",
-			"metadata": map[string]any{
-				"secret": "also ignored",
-			},
+			"name":  "item2",
+			"extra": "should be flagged",
 		},
 	}
 
@@ -5002,9 +5051,11 @@ components:
 		Version:   3.1,
 	})
 
-	// metadata paths are ignored, so no undeclared errors
-	assert.True(t, result.Valid)
-	assert.Empty(t, result.UndeclaredValues)
+	// First item ignored, only second item's extra should be flagged
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body[1].extra", result.UndeclaredValues[0].Path)
 }
 
 func TestValidateRequestHeaders_DeclaredHeaderSkipped(t *testing.T) {
@@ -5193,6 +5244,21 @@ components:
 	// metadata and internal paths are ignored, so no undeclared errors
 	assert.True(t, result.Valid)
 	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestNewValidator_WithCustomLogger(t *testing.T) {
+	// Covers types.go:295 - custom logger from options
+	customLogger := slog.New(slog.NewTextHandler(nil, nil))
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithLogger(customLogger),
+	)
+
+	v := NewValidator(opts, 3.1)
+
+	// Verify the custom logger is used
+	assert.NotNil(t, v)
+	assert.Equal(t, customLogger, v.logger)
 }
 
 // =============================================================================
