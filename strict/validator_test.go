@@ -3924,8 +3924,8 @@ components:
 	v := NewValidator(opts, 3.1)
 
 	data := map[string]any{
-		"parentProp":   "from parent",
-		"childProp":    "from child",
+		"parentProp":     "from parent",
+		"childProp":      "from child",
 		"undeclaredProp": "should be reported",
 	}
 
@@ -4069,8 +4069,8 @@ components:
 		"data": map[string]any{
 			"visible": "ok",
 			"metadata": map[string]any{
-				"ignored":       "should not be flagged",
-				"alsoIgnored":   "also not flagged",
+				"ignored":     "should not be flagged",
+				"alsoIgnored": "also not flagged",
 			},
 		},
 	}
@@ -4379,11 +4379,11 @@ components:
 	// First item should be ignored entirely, second item should be validated
 	data := []any{
 		map[string]any{
-			"id":            "1",
-			"extraInFirst":  "ignored because path $.body[0] is ignored",
+			"id":           "1",
+			"extraInFirst": "ignored because path $.body[0] is ignored",
 		},
 		map[string]any{
-			"name":           "test",
+			"name":          "test",
 			"extraInSecond": "should be flagged",
 		},
 	}
@@ -4476,9 +4476,9 @@ func TestValidateRequestHeaders_DeclaredHeaderSkipped(t *testing.T) {
 	}
 
 	headers := http.Header{
-		"X-Custom":      []string{"declared-value"},
-		"X-Another":     []string{"also-declared"},
-		"X-Undeclared":  []string{"should-be-flagged"},
+		"X-Custom":     []string{"declared-value"},
+		"X-Another":    []string{"also-declared"},
+		"X-Undeclared": []string{"should-be-flagged"},
 	}
 
 	undeclared := ValidateRequestHeaders(headers, params, opts)
@@ -4497,8 +4497,8 @@ func TestValidateResponseHeaders_DeclaredHeaderSkipped(t *testing.T) {
 	declaredHeaders["X-Response-Id"] = &v3.Header{}
 
 	headers := http.Header{
-		"X-Response-Id":   []string{"declared"},
-		"X-Undeclared":    []string{"should-be-flagged"},
+		"X-Response-Id": []string{"declared"},
+		"X-Undeclared":  []string{"should-be-flagged"},
 	}
 
 	undeclared := ValidateResponseHeaders(headers, &declaredHeaders, opts)
@@ -4518,9 +4518,9 @@ func TestValidateResponseHeaders_WithDeclaredHeaders(t *testing.T) {
 	declaredHeaders["X-Request-Id"] = &v3.Header{}
 
 	headers := http.Header{
-		"X-Rate-Limit":  []string{"100"},
-		"X-Request-Id":  []string{"abc123"},
-		"X-Undeclared":  []string{"flagged"},
+		"X-Rate-Limit": []string{"100"},
+		"X-Request-Id": []string{"abc123"},
+		"X-Undeclared": []string{"flagged"},
 	}
 
 	undeclared := ValidateResponseHeaders(headers, &declaredHeaders, opts)
@@ -4826,8 +4826,8 @@ components:
 
 	// Property name that would match the invalid pattern if it could compile
 	data := map[string]any{
-		"id":              "1",
-		"[invalid(regex":  "value",
+		"id":             "1",
+		"[invalid(regex": "value",
 	}
 
 	result := v.Validate(Input{
