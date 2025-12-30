@@ -1024,3 +1024,32 @@ components:
 	assert.True(t, valid)
 	assert.Empty(t, errors)
 }
+
+func TestParamValidator_ValidateSecurity_APIKey_UnknownInLocation(t *testing.T) {
+	// Test apiKey with unknown "in" location - should pass through (fallback at line 221)
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: body
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with no auth - should pass because "body" is an unknown "in" location
+	// and the validator falls through to return true (line 221)
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}

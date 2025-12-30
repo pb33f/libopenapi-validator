@@ -174,6 +174,38 @@ func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version31(t *testing.T) {
 	require.NotNil(t, jsch, "Should return compiled schema")
 }
 
+func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version32(t *testing.T) {
+	schemaJSON := `{
+		"type": "string"
+	}`
+
+	options := config.NewValidationOptions(
+		config.WithOpenAPIMode(),
+	)
+
+	// Test version 3.2 (>= 3.15)
+	jsch, err := NewCompiledSchemaWithVersion("test", []byte(schemaJSON), options, 3.2)
+	require.NoError(t, err, "Should compile OpenAPI 3.2 schema")
+	require.NotNil(t, jsch, "Should return compiled schema")
+}
+
+func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version32_NullableRejected(t *testing.T) {
+	schemaJSON := `{
+		"type": "string",
+		"nullable": true
+	}`
+
+	options := config.NewValidationOptions(
+		config.WithOpenAPIMode(),
+	)
+
+	// Test version 3.2 (>= 3.15) with nullable should fail (same as 3.1+)
+	jsch, err := NewCompiledSchemaWithVersion("test", []byte(schemaJSON), options, 3.2)
+	assert.Error(t, err, "Should fail for nullable in OpenAPI 3.2")
+	assert.Nil(t, jsch, "Should not return compiled schema")
+	assert.Contains(t, err.Error(), "The `nullable` keyword is not supported in OpenAPI 3.1+")
+}
+
 func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version31_NullableRejected(t *testing.T) {
 	schemaJSON := `{
 		"type": "string",

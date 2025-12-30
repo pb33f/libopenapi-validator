@@ -3704,3 +3704,67 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "Query parameter 'match[]' is missing", errors[0].Message)
 }
+
+func TestNewValidator_QueryParams_StrictMode_UndeclaredParam(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /api/search:
+    get:
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      operationId: search
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	// Request with undeclared 'extra' parameter
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://example.com/api/search?query=test&limit=10&extra=undeclared", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "extra")
+	assert.Contains(t, errors[0].Message, "not declared")
+}
+
+func TestNewValidator_QueryParams_StrictMode_ValidRequest(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /api/search:
+    get:
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      operationId: search
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	// Request with only declared parameters
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://example.com/api/search?query=test&limit=10", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}

@@ -1504,3 +1504,56 @@ paths:
 	assert.Equal(t, "Cookie parameter 'session_id' is missing", errors[0].Message)
 	assert.Contains(t, errors[0].Reason, "required")
 }
+
+func TestNewValidator_CookieParams_StrictMode_UndeclaredCookie(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: session_id
+          in: cookie
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "session_id", Value: "abc123"})
+	request.AddCookie(&http.Cookie{Name: "extra_cookie", Value: "undeclared"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "extra_cookie")
+	assert.Contains(t, errors[0].Message, "not declared")
+}
+
+func TestNewValidator_CookieParams_StrictMode_ValidRequest(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: session_id
+          in: cookie
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.AddCookie(&http.Cookie{Name: "session_id", Value: "abc123"})
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
