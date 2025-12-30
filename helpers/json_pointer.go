@@ -6,14 +6,14 @@ package helpers
 import (
 	"fmt"
 	"strings"
+
+	"github.com/go-openapi/jsonpointer"
 )
 
 // EscapeJSONPointerSegment escapes a single segment for use in a JSON Pointer (RFC 6901).
 // It replaces '~' with '~0' and '/' with '~1'.
 func EscapeJSONPointerSegment(segment string) string {
-	escaped := strings.ReplaceAll(segment, "~", "~0")
-	escaped = strings.ReplaceAll(escaped, "/", "~1")
-	return escaped
+	return jsonpointer.Escape(segment)
 }
 
 // ConstructParameterJSONPointer constructs a full JSON Pointer path for a parameter

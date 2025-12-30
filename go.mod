@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad
 	github.com/dlclark/regexp2 v1.11.5
+	github.com/go-openapi/jsonpointer v0.22.4
 	github.com/goccy/go-yaml v1.19.1
 	github.com/pb33f/jsonpath v0.7.0
 	github.com/pb33f/libopenapi v0.30.2
@@ -18,6 +19,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
