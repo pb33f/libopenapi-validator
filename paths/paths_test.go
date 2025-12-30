@@ -1276,3 +1276,59 @@ paths:
 	assert.Equal(t, "getOperations", pathItem.Get.OperationId)
 	assert.Equal(t, "/Messages/Operations", foundPath)
 }
+
+func TestFindPath_WithFragment(t *testing.T) {
+	// Test that request paths with fragments are handled correctly
+	spec := `openapi: 3.1.0
+info:
+  title: Fragment Test
+  version: 1.0.0
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// Request with fragment in URL
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/users/123#section", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "getUser", pathItem.Get.OperationId)
+	assert.Equal(t, "/users/{id}", foundPath)
+}
+
+func TestFindPath_WithTrailingSlashBasePath(t *testing.T) {
+	// Test that base paths with trailing slash work correctly
+	spec := `openapi: 3.1.0
+info:
+  title: Trailing Slash Test
+  version: 1.0.0
+servers:
+  - url: https://api.com/v1/
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// Request to path that includes base with trailing slash
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/v1/users", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "getUsers", pathItem.Get.OperationId)
+	assert.Equal(t, "/users", foundPath)
+}

@@ -966,3 +966,61 @@ components:
 	// Should have errors from both OR options
 	assert.GreaterOrEqual(t, len(errors), 1)
 }
+
+func TestParamValidator_ValidateSecurity_UnknownSchemeType(t *testing.T) {
+	// Test oauth2 type - unknown to our validator, should pass through (not fail)
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OAuth2: []
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: https://example.com/oauth
+          scopes:
+            read: Read access
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with no auth - should pass because oauth2 type is not validated
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestParamValidator_ValidateSecurity_UnknownHTTPScheme(t *testing.T) {
+	// Test custom HTTP scheme - unknown to our validator, should pass through (not fail)
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - CustomAuth: []
+components:
+  securitySchemes:
+    CustomAuth:
+      type: http
+      scheme: custom
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with no auth - should pass because custom scheme is not validated
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}

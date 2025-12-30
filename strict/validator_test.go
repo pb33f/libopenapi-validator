@@ -3734,3 +3734,116 @@ func TestStrictValidator_GetSchemaKey_NoLowLevel(t *testing.T) {
 	// Should return pointer-based key
 	assert.NotEmpty(t, key)
 }
+
+func TestTruncateValue_SmallMapUnchanged(t *testing.T) {
+	// Small map (<= 3 entries) should return unchanged
+	input := map[string]any{"a": 1, "b": 2}
+	result := TruncateValue(input)
+	assert.Equal(t, input, result)
+
+	// Exactly 3 entries should also pass unchanged
+	input3 := map[string]any{"a": 1, "b": 2, "c": 3}
+	result3 := TruncateValue(input3)
+	assert.Equal(t, input3, result3)
+}
+
+func TestTruncateValue_SmallArrayUnchanged(t *testing.T) {
+	// Small array (<= 3 entries) should return unchanged
+	input := []any{1, 2}
+	result := TruncateValue(input)
+	assert.Equal(t, input, result)
+
+	// Exactly 3 entries should also pass unchanged
+	input3 := []any{1, 2, 3}
+	result3 := TruncateValue(input3)
+	assert.Equal(t, input3, result3)
+}
+
+func TestStrictValidator_DataMatchesSchema_CompilationError(t *testing.T) {
+	// Create a schema with an invalid regex pattern that will fail compilation
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    BadPattern:
+      type: object
+      properties:
+        name:
+          type: string
+          pattern: "[invalid(regex"
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "BadPattern")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// dataMatchesSchema should return false with error due to invalid pattern
+	matches, err := v.dataMatchesSchema(schema, map[string]any{"name": "test"})
+	assert.False(t, matches)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "strict:")
+}
+
+func TestStrictValidator_FindMatchingVariant_SchemaError(t *testing.T) {
+	// Create oneOf with a variant that has invalid pattern - should skip bad variant
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Container:
+      oneOf:
+        - type: object
+          properties:
+            valid:
+              type: string
+        - type: object
+          properties:
+            broken:
+              type: string
+              pattern: "[unclosed("
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Container")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// findMatchingVariant should skip the broken variant and match the valid one
+	variant := v.findMatchingVariant(schema.OneOf, map[string]any{"valid": "test"})
+
+	// Should find a valid variant (the first one)
+	assert.NotNil(t, variant)
+}
+
+func TestStrictValidator_GetPatternPropertySchema_InvalidPattern(t *testing.T) {
+	// Create schema with invalid patternProperties regex
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    BadPatternProps:
+      type: object
+      patternProperties:
+        "[invalid(":
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "BadPatternProps")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// getPatternPropertySchema should return nil for invalid pattern
+	propProxy := v.getPatternPropertySchema(schema, "test")
+	assert.Nil(t, propProxy)
+}
