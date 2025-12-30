@@ -59,11 +59,7 @@ func (v *Validator) collectDeclaredProperties(
 				continue
 			}
 			// trigger property exists, include dependent schema's properties
-			depProxy := pair.Value()
-			if depProxy == nil {
-				continue
-			}
-			mergePropertiesIntoDeclared(declared, depProxy.Schema())
+			mergePropertiesIntoDeclared(declared, pair.Value().Schema())
 		}
 	}
 
