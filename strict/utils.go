@@ -126,10 +126,7 @@ func compilePattern(pattern string) *regexp.Regexp {
 
 	b.WriteString("$")
 
-	re, err := regexp.Compile(b.String())
-	if err != nil {
-		return nil
-	}
+	re, _ := regexp.Compile(b.String())
 	return re
 }
 

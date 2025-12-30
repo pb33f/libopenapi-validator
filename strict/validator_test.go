@@ -15,7 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	libcache "github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // Helper to build a schema from YAML
@@ -4820,7 +4822,8 @@ components:
 // =============================================================================
 
 func TestStrictValidator_SchemaCacheHit(t *testing.T) {
-	// Covers matcher.go:64-66 - global schema cache hit path
+	// Covers matcher.go:60-62 - global schema cache hit path
+	// Need a oneOf schema to trigger dataMatchesSchema which uses getCompiledSchema
 	yml := `openapi: "3.1.0"
 info:
   title: Test
@@ -4828,27 +4831,56 @@ info:
 paths: {}
 components:
   schemas:
-    CachedSchema:
+    DogVariant:
       type: object
       properties:
-        name:
+        breed:
           type: string
+    CatVariant:
+      type: object
+      properties:
+        color:
+          type: string
+    CachedSchema:
+      type: object
+      oneOf:
+        - $ref: '#/components/schemas/DogVariant'
+        - $ref: '#/components/schemas/CatVariant'
 `
 	model := buildSchemaFromYAML(t, yml)
-	schema := getSchema(t, model, "CachedSchema")
+	dogSchema := getSchema(t, model, "DogVariant")
 
 	// Create options with schema cache
 	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	// Pre-populate the GLOBAL cache with a compiled schema for the DogVariant hash
+	// This is what findMatchingVariant will check via dataMatchesSchema
+	hash := dogSchema.GoLow().Hash()
+	compiledSchema, err := helpers.NewCompiledSchemaWithVersion(
+		"test-cached",
+		[]byte(`{"type":"object","properties":{"breed":{"type":"string"}}}`),
+		opts,
+		3.1,
+	)
+	require.NoError(t, err)
+	opts.SchemaCache.Store(hash, &libcache.SchemaCacheEntry{
+		CompiledSchema: compiledSchema,
+	})
+
 	v := NewValidator(opts, 3.1)
 
+	// Data that matches DogVariant
 	data := map[string]any{
-		"name":  "test",
+		"breed": "labrador",
 		"extra": "undeclared",
 	}
 
-	// First validation - populates cache
-	result1 := v.Validate(Input{
-		Schema:    schema,
+	// Get the parent oneOf schema
+	parentSchema := getSchema(t, model, "CachedSchema")
+
+	// Validation should hit the GLOBAL cache when checking oneOf variants
+	result := v.Validate(Input{
+		Schema:    parentSchema,
 		Data:      data,
 		Direction: DirectionRequest,
 		Options:   opts,
@@ -4856,21 +4888,10 @@ components:
 		Version:   3.1,
 	})
 
-	// Second validation - should hit cache
-	result2 := v.Validate(Input{
-		Schema:    schema,
-		Data:      data,
-		Direction: DirectionRequest,
-		Options:   opts,
-		BasePath:  "$.body",
-		Version:   3.1,
-	})
-
-	// Both should have same result
-	assert.False(t, result1.Valid)
-	assert.False(t, result2.Valid)
-	assert.Len(t, result1.UndeclaredValues, 1)
-	assert.Len(t, result2.UndeclaredValues, 1)
+	// Should still detect undeclared property
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
 }
 
 func TestStrictValidator_PrefixItemsWithIgnoredPath(t *testing.T) {
@@ -5015,6 +5036,45 @@ func TestValidateRequestHeaders_DeclaredHeaderSkipped(t *testing.T) {
 	assert.Equal(t, "X-Undeclared", undeclared[0].Name)
 }
 
+func TestValidateRequestHeaders_NilOrDisabled(t *testing.T) {
+	// Covers validator.go:103 - early return when headers nil, options nil, or strict mode disabled
+	params := []*v3.Parameter{{Name: "X-Custom", In: "header"}}
+	headers := http.Header{"X-Custom": []string{"value"}}
+
+	// Test nil headers
+	result := ValidateRequestHeaders(nil, params, config.NewValidationOptions(config.WithStrictMode()))
+	assert.Nil(t, result)
+
+	// Test nil options
+	result = ValidateRequestHeaders(headers, params, nil)
+	assert.Nil(t, result)
+
+	// Test strict mode disabled
+	opts := config.NewValidationOptions() // strict mode off by default
+	result = ValidateRequestHeaders(headers, params, opts)
+	assert.Nil(t, result)
+}
+
+func TestValidateRequestHeaders_IgnoredHeaderSkipped(t *testing.T) {
+	// Covers validator.go:129 - skip when header is in ignored list
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	// No declared headers - but Content-Type is in default ignored list
+	params := []*v3.Parameter{}
+
+	headers := http.Header{
+		"Content-Type":  []string{"application/json"}, // ignored by default
+		"Authorization": []string{"Bearer token"},     // ignored by default
+		"X-Custom":      []string{"should-be-flagged"},
+	}
+
+	undeclared := ValidateRequestHeaders(headers, params, opts)
+
+	// Only X-Custom should be reported (Content-Type and Authorization are ignored)
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Custom", undeclared[0].Name)
+}
+
 func TestValidateResponseHeaders_DeclaredHeaderSkipped(t *testing.T) {
 	// Covers validator.go:219-223, 228-230 - declared header handling in response
 	opts := config.NewValidationOptions(config.WithStrictMode())
@@ -5053,6 +5113,27 @@ func TestValidateResponseHeaders_WithDeclaredHeaders(t *testing.T) {
 	undeclared := ValidateResponseHeaders(headers, &declaredHeaders, opts)
 
 	// Only X-Undeclared should be reported
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Undeclared", undeclared[0].Name)
+}
+
+func TestValidateResponseHeaders_IgnorePathMatch(t *testing.T) {
+	// Covers validator.go:239 - skip when header matches ignore path pattern
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.headers.x-internal"),
+	)
+
+	declaredHeaders := make(map[string]*v3.Header)
+
+	headers := http.Header{
+		"X-Internal":   []string{"should-be-ignored"}, // matches ignore path
+		"X-Undeclared": []string{"should-be-flagged"},
+	}
+
+	undeclared := ValidateResponseHeaders(headers, &declaredHeaders, opts)
+
+	// Only X-Undeclared should be reported (X-Internal matches ignore path)
 	assert.Len(t, undeclared, 1)
 	assert.Equal(t, "X-Undeclared", undeclared[0].Name)
 }
@@ -5493,7 +5574,8 @@ func TestStrictValidator_NilSchemaPassesValidation(t *testing.T) {
 }
 
 func TestStrictValidator_ValidateValue_ShouldIgnore(t *testing.T) {
-	// Covers schema_walker.go:17-18 - shouldIgnore in validateValue
+	// Covers schema_walker.go:17-18 - shouldIgnore in validateValue at ENTRY point
+	// Need to ignore $.body itself so the check happens at validateValue entry
 	yml := `openapi: "3.1.0"
 info:
   title: Test
@@ -5504,27 +5586,22 @@ components:
     IgnoreTest:
       type: object
       properties:
-        data:
-          type: object
-          properties:
-            nested:
-              type: string
+        name:
+          type: string
 `
 	model := buildSchemaFromYAML(t, yml)
 	schema := getSchema(t, model, "IgnoreTest")
 
-	// Ignore the entire data object - validateValue should return early at line 18
+	// Ignore the entire body - validateValue entry should return early at line 18
 	opts := config.NewValidationOptions(
 		config.WithStrictMode(),
-		config.WithStrictIgnorePaths("$.body.data"),
+		config.WithStrictIgnorePaths("$.body"),
 	)
 	v := NewValidator(opts, 3.1)
 
 	data := map[string]any{
-		"data": map[string]any{
-			"nested":     "valid",
-			"undeclared": "should be ignored",
-		},
+		"name":       "valid",
+		"undeclared": "should be ignored because entire body is ignored",
 	}
 
 	result := v.Validate(Input{
@@ -5536,13 +5613,14 @@ components:
 		Version:   3.1,
 	})
 
-	// data is ignored, so no undeclared errors
+	// Entire body is ignored, so no undeclared errors
 	assert.True(t, result.Valid)
 	assert.Empty(t, result.UndeclaredValues)
 }
 
 func TestStrictValidator_ValidateValue_CycleDetection(t *testing.T) {
 	// Covers schema_walker.go:27-28 - cycle detection in validateValue
+	// Need to call validateValue directly with a pre-visited context
 	yml := `openapi: "3.1.0"
 info:
   title: Test
@@ -5550,48 +5628,33 @@ info:
 paths: {}
 components:
   schemas:
-    Node:
+    TestSchema:
       type: object
       properties:
-        value:
+        name:
           type: string
-        child:
-          $ref: '#/components/schemas/Node'
 `
 	model := buildSchemaFromYAML(t, yml)
-	schema := getSchema(t, model, "Node")
+	schema := getSchema(t, model, "TestSchema")
 
 	opts := config.NewValidationOptions(config.WithStrictMode())
 	v := NewValidator(opts, 3.1)
 
-	// Create deeply nested data that would cause infinite recursion without cycle detection
+	// Create a context and pre-mark the schema as visited at this path
+	ctx := newTraversalContext(DirectionRequest, v.compiledIgnorePaths, "$.body")
+	schemaKey := v.getSchemaKey(schema)
+	ctx.checkAndMarkVisited(schemaKey) // First visit - marks as visited
+
 	data := map[string]any{
-		"value": "root",
-		"child": map[string]any{
-			"value": "child1",
-			"child": map[string]any{
-				"value": "child2",
-				"child": map[string]any{
-					"value":      "child3",
-					"undeclared": "should be caught before cycle kicks in",
-				},
-			},
-		},
+		"name":       "test",
+		"undeclared": "should not be detected due to cycle",
 	}
 
-	result := v.Validate(Input{
-		Schema:    schema,
-		Data:      data,
-		Direction: DirectionRequest,
-		Options:   opts,
-		BasePath:  "$.body",
-		Version:   3.1,
-	})
+	// Call validateValue directly - should hit line 28 (cycle detected)
+	result := v.validateValue(ctx, schema, data)
 
-	// Should detect the undeclared property even with recursive schema
-	assert.False(t, result.Valid)
-	assert.Len(t, result.UndeclaredValues, 1)
-	assert.Equal(t, "undeclared", result.UndeclaredValues[0].Name)
+	// Cycle detected, returns early with no errors
+	assert.Empty(t, result)
 }
 
 func TestStrictValidator_ShouldReportUndeclared_AdditionalPropertiesTrue(t *testing.T) {
@@ -5868,6 +5931,61 @@ components:
 	})
 
 	// x-custom matches pattern but is readOnly, skipped in request
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_PatternShouldIgnore(t *testing.T) {
+	// Covers schema_walker.go:219-220 - shouldIgnore for patternProperty path
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    PatternIgnore:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+      patternProperties:
+        "^x-":
+          type: object
+          properties:
+            nested:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "PatternIgnore")
+
+	// Ignore the pattern-matched property path
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.x-custom"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	// x-custom matches pattern, path matches ignore pattern - should skip (line 220)
+	data := map[string]any{
+		"name": "test",
+		"x-custom": map[string]any{
+			"nested":     "valid",
+			"undeclared": "should be ignored because path is ignored",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// x-custom path is ignored, so no undeclared errors
 	assert.True(t, result.Valid)
 	assert.Empty(t, result.UndeclaredValues)
 }

@@ -35,10 +35,6 @@ func (v *Validator) dataMatchesSchema(schema *base.Schema, data any) (bool, erro
 	if err != nil {
 		return false, err
 	}
-	if compiled == nil {
-		return false, nil
-	}
-
 	return compiled.Validate(data) == nil, nil
 }
 
