@@ -3847,3 +3847,1120 @@ components:
 	propProxy := v.getPatternPropertySchema(schema, "test")
 	assert.Nil(t, propProxy)
 }
+
+// =============================================================================
+// Phase 1: CRITICAL Coverage Tests
+// =============================================================================
+
+func TestStrictValidator_AllOfWithParentProperties(t *testing.T) {
+	// Covers polymorphic.go:88-91 - parent schema properties merged with allOf
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    MergedSchema:
+      type: object
+      properties:
+        parentProp:
+          type: string
+      allOf:
+        - type: object
+          properties:
+            childProp:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "MergedSchema")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Both parent and child properties should be considered declared
+	data := map[string]any{
+		"parentProp": "from parent",
+		"childProp":  "from child",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_AllOfWithParentProperties_UndeclaredReported(t *testing.T) {
+	// Verify undeclared properties are still caught with parent+allOf merge
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    MergedSchema:
+      type: object
+      properties:
+        parentProp:
+          type: string
+      allOf:
+        - type: object
+          properties:
+            childProp:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "MergedSchema")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"parentProp":   "from parent",
+		"childProp":    "from child",
+		"undeclaredProp": "should be reported",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "undeclaredProp", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_AllOfReadOnlyInRequest(t *testing.T) {
+	// Covers polymorphic.go:116-117 - shouldSkipProperty for readOnly in allOf
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    ReadOnlyAllOf:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              readOnly: true
+            name:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "ReadOnlyAllOf")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// In request direction, readOnly property should be skipped
+	data := map[string]any{
+		"id":   "123",
+		"name": "test",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// id is readOnly - should be skipped in request validation (not flagged)
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_AllOfWriteOnlyInResponse(t *testing.T) {
+	// Covers polymorphic.go:222-223 - shouldSkipProperty for writeOnly in oneOf/anyOf
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    WriteOnlySchema:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            password:
+              type: string
+              writeOnly: true
+            email:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "WriteOnlySchema")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// In response direction, writeOnly property should be skipped
+	data := map[string]any{
+		"password": "secret123",
+		"email":    "user@example.com",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionResponse,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// password is writeOnly - should be skipped in response validation
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_AllOfWithIgnoredPath(t *testing.T) {
+	// Covers polymorphic.go:107-108 - shouldIgnore in allOf validation loop
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    IgnoreInAllOf:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                visible:
+                  type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "IgnoreInAllOf")
+
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.data.metadata"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	// metadata path is ignored, so undeclared properties there should not be reported
+	data := map[string]any{
+		"data": map[string]any{
+			"visible": "ok",
+			"metadata": map[string]any{
+				"ignored":       "should not be flagged",
+				"alsoIgnored":   "also not flagged",
+			},
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// metadata path is ignored, so no undeclared errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_OneOfWithIgnoredPath(t *testing.T) {
+	// Covers polymorphic.go:213-214 - shouldIgnore in oneOf/anyOf validation loop
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    IgnoreInOneOf:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                name:
+                  type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "IgnoreInOneOf")
+
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.data.internal"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"data": map[string]any{
+			"name": "visible",
+			"internal": map[string]any{
+				"secret": "ignored",
+			},
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_AllOfAdditionalPropertiesFalseRecurse(t *testing.T) {
+	// Covers polymorphic.go:461-462, 467-468 - recursion with additionalProperties: false
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    RecurseTest:
+      type: object
+      additionalProperties: false
+      allOf:
+        - type: object
+          properties:
+            nested:
+              type: object
+              properties:
+                valid:
+                  type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "RecurseTest")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// nested.extra should be reported as undeclared
+	data := map[string]any{
+		"nested": map[string]any{
+			"valid": "ok",
+			"extra": "should be flagged",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body.nested.extra", result.UndeclaredValues[0].Path)
+}
+
+func TestStrictValidator_OneOfVariantPropertyPriority(t *testing.T) {
+	// Covers polymorphic.go:248-250, 255-257 - findPropertySchemaInMerged
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    PriorityTest:
+      type: object
+      properties:
+        type:
+          type: string
+      oneOf:
+        - type: object
+          properties:
+            details:
+              type: object
+              properties:
+                variantField:
+                  type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "PriorityTest")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// type is from parent, details is from variant
+	data := map[string]any{
+		"type": "test",
+		"details": map[string]any{
+			"variantField": "from variant",
+			"undeclared":   "should be flagged",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// undeclared in details should be flagged
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "undeclared", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_PropertyDeclaredInAllOfChild(t *testing.T) {
+	// Covers polymorphic.go:46-47 - isPropertyDeclaredInAllOf continuation
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfChildProp:
+      type: object
+      properties:
+        parentOnly:
+          type: string
+      allOf:
+        - type: object
+          properties:
+            fromChild:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfChildProp")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// fromChild is declared in allOf child, should be considered declared
+	data := map[string]any{
+		"parentOnly": "parent",
+		"fromChild":  "child",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+// =============================================================================
+// Phase 2: HIGH Priority Coverage Tests
+// =============================================================================
+
+func TestStrictValidator_SchemaCacheHit(t *testing.T) {
+	// Covers matcher.go:64-66 - global schema cache hit path
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    CachedSchema:
+      type: object
+      properties:
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "CachedSchema")
+
+	// Create options with schema cache
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name":  "test",
+		"extra": "undeclared",
+	}
+
+	// First validation - populates cache
+	result1 := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Second validation - should hit cache
+	result2 := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Both should have same result
+	assert.False(t, result1.Valid)
+	assert.False(t, result2.Valid)
+	assert.Len(t, result1.UndeclaredValues, 1)
+	assert.Len(t, result2.UndeclaredValues, 1)
+}
+
+func TestStrictValidator_PrefixItemsWithIgnoredPath(t *testing.T) {
+	// Covers array_validator.go:48-50 - shouldIgnore in prefixItems loop
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    TupleIgnore:
+      type: array
+      prefixItems:
+        - type: object
+          properties:
+            id:
+              type: string
+        - type: object
+          properties:
+            name:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "TupleIgnore")
+
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body[0]"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	// First item should be ignored entirely, second item should be validated
+	data := []any{
+		map[string]any{
+			"id":            "1",
+			"extraInFirst":  "ignored because path $.body[0] is ignored",
+		},
+		map[string]any{
+			"name":           "test",
+			"extraInSecond": "should be flagged",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Only second item's extra property should be flagged
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extraInSecond", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body[1].extraInSecond", result.UndeclaredValues[0].Path)
+}
+
+func TestStrictValidator_ItemsWithIgnoredPath(t *testing.T) {
+	// Covers array_validator.go:71-72 - shouldIgnore in items loop
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    ArrayIgnore:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "ArrayIgnore")
+
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body[*].metadata"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	data := []any{
+		map[string]any{
+			"name": "item1",
+			"metadata": map[string]any{
+				"internal": "ignored",
+			},
+		},
+		map[string]any{
+			"name": "item2",
+			"metadata": map[string]any{
+				"secret": "also ignored",
+			},
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// metadata paths are ignored, so no undeclared errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestValidateRequestHeaders_DeclaredHeaderSkipped(t *testing.T) {
+	// Covers validator.go:123-125 - declared header skip in request validation
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	// Create params with X-Custom header declared
+	params := []*v3.Parameter{
+		{
+			Name: "X-Custom",
+			In:   "header",
+		},
+		{
+			Name: "X-Another",
+			In:   "header",
+		},
+	}
+
+	headers := http.Header{
+		"X-Custom":      []string{"declared-value"},
+		"X-Another":     []string{"also-declared"},
+		"X-Undeclared":  []string{"should-be-flagged"},
+	}
+
+	undeclared := ValidateRequestHeaders(headers, params, opts)
+
+	// Only X-Undeclared should be reported
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Undeclared", undeclared[0].Name)
+}
+
+func TestValidateResponseHeaders_DeclaredHeaderSkipped(t *testing.T) {
+	// Covers validator.go:219-223, 228-230 - declared header handling in response
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	// Create declared headers map
+	declaredHeaders := make(map[string]*v3.Header)
+	declaredHeaders["X-Response-Id"] = &v3.Header{}
+
+	headers := http.Header{
+		"X-Response-Id":   []string{"declared"},
+		"X-Undeclared":    []string{"should-be-flagged"},
+	}
+
+	undeclared := ValidateResponseHeaders(headers, &declaredHeaders, opts)
+
+	// Only X-Undeclared should be reported
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Undeclared", undeclared[0].Name)
+}
+
+func TestValidateResponseHeaders_WithDeclaredHeaders(t *testing.T) {
+	// Covers validator.go:219-223, 228-230 - building declared names list
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	// Create declared headers map with multiple headers
+	declaredHeaders := make(map[string]*v3.Header)
+	declaredHeaders["X-Rate-Limit"] = &v3.Header{}
+	declaredHeaders["X-Request-Id"] = &v3.Header{}
+
+	headers := http.Header{
+		"X-Rate-Limit":  []string{"100"},
+		"X-Request-Id":  []string{"abc123"},
+		"X-Undeclared":  []string{"flagged"},
+	}
+
+	undeclared := ValidateResponseHeaders(headers, &declaredHeaders, opts)
+
+	// Only X-Undeclared should be reported
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Undeclared", undeclared[0].Name)
+}
+
+func TestNewValidator_WithIgnorePaths(t *testing.T) {
+	// Covers types.go:310-311 - compiledIgnorePaths populated
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.metadata", "$.body.internal"),
+	)
+
+	v := NewValidator(opts, 3.1)
+
+	// Verify ignore paths are compiled
+	assert.NotNil(t, v)
+	assert.Len(t, v.compiledIgnorePaths, 2)
+
+	// Test that the patterns work
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    TestSchema:
+      type: object
+      properties:
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "TestSchema")
+
+	// metadata and internal are undeclared properties that match ignore patterns
+	data := map[string]any{
+		"name": "test",
+		"metadata": map[string]any{
+			"ignored": "value",
+		},
+		"internal": map[string]any{
+			"deep": map[string]any{
+				"nested": "also ignored",
+			},
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// metadata and internal paths are ignored, so no undeclared errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+// =============================================================================
+// Phase 3: MEDIUM Priority Tests
+// =============================================================================
+
+func TestStrictValidator_PrimitiveValuesIgnored(t *testing.T) {
+	// Covers schema_walker.go:37-38 - validateValue default case for primitives
+	// Primitive values (string, number, boolean) have no properties to check
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    StringSchema:
+      type: string
+    NumberSchema:
+      type: number
+    BooleanSchema:
+      type: boolean
+`
+	model := buildSchemaFromYAML(t, yml)
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Test string value - no properties to check
+	stringSchema := getSchema(t, model, "StringSchema")
+	result := v.Validate(Input{
+		Schema:    stringSchema,
+		Data:      "just a string",
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+
+	// Test number value
+	numberSchema := getSchema(t, model, "NumberSchema")
+	result = v.Validate(Input{
+		Schema:    numberSchema,
+		Data:      42.5,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+
+	// Test boolean value
+	boolSchema := getSchema(t, model, "BooleanSchema")
+	result = v.Validate(Input{
+		Schema:    boolSchema,
+		Data:      true,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_AdditionalPropertiesSchemaRecurse(t *testing.T) {
+	// Covers schema_walker.go:72-80 - recurse into additionalProperties schema
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AddlPropsNested:
+      type: object
+      properties:
+        id:
+          type: string
+      additionalProperties:
+        type: object
+        properties:
+          nested:
+            type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AddlPropsNested")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Data with nested undeclared property inside additionalProperties
+	data := map[string]any{
+		"id": "1",
+		"extra": map[string]any{
+			"nested": "ok",
+			"bad":    "undeclared inside extra",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Both "extra" at top level AND "bad" inside extra should be reported
+	assert.False(t, result.Valid)
+	assert.GreaterOrEqual(t, len(result.UndeclaredValues), 1)
+
+	// Find undeclared values
+	foundExtra := false
+	foundBad := false
+	for _, uv := range result.UndeclaredValues {
+		if uv.Name == "extra" {
+			foundExtra = true
+		}
+		if uv.Name == "bad" {
+			foundBad = true
+		}
+	}
+	assert.True(t, foundExtra, "expected 'extra' to be reported as undeclared")
+	assert.True(t, foundBad, "expected 'bad' inside extra to be reported as undeclared")
+}
+
+func TestStrictValidator_AdditionalPropertiesFalseShortCircuit(t *testing.T) {
+	// Covers schema_walker.go:113-115 - shouldReportUndeclared returns false
+	// When additionalProperties: false, JSON Schema handles it, not strict mode
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    NoExtras:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "NoExtras")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Data with extra property - additionalProperties: false handles this
+	data := map[string]any{
+		"id":    "1",
+		"extra": "should be handled by JSON Schema, not strict",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Strict mode should NOT report this because additionalProperties: false
+	// means JSON Schema will handle it
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_PatternPropertiesWithAdditionalFalse(t *testing.T) {
+	// Covers schema_walker.go:223-228 - patternProperties with additionalProperties: false
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    PatternOnly:
+      type: object
+      additionalProperties: false
+      patternProperties:
+        "^x-":
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "PatternOnly")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// x-custom matches the pattern, so it's declared
+	data := map[string]any{
+		"x-custom": "ok",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// x-custom matches pattern and additionalProperties: false handles the rest
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_InvalidPatternPropertiesRegex(t *testing.T) {
+	// Covers property_collector.go:46-49 - invalid regex skipped
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    InvalidPattern:
+      type: object
+      properties:
+        id:
+          type: string
+      patternProperties:
+        "[invalid(regex":
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "InvalidPattern")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Property name that would match the invalid pattern if it could compile
+	data := map[string]any{
+		"id":              "1",
+		"[invalid(regex":  "value",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Invalid pattern is skipped, so the property is reported as undeclared
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "[invalid(regex", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_UnevaluatedItemsWithIgnoredPath(t *testing.T) {
+	// Covers array_validator.go:97-98 - shouldIgnore in unevaluatedItems
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    UnevalIgnore:
+      type: array
+      unevaluatedItems:
+        type: object
+        properties:
+          id:
+            type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "UnevalIgnore")
+
+	// Ignore the first array element
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body[0]"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	// First item has undeclared 'extra', but it should be ignored
+	data := []any{
+		map[string]any{
+			"id":    "1",
+			"extra": "should be ignored at index 0",
+		},
+		map[string]any{
+			"id":     "2",
+			"extra2": "should be reported at index 1",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// First item ignored, second item's extra2 should be reported
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra2", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_AdditionalPropertiesSchemaReportsUndeclared(t *testing.T) {
+	// Covers schema_walker.go:122-126 - additionalProperties with schema still reports
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    SchemaAddl:
+      type: object
+      additionalProperties:
+        type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "SchemaAddl")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Data with extra property allowed by additionalProperties schema
+	data := map[string]any{
+		"extra": "ok per JSON Schema but flagged by strict",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Strict mode should still flag undeclared properties even when
+	// additionalProperties allows them
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_NilSchemaPassesValidation(t *testing.T) {
+	// Covers matcher.go:38-40 - nil schema handling in dataMatchesSchema
+	// When schema is nil, validation passes (no schema means anything matches)
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Test with nil schema directly using dataMatchesSchema
+	matches, err := v.dataMatchesSchema(nil, map[string]any{"key": "value"})
+	assert.NoError(t, err)
+	assert.True(t, matches, "nil schema should match any data")
+
+	// Also test with different data types
+	matches, err = v.dataMatchesSchema(nil, "string value")
+	assert.NoError(t, err)
+	assert.True(t, matches)
+
+	matches, err = v.dataMatchesSchema(nil, 123)
+	assert.NoError(t, err)
+	assert.True(t, matches)
+
+	matches, err = v.dataMatchesSchema(nil, []any{1, 2, 3})
+	assert.NoError(t, err)
+	assert.True(t, matches)
+}

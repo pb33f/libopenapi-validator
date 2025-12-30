@@ -145,6 +145,21 @@ func TestHeaderParameterMissing(t *testing.T) {
 	require.Equal(t, HowToFixMissingValue, err.HowToFix)
 }
 
+func TestCookieParameterMissing(t *testing.T) {
+	param := createMockParameterWithSchema()
+
+	// Call the function
+	err := CookieParameterMissing(param)
+
+	// Validate the error
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationCookie, err.ValidationSubType)
+	require.Contains(t, err.Message, "Cookie parameter 'testParam' is missing")
+	require.Contains(t, err.Reason, "'testParam' is defined as being required")
+	require.Equal(t, HowToFixMissingValue, err.HowToFix)
+}
+
 func TestHeaderParameterCannotBeDecoded(t *testing.T) {
 	param := createMockParameterWithSchema()
 	val := "malformed_header_value"
