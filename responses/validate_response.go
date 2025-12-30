@@ -78,8 +78,34 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		renderedSchema, _ = input.Schema.RenderInline()
+		renderCtx := base.NewInlineRenderContext()
+		var renderErr error
+		renderedSchema, renderErr = input.Schema.RenderInlineWithContext(renderCtx)
 		referenceSchema = string(renderedSchema)
+
+		// If rendering failed (e.g., circular reference), return the render error
+		if renderErr != nil {
+			violation := &errors.SchemaValidationFailure{
+				Reason:          renderErr.Error(),
+				Location:        "schema rendering",
+				ReferenceSchema: referenceSchema,
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.ResponseBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%d response body for '%s' failed schema rendering",
+					input.Response.StatusCode, input.Request.URL.Path),
+				Reason: fmt.Sprintf("The response schema for status code '%d' failed to render: %s",
+					input.Response.StatusCode, renderErr.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               "check the response schema for circular references or invalid structures",
+				Context:                referenceSchema,
+			})
+			return false, validationErrors
+		}
+
 		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
 
 		var err error

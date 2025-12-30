@@ -249,3 +249,45 @@ func TestValidateResponseSchema_NilSchemaGoLow(t *testing.T) {
 	assert.Equal(t, "schema cannot be rendered", errors[0].Message)
 	assert.Contains(t, errors[0].Reason, "does not have low-level information")
 }
+
+func TestValidateResponseSchema_CircularReference(t *testing.T) {
+	// Test when schema has a circular reference that causes render failure
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	// Verify circular reference was detected
+	require.Len(t, model.Index.GetCircularReferences(), 1)
+
+	schema := model.Model.Components.Schemas.GetOrZero("Error")
+	require.NotNil(t, schema)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"code": "abc", "details": [{"code": "def"}]}`),
+		Schema:   schema.Schema(),
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "failed schema rendering")
+	assert.Contains(t, errors[0].Reason, "circular reference")
+}
