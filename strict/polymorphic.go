@@ -350,7 +350,6 @@ func (v *Validator) selectByDiscriminator(schema *base.Schema, variants []*base.
 }
 
 // findMatchingVariant finds the first variant that the data validates against.
-// If a schema compilation error occurs, the variant is skipped and logged.
 func (v *Validator) findMatchingVariant(variants []*base.SchemaProxy, data map[string]any) *base.Schema {
 	for _, variantProxy := range variants {
 		if variantProxy == nil {
@@ -362,12 +361,7 @@ func (v *Validator) findMatchingVariant(variants []*base.SchemaProxy, data map[s
 			continue
 		}
 
-		matches, err := v.dataMatchesSchema(variantSchema, data)
-		if err != nil {
-			// Schema compilation failed - log and skip this variant
-			v.logger.Debug("strict: skipping variant due to schema error", "error", err)
-			continue
-		}
+		matches, _ := v.dataMatchesSchema(variantSchema, data)
 		if matches {
 			return variantSchema
 		}

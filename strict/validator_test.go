@@ -4140,6 +4140,251 @@ components:
 	assert.Empty(t, result.UndeclaredValues)
 }
 
+func TestStrictValidator_OneOfWithIgnoredTopLevelProperty(t *testing.T) {
+	// Covers polymorphic.go:213-214 - shouldIgnore at TOP LEVEL of oneOf iteration
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    OneOfIgnoreTopLevel:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            name:
+              type: string
+            internal:
+              type: object
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "OneOfIgnoreTopLevel")
+
+	// Ignore "internal" property at top level - this directly hits line 214
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.internal"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name": "visible",
+		"internal": map[string]any{
+			"anything": "should be ignored entirely",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// internal property is ignored at top level, no errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_FindPropertySchemaInMerged_VariantProperty(t *testing.T) {
+	// Covers polymorphic.go:248-249 - property found in variant's explicit properties
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    OneOfVariantProp:
+      type: object
+      properties:
+        parentProp:
+          type: string
+      oneOf:
+        - type: object
+          properties:
+            variantProp:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "OneOfVariantProp")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// variantProp is defined in variant, should be found via line 249
+	data := map[string]any{
+		"parentProp":  "parent",
+		"variantProp": "variant",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_FindPropertySchemaInMerged_ParentProperty(t *testing.T) {
+	// Covers polymorphic.go:254-256 - property found in parent's explicit properties
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    OneOfParentProp:
+      type: object
+      properties:
+        parentOnly:
+          type: string
+      oneOf:
+        - type: object
+          properties:
+            variantOnly:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "OneOfParentProp")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// parentOnly is NOT in variant, so findPropertySchemaInMerged falls through
+	// to parent lookup at line 254-256
+	data := map[string]any{
+		"parentOnly":  "from parent",
+		"variantOnly": "from variant",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_FindPropertySchemaInAllOf_FromAllOfSchema(t *testing.T) {
+	// Covers polymorphic.go:437-439 - property found in allOf schema's explicit properties
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfExplicitProp:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            fromAllOf:
+              type: object
+              properties:
+                nested:
+                  type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfExplicitProp")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// fromAllOf is in allOf schema, findPropertySchemaInAllOf should find it
+	// and recurse into nested object to detect undeclared
+	data := map[string]any{
+		"fromAllOf": map[string]any{
+			"nested":     "valid",
+			"undeclared": "should be flagged",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// undeclared in nested object should be reported
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "undeclared", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredPropertiesWithMerged_SkipReadOnly(t *testing.T) {
+	// Covers polymorphic.go:291-292 - shouldSkipProperty in recurseIntoDeclaredPropertiesWithMerged
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    OneOfWithReadOnly:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              readOnly: true
+            data:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "OneOfWithReadOnly")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// In request direction, readOnly property "id" should be skipped (line 291-292)
+	// Both parent and variant have additionalProperties: false, so we go through
+	// recurseIntoDeclaredPropertiesWithMerged
+	data := map[string]any{
+		"name": "test",
+		"id":   "should-be-skipped",
+		"data": "valid",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// id is readOnly and skipped in request, no validation errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
 func TestStrictValidator_AllOfAdditionalPropertiesFalseRecurse(t *testing.T) {
 	// Covers polymorphic.go:461-462, 467-468 - recursion with additionalProperties: false
 	yml := `openapi: "3.1.0"
@@ -4284,6 +4529,102 @@ components:
 		Version:   3.1,
 	})
 
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_ValidateAllOf_NilSchemaProxy(t *testing.T) {
+	// Covers polymorphic.go:67-68 - nil schemaProxy in allOf loop
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfWithNil:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            name:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfWithNil")
+
+	// Inject nil into allOf array to test the nil check at line 67-68
+	schema.AllOf = append(schema.AllOf, nil)
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name":  "test",
+		"extra": "undeclared",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Should still work - nil schemaProxy is skipped
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_ValidateAllOf_IgnoreTopLevelProperty(t *testing.T) {
+	// Covers polymorphic.go:107-108 - shouldIgnore for top-level property in allOf
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfIgnoreTopLevel:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            name:
+              type: string
+            metadata:
+              type: object
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfIgnoreTopLevel")
+
+	// Ignore the metadata property at top level
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.metadata"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name": "test",
+		"metadata": map[string]any{
+			"anything": "should be ignored at this level",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// metadata property is ignored entirely, no errors
 	assert.True(t, result.Valid)
 	assert.Empty(t, result.UndeclaredValues)
 }
