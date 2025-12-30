@@ -1106,3 +1106,56 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "email")
 }
+
+func TestNewValidator_HeaderParams_StrictMode_UndeclaredHeader(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Request-Id
+          in: header
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Request-Id", "abc123")
+	request.Header.Set("X-Undeclared-Header", "should fail")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "X-Undeclared-Header")
+	assert.Contains(t, errors[0].Message, "not declared")
+}
+
+func TestNewValidator_HeaderParams_StrictMode_ValidRequest(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: X-Request-Id
+          in: header
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+	request.Header.Set("X-Request-Id", "abc123")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}

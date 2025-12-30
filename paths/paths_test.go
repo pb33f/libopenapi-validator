@@ -1332,3 +1332,32 @@ paths:
 	assert.Equal(t, "getUsers", pathItem.Get.OperationId)
 	assert.Equal(t, "/users", foundPath)
 }
+
+func TestFindPath_PathTemplateWithFragment_RequestWithoutFragment(t *testing.T) {
+	// Test that path templates with fragments are normalized when request has no fragment
+	// This covers normalizePathForMatching stripping fragment from template (line 115-117)
+	spec := `openapi: 3.1.0
+info:
+  title: Fragment Normalization Test
+  version: 1.0.0
+paths:
+  /hashy#section:
+    post:
+      operationId: postHashy
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// Request WITHOUT fragment should still match path template WITH fragment
+	// because normalizePathForMatching strips the fragment from template
+	request, _ := http.NewRequest(http.MethodPost, "https://api.com/hashy", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "postHashy", pathItem.Post.OperationId)
+	assert.Equal(t, "/hashy#section", foundPath)
+}

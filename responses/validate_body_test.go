@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
@@ -1509,6 +1511,86 @@ paths:
 		assert.True(t, valid)
 		assert.Empty(t, validationErrors)
 	}
+}
+
+func TestValidateBody_StrictMode_UndeclaredProperty(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/getBurger:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/getBurger", nil)
+
+	// Response with undeclared property 'extra'
+	responseBody := `{"name": "Big Mac", "patties": 2, "extra": "undeclared"}`
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}
+	response.Header.Set("Content-Type", "application/json")
+
+	valid, errs := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "extra")
+	assert.Contains(t, errs[0].Message, "not declared")
+}
+
+func TestValidateBody_StrictMode_ValidResponse(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/getBurger:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/getBurger", nil)
+
+	// Response with only declared properties
+	responseBody := `{"name": "Big Mac", "patties": 2}`
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}
+	response.Header.Set("Content-Type", "application/json")
+
+	valid, errs := v.ValidateResponseBody(request, response)
+
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
 }
 
 type errorReader struct{}

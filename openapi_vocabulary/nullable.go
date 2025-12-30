@@ -15,7 +15,7 @@ func CompileNullable(_ *jsonschema.CompilerContext, obj map[string]any, version 
 	}
 
 	// check if nullable is used in OpenAPI 3.1+ (not allowed)
-	if version == Version31 {
+	if version == Version31 || version == Version32 {
 		return nil, &OpenAPIKeywordError{
 			Keyword: "nullable",
 			Message: "The `nullable` keyword is not supported in OpenAPI 3.1+. Use `type: ['string', 'null']` instead",
