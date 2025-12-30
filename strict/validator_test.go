@@ -4281,6 +4281,58 @@ components:
 	assert.Empty(t, result.UndeclaredValues)
 }
 
+func TestStrictValidator_FindPropertySchemaInMerged_VariantDirect(t *testing.T) {
+	// Covers polymorphic.go:247-249 - direct test with empty declared map
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Variant:
+      type: object
+      properties:
+        variantProp:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	variant := getSchema(t, model, "Variant")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Call with empty declared map - forces lookup in variant.Properties (line 247-249)
+	result := v.findPropertySchemaInMerged(variant, nil, "variantProp", make(map[string]*declaredProperty))
+	assert.NotNil(t, result)
+}
+
+func TestStrictValidator_FindPropertySchemaInMerged_ParentDirect(t *testing.T) {
+	// Covers polymorphic.go:254-256 - direct test with empty declared map, no variant
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Parent:
+      type: object
+      properties:
+        parentProp:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	parent := getSchema(t, model, "Parent")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Call with nil variant and empty declared - forces lookup in parent.Properties (line 254-256)
+	result := v.findPropertySchemaInMerged(nil, parent, "parentProp", make(map[string]*declaredProperty))
+	assert.NotNil(t, result)
+}
+
 func TestStrictValidator_FindPropertySchemaInAllOf_FromAllOfSchema(t *testing.T) {
 	// Covers polymorphic.go:437-439 - property found in allOf schema's explicit properties
 	yml := `openapi: "3.1.0"
@@ -4331,6 +4383,137 @@ components:
 	assert.Equal(t, "undeclared", result.UndeclaredValues[0].Name)
 }
 
+func TestStrictValidator_FindPropertySchemaInAllOf_Direct(t *testing.T) {
+	// Covers polymorphic.go:437-439 - direct test with empty declared map
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfSchema:
+      type: object
+      allOf:
+        - type: object
+          properties:
+            allOfProp:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfSchema")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Call with empty declared map - forces lookup in allOf schemas (line 437-439)
+	result := v.findPropertySchemaInAllOf(schema.AllOf, "allOfProp", make(map[string]*declaredProperty))
+	assert.NotNil(t, result)
+}
+
+func TestStrictValidator_RecurseIntoAllOfDeclaredProperties_ShouldIgnore(t *testing.T) {
+	// Covers polymorphic.go:455-456 - shouldIgnore in recurseIntoAllOfDeclaredProperties
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfIgnore:
+      type: object
+      additionalProperties: false
+      allOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+            metadata:
+              type: object
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfIgnore")
+
+	// Ignore metadata at top level
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.metadata"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	// Both parent and allOf have additionalProperties: false,
+	// so we go through recurseIntoAllOfDeclaredProperties
+	// metadata is ignored at line 455-456
+	data := map[string]any{
+		"name": "test",
+		"metadata": map[string]any{
+			"anything": "ignored",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RecurseIntoAllOfDeclaredProperties_SkipReadOnly(t *testing.T) {
+	// Covers polymorphic.go:461-462 - shouldSkipProperty in recurseIntoAllOfDeclaredProperties
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfReadOnly:
+      type: object
+      additionalProperties: false
+      allOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+            id:
+              type: string
+              readOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfReadOnly")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Both parent and allOf have additionalProperties: false,
+	// so we go through recurseIntoAllOfDeclaredProperties
+	// id is readOnly and skipped in request direction (line 461-462)
+	data := map[string]any{
+		"name": "test",
+		"id":   "should-be-skipped",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
 func TestStrictValidator_RecurseIntoDeclaredPropertiesWithMerged_SkipReadOnly(t *testing.T) {
 	// Covers polymorphic.go:291-292 - shouldSkipProperty in recurseIntoDeclaredPropertiesWithMerged
 	yml := `openapi: "3.1.0"
@@ -4350,6 +4533,8 @@ components:
         - type: object
           additionalProperties: false
           properties:
+            name:
+              type: string
             id:
               type: string
               readOnly: true
@@ -4365,6 +4550,7 @@ components:
 	// In request direction, readOnly property "id" should be skipped (line 291-292)
 	// Both parent and variant have additionalProperties: false, so we go through
 	// recurseIntoDeclaredPropertiesWithMerged
+	// Note: variant must also declare "name" so data matches the variant
 	data := map[string]any{
 		"name": "test",
 		"id":   "should-be-skipped",
@@ -5304,4 +5490,384 @@ func TestStrictValidator_NilSchemaPassesValidation(t *testing.T) {
 	matches, err = v.dataMatchesSchema(nil, []any{1, 2, 3})
 	assert.NoError(t, err)
 	assert.True(t, matches)
+}
+
+func TestStrictValidator_ValidateValue_ShouldIgnore(t *testing.T) {
+	// Covers schema_walker.go:17-18 - shouldIgnore in validateValue
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    IgnoreTest:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            nested:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "IgnoreTest")
+
+	// Ignore the entire data object - validateValue should return early at line 18
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.data"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"data": map[string]any{
+			"nested":     "valid",
+			"undeclared": "should be ignored",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// data is ignored, so no undeclared errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_ValidateValue_CycleDetection(t *testing.T) {
+	// Covers schema_walker.go:27-28 - cycle detection in validateValue
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Node:
+      type: object
+      properties:
+        value:
+          type: string
+        child:
+          $ref: '#/components/schemas/Node'
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Node")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Create deeply nested data that would cause infinite recursion without cycle detection
+	data := map[string]any{
+		"value": "root",
+		"child": map[string]any{
+			"value": "child1",
+			"child": map[string]any{
+				"value": "child2",
+				"child": map[string]any{
+					"value":      "child3",
+					"undeclared": "should be caught before cycle kicks in",
+				},
+			},
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Should detect the undeclared property even with recursive schema
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "undeclared", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_ShouldReportUndeclared_AdditionalPropertiesTrue(t *testing.T) {
+	// Covers schema_walker.go:119-120 - additionalProperties: true explicit
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    ExplicitTrue:
+      type: object
+      additionalProperties: true
+      properties:
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "ExplicitTrue")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Extra property allowed by additionalProperties: true but flagged by strict
+	data := map[string]any{
+		"name":  "test",
+		"extra": "should be flagged in strict mode",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// Strict mode should flag undeclared even with additionalProperties: true
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "extra", result.UndeclaredValues[0].Name)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_PropertyNotInData(t *testing.T) {
+	// Covers schema_walker.go:179-180 - continue when schema property not in data
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    MissingProp:
+      type: object
+      additionalProperties: false
+      properties:
+        required:
+          type: string
+        optional:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "MissingProp")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Only provide 'required', not 'optional' - line 180 should be hit
+	data := map[string]any{
+		"required": "value",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// No undeclared properties
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_SkipReadOnly(t *testing.T) {
+	// Covers schema_walker.go:194-195 - shouldSkipProperty in recurseIntoDeclaredProperties
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    ReadOnlyProp:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          readOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "ReadOnlyProp")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// Include readOnly property in request - should be skipped (line 195)
+	data := map[string]any{
+		"name": "test",
+		"id":   "should-be-skipped",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// id is readOnly and skipped, no errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_ShouldIgnore(t *testing.T) {
+	// Covers schema_walker.go:188-189 - shouldIgnore for explicit property
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    IgnoreProp:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+          properties:
+            nested:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "IgnoreProp")
+
+	// Ignore metadata property
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictIgnorePaths("$.body.metadata"),
+	)
+	v := NewValidator(opts, 3.1)
+
+	// metadata has undeclared property but is ignored (line 189)
+	data := map[string]any{
+		"name": "test",
+		"metadata": map[string]any{
+			"nested":     "ok",
+			"undeclared": "should be ignored",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// metadata is ignored, no errors
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_PatternNoMatch(t *testing.T) {
+	// Covers schema_walker.go:210-211 - property doesn't match any patternProperty
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    PatternSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+      patternProperties:
+        "^x-":
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "PatternSchema")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// "other" doesn't match explicit props or pattern "^x-" - line 211 hit
+	data := map[string]any{
+		"name":     "test",
+		"x-custom": "matches pattern",
+		"other":    "doesn't match pattern",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// "other" doesn't match pattern, but additionalProperties: false handles it
+	// so strict mode doesn't report it
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RecurseIntoDeclaredProperties_PatternSkipReadOnly(t *testing.T) {
+	// Covers schema_walker.go:225-226 - shouldSkipProperty for patternProperty
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    PatternReadOnly:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+      patternProperties:
+        "^x-":
+          type: string
+          readOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "PatternReadOnly")
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	// x-custom matches pattern but schema is readOnly - skip in request (line 226)
+	data := map[string]any{
+		"name":     "test",
+		"x-custom": "matches readOnly pattern",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	// x-custom matches pattern but is readOnly, skipped in request
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
 }
