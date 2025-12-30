@@ -311,6 +311,21 @@ func TestIsCoercibleType_String(t *testing.T) {
 	assert.False(t, IsCoercibleType("array"))
 }
 
+func TestIsCoercibleType_Array(t *testing.T) {
+	// Array containing coercible type - should return true
+	assert.True(t, IsCoercibleType([]any{"string", "boolean"}))
+	assert.True(t, IsCoercibleType([]any{"number", "null"}))
+	assert.True(t, IsCoercibleType([]any{"integer"}))
+
+	// Array containing only non-coercible types - should return false
+	assert.False(t, IsCoercibleType([]any{"string", "null"}))
+	assert.False(t, IsCoercibleType([]any{"object", "array"}))
+	assert.False(t, IsCoercibleType([]any{"string"}))
+
+	// Empty array - should return false
+	assert.False(t, IsCoercibleType([]any{}))
+}
+
 func TestCoercionExtension_ShouldCoerceToMethods(t *testing.T) {
 	// Test shouldCoerceToNumber method
 	ext := &coercionExtension{

@@ -1477,3 +1477,30 @@ paths:
 	require.Len(t, errors, 1)
 	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "email")
 }
+
+func TestNewValidator_CookieParamMissingRequired(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/beef:
+    get:
+      parameters:
+        - name: session_id
+          in: cookie
+          required: true
+          schema:
+            type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Create request WITHOUT the required cookie
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/beef", nil)
+
+	valid, errors := v.ValidateCookieParams(request)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "Cookie parameter 'session_id' is missing", errors[0].Message)
+	assert.Contains(t, errors[0].Reason, "required")
+}
