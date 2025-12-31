@@ -357,6 +357,8 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 						undeclared.Direction.String(),
 						request.URL.Path,
 						request.Method,
+						undeclared.SpecLine,
+						undeclared.SpecCol,
 					))
 			}
 		}

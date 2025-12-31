@@ -18,6 +18,8 @@ func TestUndeclaredPropertyError(t *testing.T) {
 		"request",
 		"/users",
 		"POST",
+		42,
+		10,
 	)
 
 	assert.NotNil(t, err)
@@ -30,6 +32,8 @@ func TestUndeclaredPropertyError(t *testing.T) {
 	assert.Equal(t, "/users", err.RequestPath)
 	assert.Equal(t, "POST", err.RequestMethod)
 	assert.Equal(t, "extra", err.ParameterName)
+	assert.Equal(t, 42, err.SpecLine)
+	assert.Equal(t, 10, err.SpecCol)
 }
 
 func TestUndeclaredPropertyError_Response(t *testing.T) {
@@ -41,12 +45,16 @@ func TestUndeclaredPropertyError_Response(t *testing.T) {
 		"response",
 		"/items/123",
 		"GET",
+		100,
+		5,
 	)
 
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Message, "response property 'undeclared'")
 	assert.Contains(t, err.Reason, "id, name")
 	assert.Equal(t, "{...}", err.Context) // Map truncated
+	assert.Equal(t, 100, err.SpecLine)
+	assert.Equal(t, 5, err.SpecCol)
 }
 
 func TestUndeclaredPropertyError_EmptyDirection(t *testing.T) {
@@ -58,9 +66,13 @@ func TestUndeclaredPropertyError_EmptyDirection(t *testing.T) {
 		"", // Empty direction defaults to "request"
 		"/test",
 		"POST",
+		0, // Zero values for unknown location
+		0,
 	)
 
 	assert.Contains(t, err.Message, "request property")
+	assert.Equal(t, 0, err.SpecLine)
+	assert.Equal(t, 0, err.SpecCol)
 }
 
 func TestUndeclaredHeaderError(t *testing.T) {

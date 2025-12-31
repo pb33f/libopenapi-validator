@@ -342,6 +342,8 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 						undeclared.Direction.String(),
 						request.URL.Path,
 						request.Method,
+						undeclared.SpecLine,
+						undeclared.SpecCol,
 					))
 			}
 		}
