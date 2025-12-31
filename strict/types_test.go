@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,10 +52,17 @@ paths:
 	assert.Greater(t, col, 0, "col should be greater than 0")
 }
 
-func TestExtractSchemaLocation_InlineSchema(t *testing.T) {
-	// Test with a schema that has GoLow() returning non-nil but RootNode nil
-	// This is hard to construct directly, but we can test the nil case
-	line, col := extractSchemaLocation(nil)
+func TestExtractSchemaLocation_SchemaWithNilGoLow(t *testing.T) {
+	// Create a high-level schema programmatically (no GoLow())
+	// This covers types.go:108 where low == nil
+	schema := &base.Schema{
+		Type: []string{"object"},
+	}
+
+	// GoLow() returns nil for programmatically created schemas
+	require.Nil(t, schema.GoLow())
+
+	line, col := extractSchemaLocation(schema)
 	assert.Equal(t, 0, line)
 	assert.Equal(t, 0, col)
 }
@@ -117,4 +125,3 @@ func TestNewUndeclaredProperty_WithNilSchema(t *testing.T) {
 	assert.Equal(t, 0, undeclared.SpecLine, "SpecLine should be 0 for nil schema")
 	assert.Equal(t, 0, undeclared.SpecCol, "SpecCol should be 0 for nil schema")
 }
-
