@@ -684,7 +684,7 @@ func TestStrictValidator_HeaderIgnorePathsCase(t *testing.T) {
 		"X-Trace": {"abc"},
 	}
 
-	undeclared := ValidateRequestHeaders(headers, nil, opts)
+	undeclared := ValidateRequestHeaders(headers, nil, nil, opts)
 	assert.Empty(t, undeclared)
 }
 
@@ -2824,7 +2824,7 @@ paths:
 	}
 
 	// ValidateRequestHeaders takes http.Header, not *http.Request
-	undeclared := ValidateRequestHeaders(headers, params, opts)
+	undeclared := ValidateRequestHeaders(headers, params, nil, opts)
 
 	assert.Len(t, undeclared, 1)
 	assert.Equal(t, "X-Unknown-Header", undeclared[0].Name)
@@ -5080,7 +5080,7 @@ func TestValidateRequestHeaders_DeclaredHeaderSkipped(t *testing.T) {
 		"X-Undeclared": []string{"should-be-flagged"},
 	}
 
-	undeclared := ValidateRequestHeaders(headers, params, opts)
+	undeclared := ValidateRequestHeaders(headers, params, nil, opts)
 
 	// Only X-Undeclared should be reported
 	assert.Len(t, undeclared, 1)
@@ -5093,16 +5093,16 @@ func TestValidateRequestHeaders_NilOrDisabled(t *testing.T) {
 	headers := http.Header{"X-Custom": []string{"value"}}
 
 	// Test nil headers
-	result := ValidateRequestHeaders(nil, params, config.NewValidationOptions(config.WithStrictMode()))
+	result := ValidateRequestHeaders(nil, params, nil, config.NewValidationOptions(config.WithStrictMode()))
 	assert.Nil(t, result)
 
 	// Test nil options
-	result = ValidateRequestHeaders(headers, params, nil)
+	result = ValidateRequestHeaders(headers, params, nil, nil)
 	assert.Nil(t, result)
 
 	// Test strict mode disabled
 	opts := config.NewValidationOptions() // strict mode off by default
-	result = ValidateRequestHeaders(headers, params, opts)
+	result = ValidateRequestHeaders(headers, params, nil, opts)
 	assert.Nil(t, result)
 }
 
@@ -5119,9 +5119,89 @@ func TestValidateRequestHeaders_IgnoredHeaderSkipped(t *testing.T) {
 		"X-Custom":      []string{"should-be-flagged"},
 	}
 
-	undeclared := ValidateRequestHeaders(headers, params, opts)
+	undeclared := ValidateRequestHeaders(headers, params, nil, opts)
 
 	// Only X-Custom should be reported (Content-Type and Authorization are ignored)
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Custom", undeclared[0].Name)
+}
+
+func TestValidateRequestHeaders_SecurityHeadersRecognized(t *testing.T) {
+	// Covers validator.go:122-125 - security scheme headers are recognized as declared
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	// No declared params - security headers come from security schemes
+	params := []*v3.Parameter{}
+
+	// Security headers extracted from security schemes
+	securityHeaders := []string{"X-API-Key", "X-Custom-Auth"}
+
+	headers := http.Header{
+		"X-Api-Key":     []string{"my-api-key"},   // matches securityHeaders (case-insensitive)
+		"X-Custom-Auth": []string{"custom-token"}, // matches securityHeaders
+		"X-Unknown":     []string{"should-be-flagged"},
+	}
+
+	undeclared := ValidateRequestHeaders(headers, params, securityHeaders, opts)
+
+	// Only X-Unknown should be reported; X-Api-Key and X-Custom-Auth are recognized as security headers
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Unknown", undeclared[0].Name)
+}
+
+func TestValidateRequestHeaders_SecurityHeadersCaseInsensitive(t *testing.T) {
+	// Verify security header matching is case-insensitive
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	params := []*v3.Parameter{}
+	securityHeaders := []string{"X-API-KEY"} // uppercase
+
+	headers := http.Header{
+		"x-api-key": []string{"my-key"}, // lowercase in request
+	}
+
+	undeclared := ValidateRequestHeaders(headers, params, securityHeaders, opts)
+
+	// Should not report x-api-key as undeclared (case-insensitive match)
+	assert.Empty(t, undeclared)
+}
+
+func TestValidateRequestHeaders_BothParamsAndSecurityHeaders(t *testing.T) {
+	// Test that both params and security headers are recognized
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	params := []*v3.Parameter{
+		{Name: "X-Request-Id", In: "header"},
+	}
+	securityHeaders := []string{"X-API-Key"}
+
+	headers := http.Header{
+		"X-Request-Id": []string{"123"}, // declared via params
+		"X-Api-Key":    []string{"key"}, // declared via security schemes
+		"X-Other":      []string{"should-be-flagged"},
+	}
+
+	undeclared := ValidateRequestHeaders(headers, params, securityHeaders, opts)
+
+	// Only X-Other should be reported
+	assert.Len(t, undeclared, 1)
+	assert.Equal(t, "X-Other", undeclared[0].Name)
+}
+
+func TestValidateRequestHeaders_EmptySecurityHeaders(t *testing.T) {
+	// Test with empty security headers slice (not nil)
+	opts := config.NewValidationOptions(config.WithStrictMode())
+
+	params := []*v3.Parameter{}
+	securityHeaders := []string{} // empty, not nil
+
+	headers := http.Header{
+		"X-Custom": []string{"value"},
+	}
+
+	undeclared := ValidateRequestHeaders(headers, params, securityHeaders, opts)
+
+	// X-Custom should be flagged since there are no declared headers
 	assert.Len(t, undeclared, 1)
 	assert.Equal(t, "X-Custom", undeclared[0].Name)
 }

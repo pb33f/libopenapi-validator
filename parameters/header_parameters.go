@@ -203,7 +203,19 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 
 	// strict mode: check for undeclared headers
 	if v.options.StrictMode {
-		undeclaredHeaders := strict.ValidateRequestHeaders(request.Header, params, v.options)
+		// Extract security headers applicable to this operation
+		var securityHeaders []string
+		if v.document.Components != nil && v.document.Components.SecuritySchemes != nil {
+			security := helpers.ExtractSecurityForOperation(request, pathItem)
+			// Convert orderedmap to regular map for the helper
+			schemesMap := make(map[string]*v3.SecurityScheme)
+			for pair := v.document.Components.SecuritySchemes.First(); pair != nil; pair = pair.Next() {
+				schemesMap[pair.Key()] = pair.Value()
+			}
+			securityHeaders = helpers.ExtractSecurityHeaderNames(security, schemesMap)
+		}
+
+		undeclaredHeaders := strict.ValidateRequestHeaders(request.Header, params, securityHeaders, v.options)
 		for _, undeclared := range undeclaredHeaders {
 			validationErrors = append(validationErrors,
 				errors.UndeclaredHeaderError(
