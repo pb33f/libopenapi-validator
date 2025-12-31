@@ -6135,3 +6135,51 @@ components:
 	assert.True(t, result.Valid)
 	assert.Empty(t, result.UndeclaredValues)
 }
+
+func TestStrictValidator_ValidateVariantWithParent_VariantNilGoLow(t *testing.T) {
+	// Covers polymorphic.go:233-234 - fallback to parent when variant.GoLow() is nil
+	// This tests the defensive code path for programmatically created schemas
+
+	// Build a real parent schema from YAML (has GoLow())
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    ParentSchema:
+      type: object
+      properties:
+        parentProp:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	parent := getSchema(t, model, "ParentSchema")
+	require.NotNil(t, parent.GoLow())
+
+	// Create a variant schema programmatically (no GoLow())
+	variant := &base.Schema{
+		Type: []string{"object"},
+	}
+	require.Nil(t, variant.GoLow())
+
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	ctx := newTraversalContext(DirectionRequest, nil, "$.body")
+
+	// Data with undeclared property - triggers line 230-237
+	data := map[string]any{
+		"parentProp": "value",
+		"undeclared": "triggers undeclared path",
+	}
+
+	result := v.validateVariantWithParent(ctx, parent, variant, data)
+
+	// Should detect undeclared property and use parent's location (since variant has no GoLow)
+	assert.Len(t, result, 1)
+	assert.Equal(t, "undeclared", result[0].Name)
+	// Location should come from parent (not crash due to nil variant.GoLow())
+	assert.Greater(t, result[0].SpecLine, 0)
+}
