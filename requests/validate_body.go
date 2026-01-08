@@ -4,7 +4,10 @@
 package requests
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool, []*errors.ValidationError) {
@@ -66,12 +70,6 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 		return false, []*errors.ValidationError{errors.RequestContentTypeNotFound(operation, request, pathValue)}
 	}
 
-	// we currently only support JSON validation for request bodies
-	// this will capture *everything* that contains some form of 'json' in the content type
-	if !strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
-		return true, nil
-	}
-
 	// Nothing to validate
 	if mediaType.Schema == nil {
 		return true, nil
@@ -79,6 +77,55 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 
 	// extract schema from media type
 	schema := mediaType.Schema.Schema()
+
+	if !strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
+		// we currently only support JSON and XML validation for request bodies
+		// this will capture *everything* that contains some form of 'json' in the content type
+		if !v.options.AllowXMLBodyValidation || !schema_validation.IsXMLContentType(contentType) {
+			return true, nil
+		}
+
+		if request != nil && request.Body != nil {
+			requestBody, _ := io.ReadAll(request.Body)
+			_ = request.Body.Close()
+
+			jsonBody, err := schema_validation.TransformXMLToSchemaJSON(string(requestBody), schema)
+			if err != nil {
+				return false, []*errors.ValidationError{{
+					ValidationType:    helpers.RequestBodyValidation,
+					ValidationSubType: helpers.Schema,
+					Message:           "xml example is malformed",
+					Reason:            fmt.Sprintf("failed to parse xml: %s", err.Error()),
+					SchemaValidationErrors: []*errors.SchemaValidationFailure{{
+						Reason:          err.Error(),
+						Location:        "xml parsing",
+						ReferenceSchema: "",
+						ReferenceObject: string(requestBody),
+					}},
+					HowToFix: "ensure xml is well-formed and matches schema structure",
+				}}
+			}
+
+			transformedBytes, err := json.Marshal(jsonBody)
+			if err != nil {
+				return false, []*errors.ValidationError{{
+					ValidationType:    helpers.RequestBodyValidation,
+					ValidationSubType: helpers.Schema,
+					Message:           "xml example is malformed",
+					Reason:            fmt.Sprintf("failed to parse converted xml to json: %s", err.Error()),
+					SchemaValidationErrors: []*errors.SchemaValidationFailure{{
+						Reason:          err.Error(),
+						Location:        "xml to json parsing",
+						ReferenceSchema: "",
+						ReferenceObject: string(requestBody),
+					}},
+					HowToFix: "ensure xml is well-formed and matches schema structure",
+				}}
+			}
+
+			request.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
+		}
+	}
 
 	validationSucceeded, validationErrors := ValidateRequestSchema(&ValidateRequestSchemaInput{
 		Request: request,
