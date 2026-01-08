@@ -19,8 +19,9 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
-	assert.True(t, opts.OpenAPIMode)          // Default is true
-	assert.False(t, opts.AllowScalarCoercion) // Default is false
+	assert.True(t, opts.OpenAPIMode)             // Default is true
+	assert.False(t, opts.AllowScalarCoercion)    // Default is false
+	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
 }
@@ -32,8 +33,9 @@ func TestNewValidationOptions_WithNilOption(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
-	assert.True(t, opts.OpenAPIMode)          // Default is true
-	assert.False(t, opts.AllowScalarCoercion) // Default is false
+	assert.True(t, opts.OpenAPIMode)             // Default is true
+	assert.False(t, opts.AllowScalarCoercion)    // Default is false
+	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
 }
@@ -44,8 +46,9 @@ func TestWithFormatAssertions(t *testing.T) {
 	assert.True(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
-	assert.True(t, opts.OpenAPIMode)          // Default is true
-	assert.False(t, opts.AllowScalarCoercion) // Default is false
+	assert.True(t, opts.OpenAPIMode)             // Default is true
+	assert.False(t, opts.AllowScalarCoercion)    // Default is false
+	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
 }
@@ -56,8 +59,9 @@ func TestWithContentAssertions(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
-	assert.True(t, opts.OpenAPIMode)          // Default is true
-	assert.False(t, opts.AllowScalarCoercion) // Default is false
+	assert.True(t, opts.OpenAPIMode)             // Default is true
+	assert.False(t, opts.AllowScalarCoercion)    // Default is false
+	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
 }
@@ -93,11 +97,12 @@ func TestWithExistingOpts(t *testing.T) {
 	// Create original options with all settings enabled
 	var testEngine jsonschema.RegexpEngine = nil
 	original := &ValidationOptions{
-		RegexEngine:        testEngine,
-		RegexCache:         &sync.Map{},
-		FormatAssertions:   true,
-		ContentAssertions:  true,
-		SecurityValidation: false,
+		RegexEngine:            testEngine,
+		RegexCache:             &sync.Map{},
+		FormatAssertions:       true,
+		AllowXMLBodyValidation: true,
+		ContentAssertions:      true,
+		SecurityValidation:     false,
 	}
 
 	// Create new options using existing options
@@ -105,6 +110,7 @@ func TestWithExistingOpts(t *testing.T) {
 
 	assert.Nil(t, opts.RegexEngine) // Both should be nil
 	assert.NotNil(t, opts.RegexCache)
+	assert.Equal(t, original.AllowXMLBodyValidation, opts.AllowXMLBodyValidation)
 	assert.Equal(t, original.FormatAssertions, opts.FormatAssertions)
 	assert.Equal(t, original.ContentAssertions, opts.ContentAssertions)
 	assert.Equal(t, original.SecurityValidation, opts.SecurityValidation)
@@ -119,8 +125,9 @@ func TestWithExistingOpts_NilSource(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
-	assert.True(t, opts.OpenAPIMode)          // Default is true
-	assert.False(t, opts.AllowScalarCoercion) // Default is false
+	assert.True(t, opts.OpenAPIMode)             // Default is true
+	assert.False(t, opts.AllowScalarCoercion)    // Default is false
+	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
 }
@@ -129,11 +136,13 @@ func TestMultipleOptions(t *testing.T) {
 	opts := NewValidationOptions(
 		WithFormatAssertions(),
 		WithContentAssertions(),
+		WithXmlBodyValidation(),
 	)
 
 	assert.True(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
+	assert.True(t, opts.AllowXMLBodyValidation)
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
