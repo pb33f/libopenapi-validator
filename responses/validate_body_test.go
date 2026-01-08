@@ -1498,6 +1498,208 @@ paths:
 	assert.Len(t, errs, 0)
 }
 
+func TestValidateBody_ValidXmlDecode(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithXmlBodyValidation())
+
+	body := "<name>test</name><patties>2</patties>"
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader([]byte(body)))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, "application/xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidXmlFailedValidation(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithXmlBodyValidation())
+
+	body := "<name>20</name><patties>text</patties>"
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader([]byte(body)))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, "application/xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+}
+
+func TestValidateBody_IgnoreXmlValidation(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model)
+
+	body := "invalidbodycausenoxml"
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader([]byte(body)))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, "application/xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_InvalidXmlParse(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithXmlBodyValidation())
+
+	body := ""
+
+	// build a request
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader([]byte(body)))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	// simulate a request/response
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, "application/xml")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	// fire the request
+	handler(res, request)
+
+	// record response
+	response := res.Result()
+
+	// validate!
+	valid, errors := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Message, "xml response is malformed")
+}
+
 type errorReader struct{}
 
 func (er *errorReader) Read(p []byte) (n int, err error) {

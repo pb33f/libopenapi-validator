@@ -26,7 +26,7 @@ func (x *xmlValidator) validateXMLWithVersion(schema *base.Schema, xmlString str
 	}
 
 	// parse xml and transform to json structure matching schema
-	transformedJSON, err := transformXMLToSchemaJSON(xmlString, schema)
+	transformedJSON, err := TransformXMLToSchemaJSON(xmlString, schema)
 	if err != nil {
 		violation := &liberrors.SchemaValidationFailure{
 			Reason:          err.Error(),
@@ -49,9 +49,9 @@ func (x *xmlValidator) validateXMLWithVersion(schema *base.Schema, xmlString str
 	return x.schemaValidator.validateSchemaWithVersion(schema, nil, transformedJSON, log, version)
 }
 
-// transformXMLToSchemaJSON converts xml to json structure matching openapi schema.
+// TransformXMLToSchemaJSON converts xml to json structure matching openapi schema.
 // applies xml object transformations: name, attribute, wrapped.
-func transformXMLToSchemaJSON(xmlString string, schema *base.Schema) (interface{}, error) {
+func TransformXMLToSchemaJSON(xmlString string, schema *base.Schema) (interface{}, error) {
 	if xmlString == "" {
 		return nil, fmt.Errorf("empty xml content")
 	}

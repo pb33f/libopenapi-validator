@@ -960,7 +960,7 @@ func TestValidateXML_UnwrapArrayElementMissingItem(t *testing.T) {
 func TestTransformXMLToSchemaJSON_EmptyString(t *testing.T) {
 	// test empty string error path (line 68)
 	schema := &base.Schema{}
-	_, err := transformXMLToSchemaJSON("", schema)
+	_, err := TransformXMLToSchemaJSON("", schema)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "empty xml")
 }
