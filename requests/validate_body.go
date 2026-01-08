@@ -28,6 +28,22 @@ func (v *requestBodyValidator) ValidateRequestBody(request *http.Request) (bool,
 	return v.ValidateRequestBodyWithPathItem(request, pathItem, foundPath)
 }
 
+func generateXmlValidationError(err error, referenceObject string) []*errors.ValidationError {
+	return []*errors.ValidationError{{
+		ValidationType:    helpers.RequestBodyValidation,
+		ValidationSubType: helpers.Schema,
+		Message:           "xml example is malformed",
+		Reason:            fmt.Sprintf("failed to parse xml: %s", err.Error()),
+		SchemaValidationErrors: []*errors.SchemaValidationFailure{{
+			Reason:          err.Error(),
+			Location:        "xml parsing",
+			ReferenceSchema: "",
+			ReferenceObject: referenceObject,
+		}},
+		HowToFix: "ensure xml is well-formed and matches schema structure",
+	}}
+}
+
 func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
@@ -89,38 +105,15 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 			requestBody, _ := io.ReadAll(request.Body)
 			_ = request.Body.Close()
 
-			jsonBody, err := schema_validation.TransformXMLToSchemaJSON(string(requestBody), schema)
+			stringedBody := string(requestBody)
+			jsonBody, err := schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
 			if err != nil {
-				return false, []*errors.ValidationError{{
-					ValidationType:    helpers.RequestBodyValidation,
-					ValidationSubType: helpers.Schema,
-					Message:           "xml example is malformed",
-					Reason:            fmt.Sprintf("failed to parse xml: %s", err.Error()),
-					SchemaValidationErrors: []*errors.SchemaValidationFailure{{
-						Reason:          err.Error(),
-						Location:        "xml parsing",
-						ReferenceSchema: "",
-						ReferenceObject: string(requestBody),
-					}},
-					HowToFix: "ensure xml is well-formed and matches schema structure",
-				}}
+				return false, generateXmlValidationError(err, stringedBody)
 			}
 
 			transformedBytes, err := json.Marshal(jsonBody)
 			if err != nil {
-				return false, []*errors.ValidationError{{
-					ValidationType:    helpers.RequestBodyValidation,
-					ValidationSubType: helpers.Schema,
-					Message:           "xml example is malformed",
-					Reason:            fmt.Sprintf("failed to parse converted xml to json: %s", err.Error()),
-					SchemaValidationErrors: []*errors.SchemaValidationFailure{{
-						Reason:          err.Error(),
-						Location:        "xml to json parsing",
-						ReferenceSchema: "",
-						ReferenceObject: string(requestBody),
-					}},
-					HowToFix: "ensure xml is well-formed and matches schema structure",
-				}}
+				return false, generateXmlValidationError(err, stringedBody)
 			}
 
 			request.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
