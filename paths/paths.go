@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi/orderedmap"
 
@@ -18,7 +19,31 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/radix"
 )
+
+// pathTreeCache caches radix trees per document to avoid rebuilding on every call.
+// The cache is keyed by document pointer for fast lookup.
+// This is only needed if you are trying to use FindPath directly. If you go through the validator,
+// this cache is not needed.
+var pathTreeCache sync.Map
+
+// getOrBuildPathTree returns a cached radix tree for the document, or builds one if not cached.
+func getOrBuildPathTree(document *v3.Document) *radix.PathTree {
+	if document == nil || document.Paths == nil {
+		return nil
+	}
+
+	// Use document pointer as cache key
+	if cached, ok := pathTreeCache.Load(document); ok {
+		return cached.(*radix.PathTree)
+	}
+
+	// Build and cache the tree
+	tree := radix.BuildPathTree(document)
+	pathTreeCache.Store(document, tree)
+	return tree
+}
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
 // the first return value will be a pointer to the PathItem. The second return value will contain any validation errors
@@ -26,11 +51,41 @@ import (
 // The third return value will be the path that was found in the document, as it pertains to the contract, so all path
 // parameters will not have been replaced with their values from the request - allowing model lookups.
 //
+// This function first tries a fast O(k) radix tree lookup (where k is path depth). If the radix tree
+// doesn't find a match, it falls back to regex-based matching which handles complex path patterns
+// like matrix-style ({;param}), label-style ({.param}), and OData-style (entities('{Entity}')).
+//
 // Path matching follows the OpenAPI specification: literal (concrete) paths take precedence over
 // parameterized paths, regardless of definition order in the specification.
 func FindPath(request *http.Request, document *v3.Document, regexCache config.RegexCache) (*v3.PathItem, []*errors.ValidationError, string) {
-	basePaths := getBasePaths(document)
 	stripped := StripRequestPath(request, document)
+
+	// Fast path: try radix tree first (O(k) where k = path depth)
+	tree := getOrBuildPathTree(document)
+	if tree != nil {
+		if pathItem, matchedPath, found := tree.Lookup(stripped); found {
+			// Verify the path has the requested method
+			if pathHasMethod(pathItem, request.Method) {
+				return pathItem, nil, matchedPath
+			}
+			// Path found but method doesn't exist
+			validationErrors := []*errors.ValidationError{{
+				ValidationType:    helpers.ParameterValidationPath,
+				ValidationSubType: "missingOperation",
+				Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+				Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
+					request.Method),
+				SpecLine: -1,
+				SpecCol:  -1,
+				HowToFix: errors.HowToFixPath,
+			}}
+			errors.PopulateValidationErrors(validationErrors, request, matchedPath)
+			return pathItem, validationErrors, matchedPath
+		}
+	}
+
+	// Slow path: fall back to regex matching for complex paths (matrix, label, OData, etc.)
+	basePaths := getBasePaths(document)
 
 	reqPathSegments := strings.Split(stripped, "/")
 	if reqPathSegments[0] == "" {
