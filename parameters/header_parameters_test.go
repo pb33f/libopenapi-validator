@@ -750,7 +750,7 @@ paths:
 	request.Header.Set("coffeecups", "1200") // that's a lot of cups dude, we only have one dishwasher.
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	path, _, pv := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	valid, errors := v.ValidateHeaderParamsWithPathItem(request, path, pv)
 

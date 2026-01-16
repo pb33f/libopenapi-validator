@@ -27,7 +27,7 @@ func (v *responseBodyValidator) ValidateResponseBody(
 	request *http.Request,
 	response *http.Response,
 ) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options.RegexCache)
+	pathItem, errs, foundPath := paths.FindPath(request, v.document, v.options)
 	if len(errs) > 0 {
 		return false, errs
 	}

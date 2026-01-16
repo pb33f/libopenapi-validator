@@ -18,6 +18,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
@@ -26,15 +27,50 @@ import (
 // The third return value will be the path that was found in the document, as it pertains to the contract, so all path
 // parameters will not have been replaced with their values from the request - allowing model lookups.
 //
+// This function first tries a fast O(k) radix tree lookup (where k is path depth). If the radix tree
+// doesn't find a match, it falls back to regex-based matching which handles complex path patterns
+// like matrix-style ({;param}), label-style ({.param}), and OData-style (entities('{Entity}')).
+//
 // Path matching follows the OpenAPI specification: literal (concrete) paths take precedence over
 // parameterized paths, regardless of definition order in the specification.
-func FindPath(request *http.Request, document *v3.Document, regexCache config.RegexCache) (*v3.PathItem, []*errors.ValidationError, string) {
-	basePaths := getBasePaths(document)
+func FindPath(request *http.Request, document *v3.Document, options *config.ValidationOptions) (*v3.PathItem, []*errors.ValidationError, string) {
 	stripped := StripRequestPath(request, document)
+
+	// Fast path: try radix tree first (O(k) where k = path depth)
+	tree := pathLookupFrom(options, document)
+	if tree != nil {
+		if pathItem, matchedPath, found := tree.Lookup(stripped); found {
+			// Verify the path has the requested method
+			if pathHasMethod(pathItem, request.Method) {
+				return pathItem, nil, matchedPath
+			}
+			// Path found but method doesn't exist
+			validationErrors := []*errors.ValidationError{{
+				ValidationType:    helpers.ParameterValidationPath,
+				ValidationSubType: "missingOperation",
+				Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+				Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
+					request.Method),
+				SpecLine: -1,
+				SpecCol:  -1,
+				HowToFix: errors.HowToFixPath,
+			}}
+			errors.PopulateValidationErrors(validationErrors, request, matchedPath)
+			return pathItem, validationErrors, matchedPath
+		}
+	}
+
+	// Slow path: fall back to regex matching for complex paths (matrix, label, OData, etc.)
+	basePaths := getBasePaths(document)
 
 	reqPathSegments := strings.Split(stripped, "/")
 	if reqPathSegments[0] == "" {
 		reqPathSegments = reqPathSegments[1:]
+	}
+
+	var regexCache config.RegexCache
+	if options != nil {
+		regexCache = options.RegexCache
 	}
 
 	candidates := make([]pathCandidate, 0, document.Paths.PathItems.Len())
@@ -219,4 +255,15 @@ func comparePaths(mapped, requested, basePaths []string, regexCache config.Regex
 	l := filepath.Join(imploded...)
 	r := filepath.Join(requested...)
 	return checkPathAgainstBase(l, r, basePaths)
+}
+
+// pathLookupFrom returns the PathLookup from options, or builds one from the document.
+func pathLookupFrom(options *config.ValidationOptions, document *v3.Document) radix.PathLookup {
+	if options != nil && options.PathLookup != nil {
+		return options.PathLookup
+	}
+	if document != nil && document.Paths != nil {
+		return radix.BuildPathTree(document)
+	}
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/cache"
+	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 // RegexCache can be set to enable compiled regex caching.
@@ -30,6 +31,7 @@ type ValidationOptions struct {
 	AllowScalarCoercion           bool // Enable string->boolean/number coercion
 	Formats                       map[string]func(v any) error
 	SchemaCache                   cache.SchemaCache // Optional cache for compiled schemas
+	PathLookup                    radix.PathLookup  // O(k) path lookup via radix tree (built automatically)
 	Logger                        *slog.Logger      // Logger for debug/error output (nil = silent)
 	AllowXMLBodyValidation        bool              // Allows to convert XML to JSON for validating a request/response body.
 	AllowURLEncodedBodyValidation bool              // Allows to convert URL Encoded to JSON for validating a request/response body.
@@ -76,6 +78,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
 			o.SchemaCache = options.SchemaCache
+			o.PathLookup = options.PathLookup
 			o.Logger = options.Logger
 			o.AllowXMLBodyValidation = options.AllowXMLBodyValidation
 			o.AllowURLEncodedBodyValidation = options.AllowURLEncodedBodyValidation
@@ -184,9 +187,17 @@ func WithURLEncodedBodyValidation() Option {
 // WithSchemaCache sets a custom cache implementation or disables caching if nil.
 // Pass nil to disable schema caching and skip cache warming during validator initialization.
 // The default cache is a thread-safe sync.Map wrapper.
-func WithSchemaCache(cache cache.SchemaCache) Option {
+func WithSchemaCache(schemaCache cache.SchemaCache) Option {
 	return func(o *ValidationOptions) {
-		o.SchemaCache = cache
+		o.SchemaCache = schemaCache
+	}
+}
+
+// WithPathLookup sets a custom path lookup implementation.
+// The default is a radix tree built from the OpenAPI specification.
+func WithPathLookup(pathLookup radix.PathLookup) Option {
+	return func(o *ValidationOptions) {
+		o.PathLookup = pathLookup
 	}
 }
 
