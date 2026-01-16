@@ -497,7 +497,7 @@ paths:
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
 		bytes.NewBuffer(bodyBytes))
 
-	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model, &sync.Map{})
+	pathItem, validationErrors, pathValue := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.Len(t, validationErrors, 0)
 	valid, errors := v.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
 
