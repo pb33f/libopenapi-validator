@@ -3029,7 +3029,7 @@ paths:
 		"https://things.com/a/fishy/on/a/dishy?fishy[ocean]=atlantic&fishy[salt]=12", nil)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	path, _, pv := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	valid, errors := v.ValidateQueryParamsWithPathItem(request, path, pv)
 	assert.False(t, valid)

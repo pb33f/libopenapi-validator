@@ -381,7 +381,7 @@ paths:
 	v := NewParameterValidator(&m.Model)
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/beef", nil)
-	pathItem, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, pv := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)
 	assert.False(t, valid)
@@ -644,7 +644,7 @@ components:
 	v := NewParameterValidator(&m.Model, config.WithoutSecurityValidation())
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/products", nil)
-	pathItem, errs, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	pathItem, errs, pv := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.Nil(t, errs)
 
 	valid, errors := v.ValidateSecurityWithPathItem(request, pathItem, pv)

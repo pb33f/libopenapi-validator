@@ -21,6 +21,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/radix"
 	"github.com/pb33f/libopenapi-validator/requests"
 	"github.com/pb33f/libopenapi-validator/responses"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
@@ -87,20 +88,25 @@ func NewValidator(document libopenapi.Document, opts ...config.Option) (Validato
 func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	options := config.NewValidationOptions(opts...)
 
-	v := &validator{options: options, v3Model: m}
-
-	// create a new parameter validator
-	v.paramValidator = parameters.NewParameterValidator(m, opts...)
-
-	// create aq new request body validator
-	v.requestValidator = requests.NewRequestBodyValidator(m, opts...)
-
-	// create a response body validator
-	v.responseValidator = responses.NewResponseBodyValidator(m, opts...)
+	// Build radix tree for O(k) path lookup (where k = path depth)
+	if options.PathLookup == nil {
+		options.PathLookup = radix.BuildPathTree(m)
+	}
 
 	// warm the schema caches by pre-compiling all schemas in the document
 	// (warmSchemaCaches checks for nil cache and skips if disabled)
 	warmSchemaCaches(m, options)
+
+	v := &validator{options: options, v3Model: m}
+
+	// create a new parameter validator
+	v.paramValidator = parameters.NewParameterValidator(m, config.WithExistingOpts(options))
+
+	// create aq new request body validator
+	v.requestValidator = requests.NewRequestBodyValidator(m, config.WithExistingOpts(options))
+
+	// create a response body validator
+	v.responseValidator = responses.NewResponseBodyValidator(m, config.WithExistingOpts(options))
 
 	return v
 }
@@ -148,7 +154,7 @@ func (v *validator) ValidateHttpResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options.RegexCache)
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -172,7 +178,7 @@ func (v *validator) ValidateHttpRequestResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options.RegexCache)
+	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -190,7 +196,7 @@ func (v *validator) ValidateHttpRequestResponse(
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options.RegexCache)
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -301,7 +307,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options.RegexCache)
+	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
 	if len(errs) > 0 {
 		return false, errs
 	}
