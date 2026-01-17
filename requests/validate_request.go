@@ -47,6 +47,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 	var renderedSchema, jsonSchema []byte
 	var referenceSchema string
 	var compiledSchema *jsonschema.Schema
+	var cachedNode *yaml.Node // Pre-parsed YAML node from cache (for error reporting)
 
 	if input.Schema == nil {
 		return false, []*errors.ValidationError{{
@@ -71,6 +72,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			referenceSchema = cached.ReferenceSchema
 			jsonSchema = cached.RenderedJSON
 			compiledSchema = cached.CompiledSchema
+			cachedNode = cached.RenderedNode // Retrieve pre-parsed node for error reporting
 		}
 	}
 
@@ -229,9 +231,15 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 		schFlatErrs := jk.BasicOutput().Errors
 		var schemaValidationErrors []*errors.SchemaValidationFailure
 
-		// re-encode the schema.
-		var renderedNode yaml.Node
-		_ = yaml.Unmarshal(renderedSchema, &renderedNode)
+		// Use cached node if available, otherwise parse (avoids 1.6GB allocation per error)
+		var renderedNode *yaml.Node
+		if cachedNode != nil {
+			renderedNode = cachedNode
+		} else {
+			var node yaml.Node
+			_ = yaml.Unmarshal(renderedSchema, &node)
+			renderedNode = &node
+		}
 		for q := range schFlatErrs {
 			er := schFlatErrs[q]
 
