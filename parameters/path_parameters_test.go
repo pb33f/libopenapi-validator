@@ -5,7 +5,6 @@ package parameters
 
 import (
 	"net/http"
-	"regexp"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -2271,51 +2270,6 @@ func (c *regexCacheWatcher) Store(key, value any) {
 	c.inner.Store(key, value)
 }
 
-func TestNewValidator_CacheCompiledRegex(t *testing.T) {
-	spec := `openapi: 3.1.0
-paths:
-  /pizza:
-    get:
-      operationId: getPizza`
-
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-
-	cache := &regexCacheWatcher{inner: &sync.Map{}}
-	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
-
-	compiledPizza := regexp.MustCompile("^pizza$")
-	cache.inner.Store("pizza", compiledPizza)
-
-	assert.EqualValues(t, 0, cache.storeCount)
-	assert.EqualValues(t, 0, cache.hitCount+cache.missCount)
-
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/pizza", nil)
-	v.ValidatePathParams(request)
-
-	assert.EqualValues(t, 0, cache.storeCount)
-	assert.EqualValues(t, 0, cache.missCount)
-	assert.EqualValues(t, 1, cache.hitCount)
-
-	mapLength := 0
-
-	cache.inner.Range(func(key, value any) bool {
-		mapLength += 1
-		return true
-	})
-
-	assert.Equal(t, 1, mapLength)
-
-	cache.inner.Clear()
-
-	v.ValidatePathParams(request)
-
-	assert.EqualValues(t, 1, cache.storeCount)
-	assert.EqualValues(t, 1, cache.missCount)
-	assert.EqualValues(t, 1, cache.hitCount)
-}
-
 func TestValidatePathParamsWithPathItem_RegexCache_WithOneCached(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
@@ -2350,33 +2304,45 @@ paths:
 	assert.EqualValues(t, 1, cache.hitCount)
 }
 
-func TestValidatePathParamsWithPathItem_RegexCache_MissOnceThenHit(t *testing.T) {
+// TestRadixTree_RegexFallback verifies that:
+// 1. Simple paths use the radix tree (no regex cache)
+// 2. Complex paths (OData style) fall back to regex and use the cache
+func TestRadixTree_RegexFallback(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
-  /burgers/{burgerId}/locate:
-    parameters:
-      - in: path 
-        name: burgerId
-        schema:
-          type: integer
+  /simple/{id}:
     get:
-      operationId: locateBurgers`
+      operationId: getSimple
+  /entities('{Entity}'):
+    get:
+      operationId: getOData`
+
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
 	cache := &regexCacheWatcher{inner: &sync.Map{}}
 
-	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
+	// Simple path - should NOT use regex cache (handled by radix tree)
+	simpleRequest, _ := http.NewRequest(http.MethodGet, "https://things.com/simple/123", nil)
+	pathItem, _, foundPath := paths.FindPath(simpleRequest, &m.Model, cache)
 
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/123/locate", nil)
-	pathItem, _, foundPath := paths.FindPath(request, &m.Model, cache)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "/simple/{id}", foundPath)
+	assert.EqualValues(t, 0, cache.storeCount, "Simple paths should not use regex cache")
+	assert.EqualValues(t, 0, cache.hitCount+cache.missCount, "Simple paths should not touch regex cache")
 
-	v.ValidatePathParamsWithPathItem(request, pathItem, foundPath)
+	// OData path - SHOULD use regex cache (radix tree can't handle embedded params)
+	odataRequest, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('abc')", nil)
+	pathItem, _, foundPath = paths.FindPath(odataRequest, &m.Model, cache)
 
-	assert.EqualValues(t, 3, cache.storeCount)
-	assert.EqualValues(t, 3, cache.missCount)
-	assert.EqualValues(t, 3, cache.hitCount)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "/entities('{Entity}')", foundPath)
+	assert.EqualValues(t, 1, cache.storeCount, "OData paths should use regex cache")
+	assert.EqualValues(t, 1, cache.missCount, "First OData lookup should miss cache")
 
-	_, found := cache.inner.Load("{burgerId}")
-	assert.True(t, found)
+	// Second OData call should hit cache
+	pathItem, _, _ = paths.FindPath(odataRequest, &m.Model, cache)
+	assert.NotNil(t, pathItem)
+	assert.EqualValues(t, 1, cache.storeCount, "No new stores on cache hit")
+	assert.EqualValues(t, 1, cache.hitCount, "Second OData lookup should hit cache")
 }
