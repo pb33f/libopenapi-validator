@@ -31,7 +31,7 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
-			ValidationType:    helpers.ParameterValidationPath,
+			ValidationType:    helpers.PathValidation,
 			ValidationSubType: helpers.ValidationMissing,
 			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
 			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
