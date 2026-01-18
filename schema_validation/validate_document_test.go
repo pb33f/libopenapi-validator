@@ -68,7 +68,7 @@ func validateOpenAPIDocumentWithMalformedSchema(loadedSchema string, decodedDocu
 			ReferenceSchema: loadedSchema,
 		}
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:         "schema",
+			ValidationType:         helpers.Schema,
 			ValidationSubType:      "compilation",
 			Message:                "OpenAPI document schema compilation failed",
 			Reason:                 fmt.Sprintf("The OpenAPI schema failed to compile: %s", err.Error()),

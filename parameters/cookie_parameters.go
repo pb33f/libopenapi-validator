@@ -31,7 +31,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
 			ValidationType:    helpers.ParameterValidationPath,
-			ValidationSubType: "missing",
+			ValidationSubType: helpers.ValidationMissing,
 			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
 			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
 				"however that path, or the %s method for that path does not exist in the specification",

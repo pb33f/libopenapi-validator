@@ -124,8 +124,8 @@ func (v *validator) GetResponseBodyValidator() responses.ResponseBodyValidator {
 func (v *validator) ValidateDocument() (bool, []*errors.ValidationError) {
 	if v.document == nil {
 		return false, []*errors.ValidationError{{
-			ValidationType:    "document",
-			ValidationSubType: "missing",
+			ValidationType:    helpers.DocumentValidation,
+			ValidationSubType: helpers.ValidationMissing,
 			Message:           "Document is not set",
 			Reason:            "The document cannot be validated as it is not set",
 			SpecLine:          1,

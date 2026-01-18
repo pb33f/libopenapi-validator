@@ -2400,25 +2400,25 @@ paths:
 func TestSortValidationErrors(t *testing.T) {
 	// Create errors in random order
 	errs := []*errors.ValidationError{
-		{ValidationType: "security", Message: "API Key missing"},
-		{ValidationType: "parameter", Message: "Path param invalid"},
-		{ValidationType: "request", Message: "Body invalid"},
-		{ValidationType: "parameter", Message: "Header missing"},
-		{ValidationType: "security", Message: "Auth header missing"},
+		{ValidationType: helpers.SecurityValidation, Message: "API Key missing"},
+		{ValidationType: helpers.ParameterValidation, Message: "Path param invalid"},
+		{ValidationType: helpers.RequestValidation, Message: "Body invalid"},
+		{ValidationType: helpers.ParameterValidation, Message: "Header missing"},
+		{ValidationType: helpers.SecurityValidation, Message: "Auth header missing"},
 	}
 
 	sortValidationErrors(errs)
 
 	// Verify sorted by validation type first, then by message
-	assert.Equal(t, "parameter", errs[0].ValidationType)
+	assert.Equal(t, helpers.ParameterValidation, errs[0].ValidationType)
 	assert.Equal(t, "Header missing", errs[0].Message)
-	assert.Equal(t, "parameter", errs[1].ValidationType)
+	assert.Equal(t, helpers.ParameterValidation, errs[1].ValidationType)
 	assert.Equal(t, "Path param invalid", errs[1].Message)
-	assert.Equal(t, "request", errs[2].ValidationType)
+	assert.Equal(t, helpers.RequestValidation, errs[2].ValidationType)
 	assert.Equal(t, "Body invalid", errs[2].Message)
-	assert.Equal(t, "security", errs[3].ValidationType)
+	assert.Equal(t, helpers.SecurityValidation, errs[3].ValidationType)
 	assert.Equal(t, "API Key missing", errs[3].Message)
-	assert.Equal(t, "security", errs[4].ValidationType)
+	assert.Equal(t, helpers.SecurityValidation, errs[4].ValidationType)
 	assert.Equal(t, "Auth header missing", errs[4].Message)
 }
 
@@ -2432,9 +2432,9 @@ func TestSortValidationErrors_Empty(t *testing.T) {
 // TestSortValidationErrors_SingleElement tests sorting single element slice
 func TestSortValidationErrors_SingleElement(t *testing.T) {
 	errs := []*errors.ValidationError{
-		{ValidationType: "parameter", Message: "Invalid value"},
+		{ValidationType: helpers.ParameterValidation, Message: "Invalid value"},
 	}
 	sortValidationErrors(errs)
 	assert.Len(t, errs, 1)
-	assert.Equal(t, "parameter", errs[0].ValidationType)
+	assert.Equal(t, helpers.ParameterValidation, errs[0].ValidationType)
 }
