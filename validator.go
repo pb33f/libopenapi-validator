@@ -91,13 +91,13 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	v := &validator{options: options, v3Model: m}
 
 	// create a new parameter validator
-	v.paramValidator = parameters.NewParameterValidator(m, opts...)
+	v.paramValidator = parameters.NewParameterValidator(m, config.WithExistingOpts(options))
 
 	// create aq new request body validator
-	v.requestValidator = requests.NewRequestBodyValidator(m, opts...)
+	v.requestValidator = requests.NewRequestBodyValidator(m, config.WithExistingOpts(options))
 
 	// create a response body validator
-	v.responseValidator = responses.NewResponseBodyValidator(m, opts...)
+	v.responseValidator = responses.NewResponseBodyValidator(m, config.WithExistingOpts(options))
 
 	// warm the schema caches by pre-compiling all schemas in the document
 	// (warmSchemaCaches checks for nil cache and skips if disabled)
