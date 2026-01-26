@@ -6,11 +6,11 @@ require (
 	github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/goccy/go-yaml v1.19.1
-	github.com/pb33f/jsonpath v0.7.0
-	github.com/pb33f/libopenapi v0.31.2
+	github.com/pb33f/jsonpath v0.7.1
+	github.com/pb33f/libopenapi v0.33.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
-	go.yaml.in/yaml/v4 v4.0.0-rc.3
+	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/text v0.32.0
 )
 
