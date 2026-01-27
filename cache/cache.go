@@ -19,9 +19,9 @@ type SchemaCacheEntry struct {
 }
 
 // SchemaCache defines the interface for schema caching implementations.
-// The key is a [32]byte hash of the schema (from schema.GoLow().Hash()).
+// The key is a uint64 hash of the schema (from schema.GoLow().Hash()).
 type SchemaCache interface {
-	Load(key [32]byte) (*SchemaCacheEntry, bool)
-	Store(key [32]byte, value *SchemaCacheEntry)
-	Range(f func(key [32]byte, value *SchemaCacheEntry) bool)
+	Load(key uint64) (*SchemaCacheEntry, bool)
+	Store(key uint64, value *SchemaCacheEntry)
+	Range(f func(key uint64, value *SchemaCacheEntry) bool)
 }

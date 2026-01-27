@@ -508,7 +508,7 @@ func warmMediaTypeSchema(mediaType *v3.MediaType, schemaCache cache.SchemaCache,
 func warmParameterSchema(param *v3.Parameter, schemaCache cache.SchemaCache, options *config.ValidationOptions) {
 	if param != nil {
 		var schema *base.Schema
-		var hash [32]byte
+		var hash uint64
 
 		// Parameters can have schemas in two places: schema property or content property
 		if param.Schema != nil {

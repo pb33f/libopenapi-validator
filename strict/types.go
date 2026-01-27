@@ -384,7 +384,7 @@ func (v *Validator) getSchemaKey(schema *base.Schema) string {
 	}
 	if low := schema.GoLow(); low != nil {
 		hash := low.Hash()
-		return fmt.Sprintf("%x", hash[:8]) // Use first 8 bytes for shorter key
+		return fmt.Sprintf("%x", hash) // uint64 hash as hex string
 	}
 	// fallback to pointer address for inline schemas without low-level info
 	return fmt.Sprintf("%p", schema)

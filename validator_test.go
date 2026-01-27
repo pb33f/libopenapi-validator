@@ -2150,7 +2150,7 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 	require.NotNil(t, validator.options.SchemaCache)
 
 	count := 0
-	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+	validator.options.SchemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
 		count++
 		assert.NotNil(t, value.CompiledSchema, "Cache entry should have compiled schema")
 		assert.NotEmpty(t, value.ReferenceSchema, "Cache entry should have pre-converted ReferenceSchema string")
@@ -2283,7 +2283,7 @@ paths:
 	require.NotNil(t, validator.options.SchemaCache)
 
 	count := 0
-	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+	validator.options.SchemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
 		count++
 		return true
 	})
@@ -2352,7 +2352,7 @@ paths:
 	require.NotNil(t, validator.options.SchemaCache)
 
 	count := 0
-	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+	validator.options.SchemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
 		count++
 		return true
 	})
@@ -2389,7 +2389,7 @@ paths:
 	require.NotNil(t, validator.options.SchemaCache)
 
 	count := 0
-	validator.options.SchemaCache.Range(func(key [32]byte, value *cache.SchemaCacheEntry) bool {
+	validator.options.SchemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
 		count++
 		return true
 	})
