@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -174,4 +174,42 @@ info:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Len(t, errors[0].SchemaValidationErrors, 6)
+}
+
+func TestValidateDocument_NilSpecJSON(t *testing.T) {
+	// Create a document with minimal valid OpenAPI content
+	spec := `openapi: 3.1.0
+info:
+  version: 1.0.0
+  title: Test
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	// Simulate the nil SpecJSON scenario by setting it to nil
+	info := doc.GetSpecInfo()
+	info.SpecJSON = nil
+
+	// validate!
+	valid, errors := ValidateOpenAPIDocument(doc)
+
+	// Should fail validation due to nil SpecJSON
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+
+	// Verify error structure
+	validationError := errors[0]
+	assert.Equal(t, "schema", validationError.ValidationType)
+	assert.Equal(t, "document", validationError.ValidationSubType)
+	assert.Equal(t, "OpenAPI document validation failed", validationError.Message)
+	assert.Contains(t, validationError.Reason, "SpecJSON is nil")
+	assert.Contains(t, validationError.HowToFix, "ensure the OpenAPI document is valid")
+	assert.Equal(t, 1, validationError.SpecLine)
+	assert.Equal(t, 0, validationError.SpecCol)
+
+	// Verify schema validation errors
+	assert.NotEmpty(t, validationError.SchemaValidationErrors)
+	schemaErr := validationError.SchemaValidationErrors[0]
+	assert.Equal(t, "document root", schemaErr.Location)
+	assert.Contains(t, schemaErr.Reason, "SpecJSON is nil")
 }
