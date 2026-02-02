@@ -1652,7 +1652,7 @@ paths:
 	assert.Len(t, errors, 1)
 
 	err := errors[0]
-	assert.Equal(t, helpers.RequestBodyValidation, err.ValidationType)
+	assert.Equal(t, helpers.XmlValidation, err.ValidationType)
 	assert.Contains(t, err.Reason, "failed to parse xml")
 }
 
