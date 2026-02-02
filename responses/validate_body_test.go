@@ -1689,7 +1689,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 }
 
 func TestValidateBody_IgnoreXmlValidation(t *testing.T) {
@@ -1792,7 +1792,7 @@ paths:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Equal(t, errors[0].Message, "xml response is malformed")
+	assert.Equal(t, "xml example is malformed", errors[0].Message)
 }
 
 type errorReader struct{}
