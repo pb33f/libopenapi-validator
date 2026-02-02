@@ -14,8 +14,6 @@ const (
 	XmlValidation             = "xmlValidation"
 	XmlValidationPrefix       = "prefix"
 	XmlValidationNamespace    = "namespace"
-	GolangMapType             = "map[string]interface {}"
-	GolangArrayType           = "[]interface {}"
 	Schema                    = "schema"
 	ResponseBodyValidation    = "response"
 	RequestBodyContentType    = "contentType"
