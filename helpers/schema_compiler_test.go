@@ -465,7 +465,8 @@ func TestTransformNullableSchema_NullableAllOf(t *testing.T) {
 				"properties": map[string]interface{}{
 					"id": map[string]interface{}{
 						"type": "string",
-					}},
+					},
+				},
 			},
 		},
 		"nullable": true,
@@ -495,7 +496,8 @@ func TestTransformNullableSchema_NullableAllOf(t *testing.T) {
 				"properties": map[string]interface{}{
 					"id": map[string]interface{}{
 						"type": "string",
-					}},
+					},
+				},
 			},
 		},
 	})
@@ -516,7 +518,8 @@ func TestTransformNullableSchema_NullableAllOfWithExistingOneOf(t *testing.T) {
 				"properties": map[string]interface{}{
 					"id": map[string]interface{}{
 						"type": "string",
-					}},
+					},
+				},
 			},
 		},
 		"oneOf": []interface{}{
@@ -526,7 +529,8 @@ func TestTransformNullableSchema_NullableAllOfWithExistingOneOf(t *testing.T) {
 					"id": map[string]interface{}{
 						"type":  "string",
 						"const": []any{"val"},
-					}},
+					},
+				},
 			},
 		},
 		"nullable": true,
@@ -556,7 +560,8 @@ func TestTransformNullableSchema_NullableAllOfWithExistingOneOf(t *testing.T) {
 				"properties": map[string]interface{}{
 					"id": map[string]interface{}{
 						"type": "string",
-					}},
+					},
+				},
 			},
 		},
 	})
@@ -569,7 +574,8 @@ func TestTransformNullableSchema_NullableAllOfWithExistingOneOf(t *testing.T) {
 			"id": map[string]interface{}{
 				"type":  "string",
 				"const": []any{"val"},
-			}},
+			},
+		},
 	})
 
 	_, hasNullable := result["nullable"]
