@@ -86,10 +86,9 @@ func (tb *validateResponseTestBed) makeRequestWithReponse(
 }
 
 func TestValidateBody_MissingContentType(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -106,8 +105,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -134,10 +132,9 @@ paths:
 }
 
 func TestValidateBody_MissingContentType4XX(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -150,8 +147,7 @@ paths:
                 properties:
                   error:
                     type: string`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -186,10 +182,9 @@ paths:
 }
 
 func TestValidateBody_MissingPath(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -206,8 +201,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -241,10 +235,9 @@ paths:
 }
 
 func TestValidateBody_SetPath(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -261,8 +254,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -297,10 +289,9 @@ paths:
 }
 
 func TestValidateBody_SetPath_missing_operation(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -317,8 +308,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -357,10 +347,9 @@ paths:
 }
 
 func TestValidateBody_MissingStatusCode(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -377,8 +366,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -410,10 +398,9 @@ paths:
 }
 
 func TestValidateBody_InvalidBasicSchema(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -430,8 +417,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -466,10 +452,9 @@ paths:
 }
 
 func TestValidateBody_NoBody(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -486,8 +471,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -514,10 +498,9 @@ paths:
 }
 
 func TestValidateBody_InvalidResponseBodyNil(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -534,8 +517,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -561,10 +543,9 @@ paths:
 }
 
 func TestValidateBody_InvalidResponseBodyError(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -581,8 +562,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -674,10 +654,9 @@ paths:
 }
 
 func TestValidateBody_ValidComplexSchema(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -735,8 +714,7 @@ components:
         vegetarian:
           type: boolean
       required: [name, patties, vegetarian]`,
-			),
-		)
+		),
 	)
 
 	body := map[string]interface{}{
@@ -771,10 +749,9 @@ components:
 }
 
 func TestValidateBody_InvalidComplexSchema(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -832,8 +809,7 @@ components:
         vegetarian:
           type: boolean
       required: [name, patties, vegetarian]`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -870,10 +846,9 @@ components:
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -890,8 +865,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -921,10 +895,9 @@ paths:
 }
 
 func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -941,8 +914,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -950,7 +922,6 @@ paths:
 		http.MethodPost,
 		"/burgers/createBurger",
 		func(w http.ResponseWriter, r *http.Request) {
-
 			bodyBytes, err := json.Marshal(map[string]interface{}{
 				"name":       "Big Mac",
 				"patties":    2,
@@ -975,10 +946,9 @@ paths:
 }
 
 func TestValidateBody_ValidBasicSchemaUsingDefault(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -995,8 +965,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -1026,10 +995,9 @@ paths:
 }
 
 func TestValidateBody_InvalidBasicSchemaUsingDefault_MissingContentType(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -1046,8 +1014,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -1055,7 +1022,6 @@ paths:
 		http.MethodPost,
 		"/burgers/createBurger",
 		func(w http.ResponseWriter, r *http.Request) {
-
 			// primitives are now correct.
 			bodyBytes, err := json.Marshal(map[string]interface{}{
 				"name":       "Big Mac",
@@ -1080,10 +1046,9 @@ paths:
 }
 
 func TestValidateBody_InvalidSchemaMultiple(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -1104,8 +1069,7 @@ paths:
                       type: integer
                     vegetarian:
                       type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -1148,10 +1112,9 @@ paths:
 }
 
 func TestValidateBody_EmptyContentType_Valid(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: "3.0.0"
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: "3.0.0"
 info:
   title: Healthcheck
   version: '0.1.0'
@@ -1162,8 +1125,7 @@ paths:
         '200':
           description: pet response
           content: {}`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -1185,10 +1147,9 @@ paths:
 }
 
 func TestValidateBody_InvalidBodyJSON(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -1205,8 +1166,7 @@ paths:
                     type: integer
                   vegetarian:
                     type: boolean`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -1230,10 +1190,9 @@ paths:
 }
 
 func TestValidateBody_NoContentType_Valid(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: "3.0.0"
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: "3.0.0"
 info:
   title: Healthcheck
   version: '0.1.0'
@@ -1243,8 +1202,7 @@ paths:
       responses:
         '200':
           description: pet response`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
@@ -1268,10 +1226,9 @@ paths:
 // https://github.com/pb33f/libopenapi-validator/issues/107
 // https://github.com/pb33f/libopenapi-validator/issues/103
 func TestNewValidator_TestCircularRefsInValidation_Response(t *testing.T) {
-	var (
-		tb = newvalidateResponseTestBed(
-			t,
-			[]byte(`openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 info:
   title: Panic at response validation
   version: 1.0.0
@@ -1298,8 +1255,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Error'`,
-			),
-		)
+		),
 	)
 
 	req, res := tb.makeRequestWithReponse(
