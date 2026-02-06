@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
@@ -54,6 +55,7 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 		SecurityValidation: true,
 		OpenAPIMode:        true,                    // Enable OpenAPI vocabulary by default
 		SchemaCache:        cache.NewDefaultCache(), // Enable caching by default
+		RegexCache:         &sync.Map{},            // Enable regex caching by default
 	}
 
 	for _, opt := range opts {

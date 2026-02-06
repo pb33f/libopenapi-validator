@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/pb33f/libopenapi"
@@ -98,6 +99,9 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	// warm the schema caches by pre-compiling all schemas in the document
 	// (warmSchemaCaches checks for nil cache and skips if disabled)
 	warmSchemaCaches(m, options)
+
+	// warm the regex cache by pre-compiling all path parameter regexes
+	warmRegexCache(m, options)
 
 	v := &validator{options: options, v3Model: m}
 
@@ -198,6 +202,12 @@ func (v *validator) ValidateHttpRequestResponse(
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
+	// Fast path: use synchronous validation for GET/HEAD/OPTIONS/DELETE requests
+	// without a body to avoid unnecessary goroutine and channel overhead.
+	if request.Body == nil || request.ContentLength == 0 {
+		return v.ValidateHttpRequestSync(request)
+	}
+
 	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
 	if len(errs) > 0 {
 		return false, errs
@@ -565,6 +575,34 @@ func warmParameterSchema(param *v3.Parameter, schemaCache cache.SchemaCache, opt
 						CompiledSchema:  compiledSchema,
 						RenderedNode:    &renderedNode,
 					})
+				}
+			}
+		}
+	}
+}
+
+// warmRegexCache pre-compiles all path parameter regexes in the OpenAPI document and stores them in the regex cache.
+// This frontloads the compilation cost so that runtime validation doesn't need to compile regexes for path segments.
+func warmRegexCache(doc *v3.Document, options *config.ValidationOptions) {
+	if doc == nil || doc.Paths == nil || doc.Paths.PathItems == nil || options.RegexCache == nil {
+		return
+	}
+
+	for pathPair := doc.Paths.PathItems.First(); pathPair != nil; pathPair = pathPair.Next() {
+		pathKey := pathPair.Key()
+		segments := strings.Split(pathKey, "/")
+		for _, segment := range segments {
+			if segment == "" {
+				continue
+			}
+			// Only compile segments that contain path parameters (have braces)
+			if !strings.Contains(segment, "{") {
+				continue
+			}
+			if _, found := options.RegexCache.Load(segment); !found {
+				r, err := helpers.GetRegexForPath(segment)
+				if err == nil {
+					options.RegexCache.Store(segment, r)
 				}
 			}
 		}

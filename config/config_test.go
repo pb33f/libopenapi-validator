@@ -22,7 +22,7 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestNewValidationOptions_WithNilOption(t *testing.T) {
@@ -35,7 +35,7 @@ func TestNewValidationOptions_WithNilOption(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithFormatAssertions(t *testing.T) {
@@ -47,7 +47,7 @@ func TestWithFormatAssertions(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithContentAssertions(t *testing.T) {
@@ -59,7 +59,7 @@ func TestWithContentAssertions(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithoutSecurityValidation(t *testing.T) {
@@ -71,7 +71,7 @@ func TestWithoutSecurityValidation(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithRegexEngine(t *testing.T) {
@@ -86,7 +86,7 @@ func TestWithRegexEngine(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithExistingOpts(t *testing.T) {
@@ -122,7 +122,7 @@ func TestWithExistingOpts_NilSource(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestMultipleOptions(t *testing.T) {
@@ -137,7 +137,7 @@ func TestMultipleOptions(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestOptionOverride(t *testing.T) {
@@ -154,7 +154,7 @@ func TestOptionOverride(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithExistingOpts_PartialOverride(t *testing.T) {
@@ -174,7 +174,7 @@ func TestWithExistingOpts_PartialOverride(t *testing.T) {
 	)
 
 	assert.Nil(t, opts.RegexEngine) // Both should be nil
-	assert.Nil(t, opts.RegexCache)
+	assert.Nil(t, opts.RegexCache)   // Copied from original (nil/zero value)
 	assert.True(t, opts.FormatAssertions)    // From original
 	assert.True(t, opts.ContentAssertions)   // Reapplied, but same value
 	assert.False(t, opts.SecurityValidation) // From original
@@ -203,7 +203,7 @@ func TestComplexScenario(t *testing.T) {
 	assert.True(t, opts.ContentAssertions)   // Added
 	assert.False(t, opts.SecurityValidation) // From base
 	assert.Nil(t, opts.RegexEngine)          // Should be nil
-	assert.Nil(t, opts.RegexCache)
+	assert.Nil(t, opts.RegexCache)           // Copied from baseOpts (nil/zero value)
 }
 
 func TestMultipleOptionsWithSecurityDisabled(t *testing.T) {
@@ -217,7 +217,7 @@ func TestMultipleOptionsWithSecurityDisabled(t *testing.T) {
 	assert.True(t, opts.ContentAssertions)
 	assert.False(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithExistingOpts_SecurityValidationCopied(t *testing.T) {
@@ -312,7 +312,7 @@ func TestComplexOpenAPIScenario(t *testing.T) {
 	assert.True(t, opts.ContentAssertions)
 	assert.False(t, opts.SecurityValidation)
 	assert.Nil(t, opts.RegexEngine)
-	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.RegexCache) // Default is enabled (like SchemaCache)
 }
 
 func TestWithExistingOpts_OpenAPIFields(t *testing.T) {
