@@ -91,7 +91,7 @@ func TestOperationNotFound(t *testing.T) {
 	// Validate the error
 	require.NotNil(t, err)
 	require.Equal(t, helpers.RequestValidation, err.ValidationType)
-	require.Equal(t, helpers.RequestMissingOperation, err.ValidationSubType)
+	require.Equal(t, helpers.ValidationMissingOperation, err.ValidationSubType)
 	require.Contains(t, err.Message, "'PATCH' does not exist")
 	require.Contains(t, err.Reason, "there was no 'PATCH' method found in the spec")
 	require.Equal(t, 15, err.SpecLine)

@@ -29,9 +29,8 @@ func TestDefaultCache_StoreAndLoad(t *testing.T) {
 		CompiledSchema: &jsonschema.Schema{},
 	}
 
-	// Create a test key (32-byte hash)
-	var key [32]byte
-	copy(key[:], []byte("test-schema-hash-12345678901234"))
+	// Create a test key (uint64 hash)
+	key := uint64(0x123456789abcdef0)
 
 	// Store the schema
 	cache.Store(key, testSchema)
@@ -49,8 +48,7 @@ func TestDefaultCache_LoadMissing(t *testing.T) {
 	cache := NewDefaultCache()
 
 	// Try to load a key that doesn't exist
-	var key [32]byte
-	copy(key[:], []byte("nonexistent-key-12345678901234"))
+	key := uint64(0xdeadbeef)
 
 	loaded, ok := cache.Load(key)
 	assert.False(t, ok, "Should not find non-existent key")
@@ -60,7 +58,7 @@ func TestDefaultCache_LoadMissing(t *testing.T) {
 func TestDefaultCache_LoadNilCache(t *testing.T) {
 	var cache *DefaultCache
 
-	var key [32]byte
+	key := uint64(0)
 	loaded, ok := cache.Load(key)
 
 	assert.False(t, ok)
@@ -71,7 +69,7 @@ func TestDefaultCache_StoreNilCache(t *testing.T) {
 	var cache *DefaultCache
 
 	// Should not panic
-	var key [32]byte
+	key := uint64(0)
 	cache.Store(key, &SchemaCacheEntry{})
 
 	// Verify nothing was stored (cache is nil)
@@ -82,10 +80,9 @@ func TestDefaultCache_Range(t *testing.T) {
 	cache := NewDefaultCache()
 
 	// Store multiple entries
-	entries := make(map[[32]byte]*SchemaCacheEntry)
+	entries := make(map[uint64]*SchemaCacheEntry)
 	for i := 0; i < 5; i++ {
-		var key [32]byte
-		copy(key[:], []byte{byte(i)})
+		key := uint64(i)
 
 		entry := &SchemaCacheEntry{
 			RenderedInline: []byte{byte(i)},
@@ -97,8 +94,8 @@ func TestDefaultCache_Range(t *testing.T) {
 
 	// Range over all entries
 	count := 0
-	foundKeys := make(map[[32]byte]bool)
-	cache.Range(func(key [32]byte, value *SchemaCacheEntry) bool {
+	foundKeys := make(map[uint64]bool)
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
 		count++
 		foundKeys[key] = true
 
@@ -118,14 +115,13 @@ func TestDefaultCache_RangeEarlyTermination(t *testing.T) {
 
 	// Store multiple entries
 	for i := 0; i < 10; i++ {
-		var key [32]byte
-		copy(key[:], []byte{byte(i)})
+		key := uint64(i)
 		cache.Store(key, &SchemaCacheEntry{})
 	}
 
 	// Range but stop after 3 iterations
 	count := 0
-	cache.Range(func(key [32]byte, value *SchemaCacheEntry) bool {
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
 		count++
 		return count < 3 // Stop after 3
 	})
@@ -138,7 +134,7 @@ func TestDefaultCache_RangeNilCache(t *testing.T) {
 
 	// Should not panic
 	called := false
-	cache.Range(func(key [32]byte, value *SchemaCacheEntry) bool {
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
 		called = true
 		return true
 	})
@@ -151,7 +147,7 @@ func TestDefaultCache_RangeEmpty(t *testing.T) {
 
 	// Range over empty cache
 	count := 0
-	cache.Range(func(key [32]byte, value *SchemaCacheEntry) bool {
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
 		count++
 		return true
 	})
@@ -162,8 +158,7 @@ func TestDefaultCache_RangeEmpty(t *testing.T) {
 func TestDefaultCache_Overwrite(t *testing.T) {
 	cache := NewDefaultCache()
 
-	var key [32]byte
-	copy(key[:], []byte("test-key"))
+	key := uint64(0x12345678)
 
 	// Store first value
 	first := &SchemaCacheEntry{
@@ -188,10 +183,9 @@ func TestDefaultCache_MultipleKeys(t *testing.T) {
 	cache := NewDefaultCache()
 
 	// Store with different keys
-	var key1, key2, key3 [32]byte
-	copy(key1[:], []byte("key1"))
-	copy(key2[:], []byte("key2"))
-	copy(key3[:], []byte("key3"))
+	key1 := uint64(1)
+	key2 := uint64(2)
+	key3 := uint64(3)
 
 	cache.Store(key1, &SchemaCacheEntry{RenderedInline: []byte("value1")})
 	cache.Store(key2, &SchemaCacheEntry{RenderedInline: []byte("value2")})
@@ -218,8 +212,7 @@ func TestDefaultCache_ThreadSafety(t *testing.T) {
 	done := make(chan bool, 10)
 	for i := 0; i < 10; i++ {
 		go func(val int) {
-			var key [32]byte
-			copy(key[:], []byte{byte(val)})
+			key := uint64(val)
 			cache.Store(key, &SchemaCacheEntry{
 				RenderedInline: []byte{byte(val)},
 			})
@@ -235,8 +228,7 @@ func TestDefaultCache_ThreadSafety(t *testing.T) {
 	// Concurrent reads
 	for i := 0; i < 10; i++ {
 		go func(val int) {
-			var key [32]byte
-			copy(key[:], []byte{byte(val)})
+			key := uint64(val)
 			loaded, ok := cache.Load(key)
 			assert.True(t, ok)
 			assert.NotNil(t, loaded)
@@ -251,7 +243,7 @@ func TestDefaultCache_ThreadSafety(t *testing.T) {
 
 	// Verify all entries exist
 	count := 0
-	cache.Range(func(key [32]byte, value *SchemaCacheEntry) bool {
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
 		count++
 		return true
 	})
@@ -284,20 +276,18 @@ func TestDefaultCache_RangeWithInvalidTypes(t *testing.T) {
 	cache.m.Store("invalid-key-type", &SchemaCacheEntry{})
 
 	// Store an entry with wrong value type
-	var validKey [32]byte
-	copy(validKey[:], []byte{1})
+	validKey := uint64(1)
 	cache.m.Store(validKey, "invalid-value-type")
 
 	// Store a valid entry
-	var validKey2 [32]byte
-	copy(validKey2[:], []byte{2})
+	validKey2 := uint64(2)
 	validEntry := &SchemaCacheEntry{RenderedInline: []byte("valid")}
 	cache.Store(validKey2, validEntry)
 
 	// Range should skip invalid entries and only process valid ones
 	count := 0
 	var seenEntry *SchemaCacheEntry
-	cache.Range(func(key [32]byte, value *SchemaCacheEntry) bool {
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
 		count++
 		seenEntry = value
 		return true

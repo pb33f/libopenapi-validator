@@ -456,6 +456,132 @@ func TestTransformNullableSchema_ArrayTypeWithNull(t *testing.T) {
 	assert.False(t, hasNullable)
 }
 
+func TestTransformNullableSchema_NullableAllOf(t *testing.T) {
+	schema := map[string]interface{}{
+		"type": []interface{}{"object"},
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "object")
+	assert.Contains(t, typeArray, "null")
+
+	oneOf, ok := result["oneOf"]
+	require.True(t, ok)
+
+	oneOfSlice, ok := oneOf.([]interface{})
+	require.True(t, ok)
+
+	assert.Len(t, oneOfSlice, 2)
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+	})
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"type": "null",
+	})
+
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+}
+
+func TestTransformNullableSchema_NullableAllOfWithExistingOneOf(t *testing.T) {
+	schema := map[string]interface{}{
+		"type": []interface{}{"object"},
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+		"oneOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":  "string",
+						"const": []any{"val"},
+					},
+				},
+			},
+		},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "object")
+	assert.Contains(t, typeArray, "null")
+
+	oneOf, ok := result["oneOf"]
+	require.True(t, ok)
+
+	oneOfSlice, ok := oneOf.([]interface{})
+	require.True(t, ok)
+
+	assert.Len(t, oneOfSlice, 3)
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+	})
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"type": "null",
+	})
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"id": map[string]interface{}{
+				"type":  "string",
+				"const": []any{"val"},
+			},
+		},
+	})
+
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+}
+
 func TestTransformSchemaForCoercion_ValidJSON(t *testing.T) {
 	input := []byte(`{
 		"type": "boolean"
