@@ -18,7 +18,6 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
@@ -37,26 +36,13 @@ func FindPath(request *http.Request, document *v3.Document, options *config.Vali
 	stripped := StripRequestPath(request, document)
 
 	// Fast path: try radix tree first (O(k) where k = path depth)
-	tree := pathLookupFrom(options, document)
-	if tree != nil {
-		if pathItem, matchedPath, found := tree.Lookup(stripped); found {
-			// Verify the path has the requested method
+	// If no path lookup is provided, we will fall back to regex-based matching.
+	if options != nil && options.PathTree != nil {
+		if pathItem, matchedPath, found := options.PathTree.Lookup(stripped); found {
 			if pathHasMethod(pathItem, request.Method) {
 				return pathItem, nil, matchedPath
 			}
-			// Path found but method doesn't exist
-			validationErrors := []*errors.ValidationError{{
-				ValidationType:    helpers.ParameterValidationPath,
-				ValidationSubType: "missingOperation",
-				Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
-				Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
-					request.Method),
-				SpecLine: -1,
-				SpecCol:  -1,
-				HowToFix: errors.HowToFixPath,
-			}}
-			errors.PopulateValidationErrors(validationErrors, request, matchedPath)
-			return pathItem, validationErrors, matchedPath
+			return pathItem, missingOperationError(request, matchedPath), matchedPath
 		}
 	}
 
@@ -128,18 +114,7 @@ func FindPath(request *http.Request, document *v3.Document, options *config.Vali
 	}
 
 	// path matches exist but none have the required method
-	validationErrors := []*errors.ValidationError{{
-		ValidationType:    helpers.PathValidation,
-		ValidationSubType: helpers.ValidationMissingOperation,
-		Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
-		Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
-			request.Method),
-		SpecLine: -1,
-		SpecCol:  -1,
-		HowToFix: errors.HowToFixPath,
-	}}
-	errors.PopulateValidationErrors(validationErrors, request, bestOverall.path)
-	return bestOverall.pathItem, validationErrors, bestOverall.path
+	return bestOverall.pathItem, missingOperationError(request, bestOverall.path), bestOverall.path
 }
 
 // normalizePathForMatching removes the fragment from a path template unless
@@ -257,13 +232,18 @@ func comparePaths(mapped, requested, basePaths []string, regexCache config.Regex
 	return checkPathAgainstBase(l, r, basePaths)
 }
 
-// pathLookupFrom returns the PathLookup from options, or builds one from the document.
-func pathLookupFrom(options *config.ValidationOptions, document *v3.Document) radix.PathLookup {
-	if options != nil && options.PathLookup != nil {
-		return options.PathLookup
-	}
-	if document != nil && document.Paths != nil {
-		return radix.BuildPathTree(document)
-	}
-	return nil
+// missingOperationError returns a validation error for when a path was found but the HTTP method doesn't exist.
+func missingOperationError(request *http.Request, matchedPath string) []*errors.ValidationError {
+	validationErrors := []*errors.ValidationError{{
+		ValidationType:    helpers.PathValidation,
+		ValidationSubType: helpers.ValidationMissingOperation,
+		Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+		Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
+			request.Method),
+		SpecLine: -1,
+		SpecCol:  -1,
+		HowToFix: errors.HowToFixPath,
+	}}
+	errors.PopulateValidationErrors(validationErrors, request, matchedPath)
+	return validationErrors
 }

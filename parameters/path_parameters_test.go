@@ -16,6 +16,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 func TestNewValidator_SimpleArrayEncodedPath(t *testing.T) {
@@ -2321,7 +2322,7 @@ paths:
 	m, _ := doc.BuildV3Model()
 
 	cache := &regexCacheWatcher{inner: &sync.Map{}}
-	opts := &config.ValidationOptions{RegexCache: cache}
+	opts := &config.ValidationOptions{RegexCache: cache, PathTree: radix.BuildPathTree(&m.Model)}
 
 	// Simple path - should NOT use regex cache (handled by radix tree)
 	simpleRequest, _ := http.NewRequest(http.MethodGet, "https://things.com/simple/123", nil)
