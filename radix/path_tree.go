@@ -7,8 +7,8 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
-// PathLookup defines the interface for path matching implementations.
-// The PathTree implementation provides O(k) lookup where k is the path segment count.
+// PathLookup defines the interface for radix tree path matching implementations.
+// The default implementation provides O(k) lookup where k is the path segment count.
 //
 // Note: This interface handles URL path matching only. HTTP method validation
 // is performed separately after the PathItem is retrieved, since a single path
