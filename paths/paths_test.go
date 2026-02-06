@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,7 +84,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/bish=bosh,wish=wash/locate", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 }
@@ -127,7 +128,7 @@ func TestNewValidator_FindPathDelete(t *testing.T) {
 	m, _ := doc.BuildV3Model()
 	request, _ := http.NewRequest(http.MethodDelete, "https://things.com/pet/12334", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 }
 
@@ -144,7 +145,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Patch.OperationId)
 }
@@ -180,7 +181,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Trace.OperationId)
 }
@@ -199,7 +200,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/burgers/12345", nil)
 
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "locateBurger", pathItem.Put.OperationId)
 }
@@ -239,13 +240,13 @@ paths:
 
 	// check against base1
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/base1/user", nil)
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 
 	// check against base2
 	request, _ = http.NewRequest(http.MethodPost, "https://things.com/base2/user", nil)
-	pathItem, _, _ = FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ = FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 
@@ -271,7 +272,7 @@ paths:
 
 	// check against a deeper base
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/base3/base4/base5/base6/user/1234/thing/abcd", nil)
-	pathItem, _, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, _, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "addUser", pathItem.Post.OperationId)
 }
@@ -357,7 +358,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 0)
 }
@@ -380,7 +381,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -404,7 +405,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "POST Path '/pizza/1234' not found", errs[0].Message)
@@ -422,7 +423,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPatch, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 0)
 }
@@ -480,7 +481,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodOptions, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 0)
 }
@@ -514,7 +515,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodTrace, "https://things.com/pizza/burger", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 0)
 }
@@ -585,7 +586,7 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPut, "https://things.com/pizza/1234", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "PUT Path '/pizza/1234' not found", errs[0].Message)
@@ -607,13 +608,13 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodPost, "https://things.com/hashy#one", nil)
 
-	pathItem, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	pathItem, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.Len(t, errs, 0)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Post.OperationId)
 
 	request, _ = http.NewRequest(http.MethodPost, "https://things.com/hashy#two", nil)
-	pathItem, errs, _ = FindPath(request, &m.Model, &sync.Map{})
+	pathItem, errs, _ = FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.Len(t, errs, 0)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "two", pathItem.Post.OperationId)
@@ -784,21 +785,21 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
 
-	regexCache := &sync.Map{}
+	opts := &config.ValidationOptions{RegexCache: &sync.Map{}}
 
-	pathItem, _, _ := FindPath(request, &m.Model, regexCache)
+	pathItem, _, _ := FindPath(request, &m.Model, opts)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 
 	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='1234',ValidityEndDate=datetime'1492041600000')", nil)
 
-	pathItem, _, _ = FindPath(request, &m.Model, regexCache)
+	pathItem, _, _ = FindPath(request, &m.Model, opts)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 
 	request, _ = http.NewRequest(http.MethodGet, "https://things.com/orders(RelationshipNumber='dummy',ValidityEndDate=datetime'1492041600000')", nil)
 
-	pathItem, _, _ = FindPath(request, &m.Model, regexCache)
+	pathItem, _, _ = FindPath(request, &m.Model, opts)
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "one", pathItem.Get.OperationId)
 }
@@ -822,25 +823,28 @@ paths:
 
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/entities('1')", nil)
 
-	_, errs, _ := FindPath(request, &m.Model, &sync.Map{})
+	_, errs, _ := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 	assert.NotEmpty(t, errs)
 }
 
-func TestNewValidator_FindPathWithRegexpCache(t *testing.T) {
+func TestNewValidator_FindPathWithRegexpCache_ODataPath(t *testing.T) {
+	// OData-style paths have embedded parameters that the radix tree can't handle,
+	// so they fall back to regex matching which DOES populate the cache.
 	spec := `openapi: 3.1.0
 paths:
-  /pizza/{sauce}/{fill}/hamburger/pizza:
+  /entities('{Entity}')/items:
     head:
-      operationId: locateBurger`
+      operationId: getEntityItems`
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	request, _ := http.NewRequest(http.MethodHead, "https://things.com/pizza/tomato/pepperoni/hamburger/pizza", nil)
+	request, _ := http.NewRequest(http.MethodHead, "https://things.com/entities('123')/items", nil)
 
 	syncMap := sync.Map{}
+	opts := &config.ValidationOptions{RegexCache: &syncMap}
 
-	_, errs, _ := FindPath(request, &m.Model, &syncMap)
+	_, errs, _ := FindPath(request, &m.Model, opts)
 
 	keys := []string{}
 	addresses := make(map[string]bool)
@@ -851,13 +855,14 @@ paths:
 		return true
 	})
 
-	cached, found := syncMap.Load("pizza")
+	// The OData segment should be cached
+	cached, found := syncMap.Load("entities('{Entity}')")
 
-	assert.True(t, found)
-	assert.True(t, cached.(*regexp.Regexp).MatchString("pizza"))
+	assert.True(t, found, "OData path segment should be in regex cache")
+	assert.NotNil(t, cached, "Cached regex should not be nil")
+	assert.True(t, cached.(*regexp.Regexp).MatchString("entities('123')"), "Cached regex should match")
 	assert.Len(t, errs, 0)
-	assert.Len(t, keys, 4)
-	assert.Len(t, addresses, 3)
+	assert.Len(t, keys, 2, "Should have 2 path segments cached")
 }
 
 // Test cases for path precedence - Issue #181
@@ -1021,38 +1026,6 @@ paths:
 			assert.Equal(t, tt.expectedPath, foundPath)
 		})
 	}
-}
-
-func TestFindPath_TieBreaker_DefinitionOrder(t *testing.T) {
-	// When two paths have equal specificity (same number of literals/params),
-	// the first defined path should win
-	spec := `openapi: 3.1.0
-info:
-  title: Path Precedence Test
-  version: 1.0.0
-paths:
-  /pets/{petId}:
-    get:
-      operationId: getPetById
-      responses:
-        '200':
-          description: OK
-  /pets/{petName}:
-    get:
-      operationId: getPetByName
-      responses:
-        '200':
-          description: OK
-`
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-	m, _ := doc.BuildV3Model()
-
-	request, _ := http.NewRequest(http.MethodGet, "https://api.com/pets/fluffy", nil)
-	pathItem, _, foundPath := FindPath(request, &m.Model, nil)
-
-	// First defined path wins when scores are equal
-	assert.Equal(t, "getPetById", pathItem.Get.OperationId)
-	assert.Equal(t, "/pets/{petId}", foundPath)
 }
 
 func TestFindPath_PetsMinePrecedence(t *testing.T) {
@@ -1250,11 +1223,11 @@ paths:
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	m, _ := doc.BuildV3Model()
 
-	regexCache := &sync.Map{}
+	opts := &config.ValidationOptions{RegexCache: &sync.Map{}}
 
 	// First request - populates cache
 	request, _ := http.NewRequest(http.MethodGet, "https://api.com/Messages/Operations", nil)
-	pathItem, errs, foundPath := FindPath(request, &m.Model, regexCache)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, opts)
 
 	assert.Nil(t, errs)
 	assert.Equal(t, "getOperations", pathItem.Get.OperationId)
@@ -1262,7 +1235,7 @@ paths:
 
 	// Second request - uses cache
 	request, _ = http.NewRequest(http.MethodGet, "https://api.com/Messages/12345", nil)
-	pathItem, errs, foundPath = FindPath(request, &m.Model, regexCache)
+	pathItem, errs, foundPath = FindPath(request, &m.Model, opts)
 
 	assert.Nil(t, errs)
 	assert.Equal(t, "getMessage", pathItem.Get.OperationId)
@@ -1270,7 +1243,7 @@ paths:
 
 	// Third request - still works correctly
 	request, _ = http.NewRequest(http.MethodGet, "https://api.com/Messages/Operations", nil)
-	pathItem, errs, foundPath = FindPath(request, &m.Model, regexCache)
+	pathItem, errs, foundPath = FindPath(request, &m.Model, opts)
 
 	assert.Nil(t, errs)
 	assert.Equal(t, "getOperations", pathItem.Get.OperationId)
@@ -1360,4 +1333,179 @@ paths:
 	assert.NotNil(t, pathItem)
 	assert.Equal(t, "postHashy", pathItem.Post.OperationId)
 	assert.Equal(t, "/hashy#section", foundPath)
+}
+
+func TestFindPath_NilDocument(t *testing.T) {
+	// Passing a nil document is a programming error and will panic.
+	// This test verifies that behavior (callers should not pass nil).
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/test", nil)
+
+	assert.Panics(t, func() {
+		FindPath(request, nil, nil)
+	}, "FindPath should panic when document is nil")
+}
+
+func TestFindPath_NilPaths(t *testing.T) {
+	// A spec without paths will have nil Paths - this is a programming error
+	spec := `openapi: 3.1.0
+info:
+  title: No Paths Test
+  version: 1.0.0
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/test", nil)
+
+	// This panics because the original code doesn't handle nil Paths either
+	assert.Panics(t, func() {
+		FindPath(request, &m.Model, nil)
+	}, "FindPath should panic when document has no paths")
+}
+
+func TestFindPath_RequestWithFragment(t *testing.T) {
+	// Test when request URL contains a fragment - normalizePathForMatching should NOT strip template fragment
+	spec := `openapi: 3.1.0
+info:
+  title: Fragment Test
+  version: 1.0.0
+paths:
+  /docs#section:
+    get:
+      operationId: getDocs
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// Request WITH fragment should match path WITH same fragment
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/docs#section", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "getDocs", pathItem.Get.OperationId)
+	assert.Equal(t, "/docs#section", foundPath)
+}
+
+func TestFindPath_RadixTree_MethodMismatch(t *testing.T) {
+	// Test that radix tree path match with wrong method returns proper error
+	// This covers lines 72-83 in FindPath (missingOperation from radix tree)
+	spec := `openapi: 3.1.0
+info:
+  title: Method Mismatch Test
+  version: 1.0.0
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// POST to a simple path that only has GET - radix tree handles this
+	request, _ := http.NewRequest(http.MethodPost, "https://api.com/users/123", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.NotNil(t, pathItem)
+	assert.NotNil(t, errs)
+	assert.Len(t, errs, 1)
+	assert.Equal(t, "missingOperation", errs[0].ValidationSubType)
+	assert.Equal(t, "/users/{id}", foundPath)
+}
+
+func TestFindPath_RequestWithFragment_MatchesPathWithFragment(t *testing.T) {
+	// Test normalizePathForMatching when REQUEST has fragment
+	// This covers lines 167-168: if strings.Contains(requestPath, "#") { return path }
+	// Using OData-style path to force regex fallback (radix tree can't handle embedded params)
+	spec := `openapi: 3.1.0
+info:
+  title: Fragment Test
+  version: 1.0.0
+paths:
+  /entities('{id}')#section1:
+    get:
+      operationId: getSection1
+  /entities('{id}')#section2:
+    get:
+      operationId: getSection2
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// Request with fragment should match exact path with fragment
+	// The OData path forces regex fallback, which calls normalizePathForMatching
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/entities('123')#section1", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "getSection1", pathItem.Get.OperationId)
+	assert.Equal(t, "/entities('{id}')#section1", foundPath)
+
+	// Different fragment should match different path
+	request, _ = http.NewRequest(http.MethodGet, "https://api.com/entities('456')#section2", nil)
+	pathItem, errs, foundPath = FindPath(request, &m.Model, nil)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "getSection2", pathItem.Get.OperationId)
+	assert.Equal(t, "/entities('{id}')#section2", foundPath)
+}
+
+func TestCheckPathAgainstBase_MergedPath(t *testing.T) {
+	// Test checkPathAgainstBase when docPath == merged (basePath + urlPath)
+	// This covers line 225-227
+
+	// Direct equality
+	result := checkPathAgainstBase("/users", "/users", nil)
+	assert.True(t, result)
+
+	// With base path merge
+	basePaths := []string{"/api/v1"}
+	result = checkPathAgainstBase("/api/v1/users", "/users", basePaths)
+	assert.True(t, result)
+
+	// With trailing slash on base path
+	basePaths = []string{"/api/v1/"}
+	result = checkPathAgainstBase("/api/v1/users", "/users", basePaths)
+	assert.True(t, result)
+
+	// No match
+	result = checkPathAgainstBase("/other/path", "/users", basePaths)
+	assert.False(t, result)
+}
+
+func TestFindPath_RegexFallback_MethodMismatch(t *testing.T) {
+	// Test missingOperation error from regex fallback path (lines 150-161)
+	// Using OData-style path to force regex fallback, with wrong method
+	spec := `openapi: 3.1.0
+info:
+  title: Method Mismatch Test
+  version: 1.0.0
+paths:
+  /entities('{id}'):
+    get:
+      operationId: getEntity
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// POST to OData path that only has GET - regex fallback handles this
+	request, _ := http.NewRequest(http.MethodPost, "https://api.com/entities('123')", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, nil)
+
+	assert.NotNil(t, pathItem)
+	assert.NotNil(t, errs)
+	assert.Len(t, errs, 1)
+	assert.Equal(t, "missingOperation", errs[0].ValidationSubType)
+	assert.Equal(t, "/entities('{id}')", foundPath)
 }

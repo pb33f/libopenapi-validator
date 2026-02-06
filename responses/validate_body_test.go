@@ -244,7 +244,7 @@ paths:
 	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	path, _, pv := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	// simulate a request/response
 	res := httptest.NewRecorder()
@@ -648,7 +648,7 @@ paths:
 	response := res.Result()
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	path, _, pv := paths.FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
 
 	// validate!
 	valid, errors := v.ValidateResponseBodyWithPathItem(request, response, path, pv)

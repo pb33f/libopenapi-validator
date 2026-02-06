@@ -6,6 +6,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/cache"
+	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 // RegexCache can be set to enable compiled regex caching.
@@ -30,6 +31,8 @@ type ValidationOptions struct {
 	AllowScalarCoercion bool // Enable string->boolean/number coercion
 	Formats             map[string]func(v any) error
 	SchemaCache         cache.SchemaCache // Optional cache for compiled schemas
+	PathTree            radix.PathLookup  // O(k) path lookup via radix tree (built automatically)
+	pathTreeSet         bool              // Internal: true if PathTree was explicitly set via WithPathTree
 	Logger              *slog.Logger      // Logger for debug/error output (nil = silent)
 
 	// strict mode options - detect undeclared properties even when additionalProperties: true
@@ -74,6 +77,8 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
 			o.SchemaCache = options.SchemaCache
+			o.PathTree = options.PathTree
+			o.pathTreeSet = options.pathTreeSet
 			o.Logger = options.Logger
 			o.StrictMode = options.StrictMode
 			o.StrictIgnorePaths = options.StrictIgnorePaths
@@ -164,9 +169,19 @@ func WithScalarCoercion() Option {
 // WithSchemaCache sets a custom cache implementation or disables caching if nil.
 // Pass nil to disable schema caching and skip cache warming during validator initialization.
 // The default cache is a thread-safe sync.Map wrapper.
-func WithSchemaCache(cache cache.SchemaCache) Option {
+func WithSchemaCache(schemaCache cache.SchemaCache) Option {
 	return func(o *ValidationOptions) {
-		o.SchemaCache = cache
+		o.SchemaCache = schemaCache
+	}
+}
+
+// WithPathTree sets a custom radix tree for path matching.
+// The default is built automatically from the OpenAPI specification.
+// Pass nil to disable the radix tree and use regex-based matching only.
+func WithPathTree(pathTree radix.PathLookup) Option {
+	return func(o *ValidationOptions) {
+		o.PathTree = pathTree
+		o.pathTreeSet = true
 	}
 }
 
@@ -231,6 +246,11 @@ var defaultIgnoredHeaders = []string{
 	"last-modified", "transfer-encoding", "vary", "x-forwarded-for",
 	"x-forwarded-proto", "x-real-ip", "x-request-id",
 	"request-start-time", // Added by some API clients for timing
+}
+
+// IsPathTreeSet returns true if PathTree was explicitly configured via WithPathTree.
+func (o *ValidationOptions) IsPathTreeSet() bool {
+	return o.pathTreeSet
 }
 
 // GetEffectiveStrictIgnoredHeaders returns the list of headers to ignore
