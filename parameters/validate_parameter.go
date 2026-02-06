@@ -18,6 +18,7 @@ import (
 
 	stdError "errors"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -33,23 +34,54 @@ func ValidateSingleParameterSchema(
 	subValType string,
 	o *config.ValidationOptions,
 ) (validationErrors []*errors.ValidationError) {
-	// Get the JSON Schema for the parameter definition.
-	jsonSchema, err := buildJsonRender(schema)
-	if err != nil {
-		return validationErrors
+	var jsonSchema []byte
+	var compiledSchema *jsonschema.Schema
+	var referenceSchema string
+
+	// Check cache first
+	if o != nil && o.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
+		hash := schema.GoLow().Hash()
+		if cached, ok := o.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
+			jsonSchema = cached.RenderedJSON
+			compiledSchema = cached.CompiledSchema
+			referenceSchema = cached.ReferenceSchema
+		}
 	}
 
-	// Attempt to compile the JSON Schema
-	jsch, err := helpers.NewCompiledSchema(name, jsonSchema, o)
-	if err != nil {
-		return validationErrors
+	// Cache miss - render and compile
+	if compiledSchema == nil {
+		var err error
+		jsonSchema, err = buildJsonRender(schema)
+		if err != nil {
+			return validationErrors
+		}
+
+		compiledSchema, err = helpers.NewCompiledSchema(name, jsonSchema, o)
+		if err != nil {
+			return validationErrors
+		}
+
+		// Store in cache for future use
+		if o != nil && o.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
+			hash := schema.GoLow().Hash()
+			renderCtx := base.NewInlineRenderContext()
+			renderedSchema, _ := schema.RenderInlineWithContext(renderCtx)
+			referenceSchema = string(renderedSchema)
+			o.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+				Schema:          schema,
+				RenderedInline:  renderedSchema,
+				ReferenceSchema: referenceSchema,
+				RenderedJSON:    jsonSchema,
+				CompiledSchema:  compiledSchema,
+			})
+		}
 	}
 
 	// Validate the object and report any errors.
-	scErrs := jsch.Validate(rawObject)
+	scErrs := compiledSchema.Validate(rawObject)
 	var werras *jsonschema.ValidationError
 	if stdError.As(scErrs, &werras) {
-		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType)
+		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType, referenceSchema)
 	}
 	return validationErrors
 }
@@ -92,11 +124,27 @@ func ValidateParameterSchema(
 	validationOptions *config.ValidationOptions,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
+	var jsonSchema []byte
+	var compiledSchema *jsonschema.Schema
+	var referenceSchema string
 
-	// 1. build a JSON render of the schema.
-	renderCtx := base.NewInlineRenderContext()
-	renderedSchema, _ := schema.RenderInlineWithContext(renderCtx)
-	jsonSchema, _ := utils.ConvertYAMLtoJSON(renderedSchema)
+	// Check cache first
+	if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
+		hash := schema.GoLow().Hash()
+		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
+			jsonSchema = cached.RenderedJSON
+			compiledSchema = cached.CompiledSchema
+			referenceSchema = cached.ReferenceSchema
+		}
+	}
+
+	// Cache miss - render and compile
+	if compiledSchema == nil {
+		renderCtx := base.NewInlineRenderContext()
+		renderedSchema, _ := schema.RenderInlineWithContext(renderCtx)
+		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
+		referenceSchema = string(renderedSchema)
+	}
 
 	// 2. decode the object into a json blob.
 	var decodedObj interface{}
@@ -123,29 +171,46 @@ func ValidateParameterSchema(
 		}
 		validEncoding = true
 	}
-	// 3. create a new json schema compiler and add the schema to it
-	jsch, err := helpers.NewCompiledSchema(name, jsonSchema, validationOptions)
-	if err != nil {
-		// schema compilation failed, return validation error instead of panicking
-		violation := &errors.SchemaValidationFailure{
-			Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
-			Location:        "schema compilation",
-			ReferenceSchema: string(jsonSchema),
+	// 3. create a new json schema compiler and add the schema to it (only on cache miss)
+	if compiledSchema == nil {
+		var err error
+		compiledSchema, err = helpers.NewCompiledSchema(name, jsonSchema, validationOptions)
+		if err != nil {
+			// schema compilation failed, return validation error instead of panicking
+			violation := &errors.SchemaValidationFailure{
+				Reason:          fmt.Sprintf("failed to compile JSON schema: %s", err.Error()),
+				Location:        "schema compilation",
+				ReferenceSchema: referenceSchema,
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    validationType,
+				ValidationSubType: subValType,
+				Message:           fmt.Sprintf("%s '%s' failed schema compilation", entity, name),
+				Reason: fmt.Sprintf("%s '%s' schema compilation failed: %s",
+					reasonEntity, name, err.Error()),
+				SpecLine:               1,
+				SpecCol:                0,
+				ParameterName:          name,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               "check the parameter schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
+				Context:                referenceSchema,
+			})
+			return validationErrors
 		}
-		validationErrors = append(validationErrors, &errors.ValidationError{
-			ValidationType:    validationType,
-			ValidationSubType: subValType,
-			Message:           fmt.Sprintf("%s '%s' failed schema compilation", entity, name),
-			Reason: fmt.Sprintf("%s '%s' schema compilation failed: %s",
-				reasonEntity, name, err.Error()),
-			SpecLine:               1,
-			SpecCol:                0,
-			ParameterName:          name,
-			SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
-			HowToFix:               "check the parameter schema for invalid JSON Schema syntax, complex regex patterns, or unsupported schema constructs",
-			Context:                string(jsonSchema),
-		})
-		return validationErrors
+
+		// Store in cache for future use
+		if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
+			hash := schema.GoLow().Hash()
+			renderCtx := base.NewInlineRenderContext()
+			renderedSchema, _ := schema.RenderInlineWithContext(renderCtx)
+			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+				Schema:          schema,
+				RenderedInline:  renderedSchema,
+				ReferenceSchema: referenceSchema,
+				RenderedJSON:    jsonSchema,
+				CompiledSchema:  compiledSchema,
+			})
+		}
 	}
 
 	// 4. validate the object against the schema
@@ -183,13 +248,13 @@ func ValidateParameterSchema(
 				}
 			}
 			if !skip {
-				scErrs = jsch.Validate(p)
+				scErrs = compiledSchema.Validate(p)
 			}
 		}
 	}
 	var werras *jsonschema.ValidationError
 	if stdError.As(scErrs, &werras) {
-		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType)
+		validationErrors = formatJsonSchemaValidationError(schema, werras, entity, reasonEntity, name, validationType, subValType, referenceSchema)
 	}
 
 	// if there are no validationErrors, check that the supplied value is even JSON
@@ -213,7 +278,7 @@ func ValidateParameterSchema(
 	return validationErrors
 }
 
-func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.ValidationError, entity string, reasonEntity string, name string, validationType string, subValType string) (validationErrors []*errors.ValidationError) {
+func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.ValidationError, entity string, reasonEntity string, name string, validationType string, subValType string, referenceSchema string) (validationErrors []*errors.ValidationError) {
 	// flatten the validationErrors
 	schFlatErrs := scErrs.BasicOutput().Errors
 	var schemaValidationErrors []*errors.SchemaValidationFailure
@@ -233,7 +298,9 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 			InstancePath:  helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
 			OriginalError: scErrs,
 		}
-		if schema != nil {
+		if referenceSchema != "" {
+			fail.ReferenceSchema = referenceSchema
+		} else if schema != nil {
 			renderCtx := base.NewInlineRenderContext()
 			rendered, err := schema.RenderInlineWithContext(renderCtx)
 			if err == nil && rendered != nil {
