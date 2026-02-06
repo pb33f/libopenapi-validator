@@ -90,8 +90,9 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	options := config.NewValidationOptions(opts...)
 
 	// Build radix tree for O(k) path lookup (where k = path depth)
-	if options.PathLookup == nil {
-		options.PathLookup = radix.BuildPathTree(m)
+	// Skip if explicitly set via WithPathTree (including nil to disable)
+	if options.PathTree == nil && !options.IsPathTreeSet() {
+		options.PathTree = radix.BuildPathTree(m)
 	}
 
 	// warm the schema caches by pre-compiling all schemas in the document

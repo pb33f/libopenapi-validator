@@ -31,7 +31,8 @@ type ValidationOptions struct {
 	AllowScalarCoercion bool // Enable string->boolean/number coercion
 	Formats             map[string]func(v any) error
 	SchemaCache         cache.SchemaCache // Optional cache for compiled schemas
-	PathLookup          radix.PathLookup  // O(k) path lookup via radix tree (built automatically)
+	PathTree            radix.PathLookup  // O(k) path lookup via radix tree (built automatically)
+	pathTreeSet         bool              // Internal: true if PathTree was explicitly set via WithPathTree
 	Logger              *slog.Logger      // Logger for debug/error output (nil = silent)
 
 	// strict mode options - detect undeclared properties even when additionalProperties: true
@@ -76,7 +77,8 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
 			o.SchemaCache = options.SchemaCache
-			o.PathLookup = options.PathLookup
+			o.PathTree = options.PathTree
+			o.pathTreeSet = options.pathTreeSet
 			o.Logger = options.Logger
 			o.StrictMode = options.StrictMode
 			o.StrictIgnorePaths = options.StrictIgnorePaths
@@ -173,11 +175,13 @@ func WithSchemaCache(schemaCache cache.SchemaCache) Option {
 	}
 }
 
-// WithPathLookup sets a custom path lookup implementation.
-// The default is a radix tree built from the OpenAPI specification.
-func WithPathLookup(pathLookup radix.PathLookup) Option {
+// WithPathTree sets a custom radix tree for path matching.
+// The default is built automatically from the OpenAPI specification.
+// Pass nil to disable the radix tree and use regex-based matching only.
+func WithPathTree(pathTree radix.PathLookup) Option {
 	return func(o *ValidationOptions) {
-		o.PathLookup = pathLookup
+		o.PathTree = pathTree
+		o.pathTreeSet = true
 	}
 }
 
@@ -242,6 +246,11 @@ var defaultIgnoredHeaders = []string{
 	"last-modified", "transfer-encoding", "vary", "x-forwarded-for",
 	"x-forwarded-proto", "x-real-ip", "x-request-id",
 	"request-start-time", // Added by some API clients for timing
+}
+
+// IsPathTreeSet returns true if PathTree was explicitly configured via WithPathTree.
+func (o *ValidationOptions) IsPathTreeSet() bool {
+	return o.pathTreeSet
 }
 
 // GetEffectiveStrictIgnoredHeaders returns the list of headers to ignore
