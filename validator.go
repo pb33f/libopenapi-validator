@@ -22,7 +22,6 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/parameters"
-	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/radix"
 	"github.com/pb33f/libopenapi-validator/requests"
 	"github.com/pb33f/libopenapi-validator/responses"
@@ -129,50 +128,6 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	return v
 }
 
-// resolvePath uses the matcher chain to find the matching path for a request.
-// Returns the PathItem, any validation errors, and the matched path template.
-// This is the internal replacement for paths.FindPath that uses the matcher chain.
-func (v *validator) resolvePath(request *http.Request) (*v3.PathItem, []*errors.ValidationError, string) {
-	stripped := paths.StripRequestPath(request, v.v3Model)
-
-	route := v.matchers.Match(stripped, v.v3Model)
-	if route == nil {
-		validationErrors := []*errors.ValidationError{
-			{
-				ValidationType:    helpers.PathValidation,
-				ValidationSubType: helpers.ValidationMissing,
-				Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
-				Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
-					"however that path, or the %s method for that path does not exist in the specification",
-					request.Method, request.URL.Path, request.Method),
-				SpecLine: -1,
-				SpecCol:  -1,
-				HowToFix: errors.HowToFixPath,
-			},
-		}
-		errors.PopulateValidationErrors(validationErrors, request, "")
-		return nil, validationErrors, ""
-	}
-
-	// Check if the matched path has the requested HTTP method
-	if helpers.OperationForMethod(request.Method, route.pathItem) == nil {
-		validationErrors := []*errors.ValidationError{{
-			ValidationType:    helpers.PathValidation,
-			ValidationSubType: helpers.ValidationMissingOperation,
-			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
-			Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
-				request.Method),
-			SpecLine: -1,
-			SpecCol:  -1,
-			HowToFix: errors.HowToFixPath,
-		}}
-		errors.PopulateValidationErrors(validationErrors, request, route.matchedPath)
-		return route.pathItem, validationErrors, route.matchedPath
-	}
-
-	return route.pathItem, nil, route.matchedPath
-}
-
 func (v *validator) SetDocument(document libopenapi.Document) {
 	v.document = document
 }
@@ -212,20 +167,12 @@ func (v *validator) ValidateHttpResponse(
 	request *http.Request,
 	response *http.Response,
 ) (bool, []*errors.ValidationError) {
-	var pathItem *v3.PathItem
-	var pathValue string
-	var errs []*errors.ValidationError
-
-	pathItem, errs, pathValue = v.resolvePath(request)
-	if pathItem == nil || errs != nil {
+	ctx, errs := v.buildRequestContext(request)
+	if errs != nil {
 		return false, errs
 	}
-
-	responseBodyValidator := v.responseValidator
-
-	// validate response
-	_, responseErrors := responseBodyValidator.ValidateResponseBodyWithPathItem(request, response, pathItem, pathValue)
-
+	_, responseErrors := v.responseValidator.ValidateResponseBodyWithPathItem(
+		request, response, ctx.route.pathItem, ctx.route.matchedPath)
 	if len(responseErrors) > 0 {
 		return false, responseErrors
 	}
@@ -236,21 +183,13 @@ func (v *validator) ValidateHttpRequestResponse(
 	request *http.Request,
 	response *http.Response,
 ) (bool, []*errors.ValidationError) {
-	var pathItem *v3.PathItem
-	var pathValue string
-	var errs []*errors.ValidationError
-
-	pathItem, errs, pathValue = v.resolvePath(request)
-	if pathItem == nil || errs != nil {
+	ctx, errs := v.buildRequestContext(request)
+	if errs != nil {
 		return false, errs
 	}
-
-	responseBodyValidator := v.responseValidator
-
-	// validate request and response
-	_, requestErrors := v.ValidateHttpRequestWithPathItem(request, pathItem, pathValue)
-	_, responseErrors := responseBodyValidator.ValidateResponseBodyWithPathItem(request, response, pathItem, pathValue)
-
+	_, requestErrors := v.ValidateHttpRequestWithPathItem(request, ctx.route.pathItem, ctx.route.matchedPath)
+	_, responseErrors := v.responseValidator.ValidateResponseBodyWithPathItem(
+		request, response, ctx.route.pathItem, ctx.route.matchedPath)
 	if len(requestErrors) > 0 || len(responseErrors) > 0 {
 		return false, append(requestErrors, responseErrors...)
 	}
@@ -264,19 +203,24 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 		return v.ValidateHttpRequestSync(request)
 	}
 
-	pathItem, errs, foundPath := v.resolvePath(request)
-	if len(errs) > 0 {
+	ctx, errs := v.buildRequestContext(request)
+	if errs != nil {
 		return false, errs
 	}
-	return v.ValidateHttpRequestWithPathItem(request, pathItem, foundPath)
+	return v.ValidateHttpRequestWithPathItem(request, ctx.route.pathItem, ctx.route.matchedPath)
 }
 
 func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
-	// create a new parameter validator
-	paramValidator := v.paramValidator
-
-	// create a new request body validator
-	reqBodyValidator := v.requestValidator
+	// Construct a requestContext for the async validation functions
+	ctx := &requestContext{
+		request: request,
+		route: &resolvedRoute{
+			pathItem:    pathItem,
+			matchedPath: pathValue,
+		},
+		operation: helpers.OperationForMethod(request.Method, pathItem),
+		version:   v.version,
+	}
 
 	// create some channels to handle async validation
 	doneChan := make(chan struct{})
@@ -291,11 +235,11 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 		var paramValidationErrors []*errors.ValidationError
 
 		validations := []validationFunction{
-			paramValidator.ValidatePathParamsWithPathItem,
-			paramValidator.ValidateCookieParamsWithPathItem,
-			paramValidator.ValidateHeaderParamsWithPathItem,
-			paramValidator.ValidateQueryParamsWithPathItem,
-			paramValidator.ValidateSecurityWithPathItem,
+			v.validatePathParamsCtx,
+			v.validateCookieParamsCtx,
+			v.validateHeaderParamsCtx,
+			v.validateQueryParamsCtx,
+			v.validateSecurityCtx,
 		}
 
 		// listen for validation errors on parameters. everything will run async.
@@ -320,7 +264,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 			errorChan chan []*errors.ValidationError,
 			validatorFunc validationFunction,
 		) {
-			valid, pErrs := validatorFunc(request, pathItem, pathValue)
+			valid, pErrs := validatorFunc(ctx)
 			if !valid {
 				errorChan <- pErrs
 			}
@@ -342,7 +286,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 	}
 
 	requestBodyValidationFunc := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
-		valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
+		valid, pErrs := v.validateRequestBodyCtx(ctx)
 		if !valid {
 			errorChan <- pErrs
 		}
@@ -374,44 +318,67 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 	return len(validationErrors) == 0, validationErrors
 }
 
+func (v *validator) validatePathParamsCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
+	return v.paramValidator.ValidatePathParamsWithPathItem(ctx.request, ctx.route.pathItem, ctx.route.matchedPath)
+}
+
+func (v *validator) validateQueryParamsCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
+	return v.paramValidator.ValidateQueryParamsWithPathItem(ctx.request, ctx.route.pathItem, ctx.route.matchedPath)
+}
+
+func (v *validator) validateHeaderParamsCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
+	return v.paramValidator.ValidateHeaderParamsWithPathItem(ctx.request, ctx.route.pathItem, ctx.route.matchedPath)
+}
+
+func (v *validator) validateCookieParamsCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
+	return v.paramValidator.ValidateCookieParamsWithPathItem(ctx.request, ctx.route.pathItem, ctx.route.matchedPath)
+}
+
+func (v *validator) validateSecurityCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
+	return v.paramValidator.ValidateSecurityWithPathItem(ctx.request, ctx.route.pathItem, ctx.route.matchedPath)
+}
+
+func (v *validator) validateRequestBodyCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
+	return v.requestValidator.ValidateRequestBodyWithPathItem(ctx.request, ctx.route.pathItem, ctx.route.matchedPath)
+}
+
+// validateRequestSync runs all validation functions sequentially using the request context.
+func (v *validator) validateRequestSync(ctx *requestContext) (bool, []*errors.ValidationError) {
+	var validationErrors []*errors.ValidationError
+	for _, validateFunc := range []validationFunction{
+		v.validatePathParamsCtx,
+		v.validateCookieParamsCtx,
+		v.validateHeaderParamsCtx,
+		v.validateQueryParamsCtx,
+		v.validateSecurityCtx,
+		v.validateRequestBodyCtx,
+	} {
+		if valid, pErrs := validateFunc(ctx); !valid {
+			validationErrors = append(validationErrors, pErrs...)
+		}
+	}
+	return len(validationErrors) == 0, validationErrors
+}
+
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := v.resolvePath(request)
-	if len(errs) > 0 {
+	ctx, errs := v.buildRequestContext(request)
+	if errs != nil {
 		return false, errs
 	}
-	return v.ValidateHttpRequestSyncWithPathItem(request, pathItem, foundPath)
+	return v.validateRequestSync(ctx)
 }
 
 func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
-	// create a new parameter validator
-	paramValidator := v.paramValidator
-
-	// create a new request body validator
-	reqBodyValidator := v.requestValidator
-
-	validationErrors := make([]*errors.ValidationError, 0)
-
-	paramValidationErrors := make([]*errors.ValidationError, 0)
-	for _, validateFunc := range []validationFunction{
-		paramValidator.ValidatePathParamsWithPathItem,
-		paramValidator.ValidateCookieParamsWithPathItem,
-		paramValidator.ValidateHeaderParamsWithPathItem,
-		paramValidator.ValidateQueryParamsWithPathItem,
-		paramValidator.ValidateSecurityWithPathItem,
-	} {
-		valid, pErrs := validateFunc(request, pathItem, pathValue)
-		if !valid {
-			paramValidationErrors = append(paramValidationErrors, pErrs...)
-		}
+	ctx := &requestContext{
+		request: request,
+		route: &resolvedRoute{
+			pathItem:    pathItem,
+			matchedPath: pathValue,
+		},
+		operation: helpers.OperationForMethod(request.Method, pathItem),
+		version:   v.version,
 	}
-
-	valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
-	if !valid {
-		paramValidationErrors = append(paramValidationErrors, pErrs...)
-	}
-
-	validationErrors = append(validationErrors, paramValidationErrors...)
-	return len(validationErrors) == 0, validationErrors
+	return v.validateRequestSync(ctx)
 }
 
 type validator struct {
@@ -449,7 +416,7 @@ func runValidation(control, doneChan chan struct{},
 }
 
 type (
-	validationFunction      func(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
+	validationFunction      func(ctx *requestContext) (bool, []*errors.ValidationError)
 	validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
 )
 
