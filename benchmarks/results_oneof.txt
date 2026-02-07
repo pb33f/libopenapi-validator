@@ -1,0 +1,58 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/pb33f/libopenapi-validator/benchmarks
+cpu: Apple M4 Max
+BenchmarkProd_Init-16                                	       1	2709541917 ns/op	3117928032 B/op	36490320 allocs/op
+BenchmarkProd_Init-16                                	       1	2846241917 ns/op	3214793832 B/op	37345748 allocs/op
+BenchmarkProd_Init-16                                	       1	2768651416 ns/op	3216275128 B/op	37353782 allocs/op
+BenchmarkProd_Init_MemoryFootprint-16                	       1	2847588541 ns/op	   3851768 heap-bytes	     67153 heap-objects	3214863840 B/op	37352064 allocs/op
+BenchmarkProd_Init_MemoryFootprint-16                	       1	2969881416 ns/op	   3579312 heap-bytes	     66509 heap-objects	3245880936 B/op	37656371 allocs/op
+BenchmarkProd_Init_MemoryFootprint-16                	       1	3250684000 ns/op	   4338872 heap-bytes	     65966 heap-objects	3235614336 B/op	37541535 allocs/op
+BenchmarkProd_BulkActions_SingleCampaign-16          	   46803	     25779 ns/op	   17498 B/op	     325 allocs/op
+BenchmarkProd_BulkActions_SingleCampaign-16          	   49252	     25564 ns/op	   17492 B/op	     325 allocs/op
+BenchmarkProd_BulkActions_SingleCampaign-16          	   49953	     24605 ns/op	   17501 B/op	     325 allocs/op
+BenchmarkProd_BulkActions_Mixed3-16                  	   21994	     51769 ns/op	   53129 B/op	     965 allocs/op
+BenchmarkProd_BulkActions_Mixed3-16                  	   23162	     50534 ns/op	   53123 B/op	     965 allocs/op
+BenchmarkProd_BulkActions_Mixed3-16                  	   22612	     61451 ns/op	   53133 B/op	     965 allocs/op
+BenchmarkProd_BulkActions_Large15-16                 	    6277	    177459 ns/op	  244602 B/op	    4304 allocs/op
+BenchmarkProd_BulkActions_Large15-16                 	    7388	    168957 ns/op	  244523 B/op	    4302 allocs/op
+BenchmarkProd_BulkActions_Large15-16                 	    7005	    179887 ns/op	  244568 B/op	    4303 allocs/op
+BenchmarkProd_BulkActions_Invalid_MissingField-16    	   14383	     82966 ns/op	   87740 B/op	    1601 allocs/op
+BenchmarkProd_BulkActions_Invalid_MissingField-16    	   15643	     81456 ns/op	   87764 B/op	    1601 allocs/op
+BenchmarkProd_BulkActions_Invalid_MissingField-16    	   14986	     80117 ns/op	   87748 B/op	    1601 allocs/op
+BenchmarkProd_BulkActions_Invalid_WrongType-16       	    9637	    123489 ns/op	  141487 B/op	    2438 allocs/op
+BenchmarkProd_BulkActions_Invalid_WrongType-16       	   10000	    123077 ns/op	  141494 B/op	    2438 allocs/op
+BenchmarkProd_BulkActions_Invalid_WrongType-16       	   10000	    122167 ns/op	  141487 B/op	    2438 allocs/op
+BenchmarkProd_BulkActions_Invalid_ExtraField-16      	    7972	    151336 ns/op	  173099 B/op	    3014 allocs/op
+BenchmarkProd_BulkActions_Invalid_ExtraField-16      	    8877	    152876 ns/op	  173133 B/op	    3014 allocs/op
+BenchmarkProd_BulkActions_Invalid_ExtraField-16      	    8354	    150243 ns/op	  173109 B/op	    3014 allocs/op
+BenchmarkProd_BulkActions_Invalid_ContentType-16     	  101173	     10914 ns/op	    4832 B/op	      97 allocs/op
+BenchmarkProd_BulkActions_Invalid_ContentType-16     	  135019	     11687 ns/op	    4832 B/op	      97 allocs/op
+BenchmarkProd_BulkActions_Invalid_ContentType-16     	  137504	     12711 ns/op	    4832 B/op	      97 allocs/op
+BenchmarkProd_GET_ListCampaigns-16                   	  365862	      3382 ns/op	    3697 B/op	      89 allocs/op
+BenchmarkProd_GET_ListCampaigns-16                   	  367837	      3426 ns/op	    3697 B/op	      89 allocs/op
+BenchmarkProd_GET_ListCampaigns-16                   	  366966	      3578 ns/op	    3697 B/op	      89 allocs/op
+BenchmarkProd_GET_ListAdGroups-16                    	  288392	      4215 ns/op	    4513 B/op	     111 allocs/op
+BenchmarkProd_GET_ListAdGroups-16                    	  296079	      4222 ns/op	    4513 B/op	     111 allocs/op
+BenchmarkProd_GET_ListAdGroups-16                    	  289665	      4262 ns/op	    4513 B/op	     111 allocs/op
+BenchmarkProd_GET_ListAds-16                         	  366175	      3389 ns/op	    3697 B/op	      89 allocs/op
+BenchmarkProd_GET_ListAds-16                         	  349141	      3434 ns/op	    3697 B/op	      89 allocs/op
+BenchmarkProd_GET_ListAds-16                         	  353517	      3456 ns/op	    3697 B/op	      89 allocs/op
+BenchmarkProd_GET_Me-16                              	 1533409	       766.9 ns/op	    1168 B/op	      18 allocs/op
+BenchmarkProd_GET_Me-16                              	 1546609	       780.6 ns/op	    1168 B/op	      18 allocs/op
+BenchmarkProd_GET_Me-16                              	 1540164	       777.8 ns/op	    1168 B/op	      18 allocs/op
+BenchmarkProd_GET_GetBulkActionsJob-16               	  355526	      3430 ns/op	    3200 B/op	      81 allocs/op
+BenchmarkProd_GET_GetBulkActionsJob-16               	  363735	      3422 ns/op	    3200 B/op	      81 allocs/op
+BenchmarkProd_GET_GetBulkActionsJob-16               	  347875	      3432 ns/op	    3200 B/op	      81 allocs/op
+BenchmarkProd_Concurrent_BulkActions-16              	  127906	     10958 ns/op	   53138 B/op	     966 allocs/op
+BenchmarkProd_Concurrent_BulkActions-16              	  126508	     11545 ns/op	   53148 B/op	     966 allocs/op
+BenchmarkProd_Concurrent_BulkActions-16              	  129488	     10089 ns/op	   53125 B/op	     965 allocs/op
+BenchmarkProd_Concurrent_MixedEndpoints-16           	  494131	      2105 ns/op	   11435 B/op	     221 allocs/op
+BenchmarkProd_Concurrent_MixedEndpoints-16           	  856428	      2128 ns/op	   11435 B/op	     221 allocs/op
+BenchmarkProd_Concurrent_MixedEndpoints-16           	  883941	      2122 ns/op	   11436 B/op	     222 allocs/op
+BenchmarkProd_BulkActions_Sync-16                    	   33493	     36043 ns/op	   51692 B/op	     938 allocs/op
+BenchmarkProd_BulkActions_Sync-16                    	   33336	     35982 ns/op	   51688 B/op	     938 allocs/op
+BenchmarkProd_BulkActions_Sync-16                    	   33034	     35731 ns/op	   51696 B/op	     938 allocs/op
+BenchmarkProd_BulkActions_Async-16                   	   23635	     50605 ns/op	   53147 B/op	     966 allocs/op
+BenchmarkProd_BulkActions_Async-16                   	   24212	     50200 ns/op	   53146 B/op	     966 allocs/op
+BenchmarkProd_BulkActions_Async-16                   	   24121	     49747 ns/op	   53160 B/op	     966 allocs/op

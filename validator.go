@@ -197,8 +197,8 @@ func (v *validator) ValidateHttpRequestResponse(
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
-	// Fast path: use synchronous validation for GET/HEAD/OPTIONS/DELETE requests
-	// without a body to avoid unnecessary goroutine and channel overhead.
+	// Fast path: use synchronous validation for requests without a body
+	// to avoid unnecessary goroutine overhead.
 	if request.Body == nil || request.ContentLength == 0 {
 		return v.ValidateHttpRequestSync(request)
 	}
@@ -207,11 +207,10 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 	if errs != nil {
 		return false, errs
 	}
-	return v.ValidateHttpRequestWithPathItem(request, ctx.route.pathItem, ctx.route.matchedPath)
+	return v.validateWithContext(ctx)
 }
 
 func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
-	// Construct a requestContext for the async validation functions
 	ctx := &requestContext{
 		request: request,
 		route: &resolvedRoute{
@@ -221,101 +220,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 		operation: helpers.OperationForMethod(request.Method, pathItem),
 		version:   v.version,
 	}
-
-	// create some channels to handle async validation
-	doneChan := make(chan struct{})
-	errChan := make(chan []*errors.ValidationError)
-	controlChan := make(chan struct{})
-
-	// async param validation function.
-	parameterValidationFunc := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
-		paramErrs := make(chan []*errors.ValidationError)
-		paramControlChan := make(chan struct{})
-		paramFunctionControlChan := make(chan struct{})
-		var paramValidationErrors []*errors.ValidationError
-
-		validations := []validationFunction{
-			v.validatePathParamsCtx,
-			v.validateCookieParamsCtx,
-			v.validateHeaderParamsCtx,
-			v.validateQueryParamsCtx,
-			v.validateSecurityCtx,
-		}
-
-		// listen for validation errors on parameters. everything will run async.
-		paramListener := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
-			completedValidations := 0
-			for {
-				select {
-				case vErrs := <-errorChan:
-					paramValidationErrors = append(paramValidationErrors, vErrs...)
-				case <-control:
-					completedValidations++
-					if completedValidations == len(validations) {
-						paramFunctionControlChan <- struct{}{}
-						return
-					}
-				}
-			}
-		}
-
-		validateParamFunction := func(
-			control chan struct{},
-			errorChan chan []*errors.ValidationError,
-			validatorFunc validationFunction,
-		) {
-			valid, pErrs := validatorFunc(ctx)
-			if !valid {
-				errorChan <- pErrs
-			}
-			control <- struct{}{}
-		}
-		go paramListener(paramControlChan, paramErrs)
-		for i := range validations {
-			go validateParamFunction(paramControlChan, paramErrs, validations[i])
-		}
-
-		// wait for all the validations to complete
-		<-paramFunctionControlChan
-		if len(paramValidationErrors) > 0 {
-			errorChan <- paramValidationErrors
-		}
-
-		// let runValidation know we are done with this part.
-		controlChan <- struct{}{}
-	}
-
-	requestBodyValidationFunc := func(control chan struct{}, errorChan chan []*errors.ValidationError) {
-		valid, pErrs := v.validateRequestBodyCtx(ctx)
-		if !valid {
-			errorChan <- pErrs
-		}
-		control <- struct{}{}
-	}
-
-	// build async functions
-	asyncFunctions := []validationFunctionAsync{
-		parameterValidationFunc,
-		requestBodyValidationFunc,
-	}
-
-	var validationErrors []*errors.ValidationError
-
-	// sit and wait for everything to report back.
-	go runValidation(controlChan, doneChan, errChan, &validationErrors, len(asyncFunctions))
-
-	// run async functions
-	for i := range asyncFunctions {
-		go asyncFunctions[i](controlChan, errChan)
-	}
-
-	// wait for all the validations to complete
-	<-doneChan
-
-	// sort errors for deterministic ordering (async validation can return errors in any order)
-	sortValidationErrors(validationErrors)
-
-	return len(validationErrors) == 0, validationErrors
+	return v.validateWithContext(ctx)
 }
 
 func (v *validator) validatePathParamsCtx(ctx *requestContext) (bool, []*errors.ValidationError) {
@@ -360,6 +265,38 @@ func (v *validator) validateRequestSync(ctx *requestContext) (bool, []*errors.Va
 	return len(validationErrors) == 0, validationErrors
 }
 
+// validateWithContext runs all validation functions concurrently using a WaitGroup.
+// This replaces the previous 9-goroutine/5-channel choreography with a simpler pattern.
+func (v *validator) validateWithContext(ctx *requestContext) (bool, []*errors.ValidationError) {
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var allErrors []*errors.ValidationError
+
+	validators := []validationFunction{
+		v.validatePathParamsCtx,
+		v.validateCookieParamsCtx,
+		v.validateHeaderParamsCtx,
+		v.validateQueryParamsCtx,
+		v.validateSecurityCtx,
+		v.validateRequestBodyCtx,
+	}
+
+	wg.Add(len(validators))
+	for _, fn := range validators {
+		go func(validate validationFunction) {
+			defer wg.Done()
+			if valid, errs := validate(ctx); !valid {
+				mu.Lock()
+				allErrors = append(allErrors, errs...)
+				mu.Unlock()
+			}
+		}(fn)
+	}
+	wg.Wait()
+	sortValidationErrors(allErrors)
+	return len(allErrors) == 0, allErrors
+}
+
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
 	ctx, errs := v.buildRequestContext(request)
 	if errs != nil {
@@ -392,33 +329,7 @@ type validator struct {
 	version           float32 // cached OAS version (3.0 or 3.1)
 }
 
-func runValidation(control, doneChan chan struct{},
-	errorChan chan []*errors.ValidationError,
-	validationErrors *[]*errors.ValidationError,
-	total int,
-) {
-	var validationLock sync.Mutex
-	completedValidations := 0
-	for {
-		select {
-		case vErrs := <-errorChan:
-			validationLock.Lock()
-			*validationErrors = append(*validationErrors, vErrs...)
-			validationLock.Unlock()
-		case <-control:
-			completedValidations++
-			if completedValidations == total {
-				doneChan <- struct{}{}
-				return
-			}
-		}
-	}
-}
-
-type (
-	validationFunction      func(ctx *requestContext) (bool, []*errors.ValidationError)
-	validationFunctionAsync func(control chan struct{}, errorChan chan []*errors.ValidationError)
-)
+type validationFunction func(ctx *requestContext) (bool, []*errors.ValidationError)
 
 // sortValidationErrors sorts validation errors for deterministic ordering.
 // Errors are sorted by validation type first, then by message.
