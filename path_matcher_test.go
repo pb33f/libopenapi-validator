@@ -7,14 +7,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-
+	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/radix"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 )
 
 func createTestDocument(paths map[string]bool) *v3.Document {
@@ -155,7 +154,59 @@ paths:
 	require.NotNil(t, result, "should find match")
 	assert.NotNil(t, result.pathItem, "pathItem should not be nil")
 	assert.Equal(t, "/users/{id}", result.matchedPath)
-	assert.Nil(t, result.pathParams, "regex matcher should not extract params yet")
+	assert.Equal(t, map[string]string{"id": "123"}, result.pathParams)
+}
+
+func TestRegexMatcher_ExtractsMultipleParams(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users/{userId}/posts/{postId}:
+    get:
+      responses:
+        '200':
+          description: OK
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	matcher := &regexMatcher{regexCache: &sync.Map{}}
+	result := matcher.Match("/users/abc/posts/456", &model.Model)
+
+	require.NotNil(t, result, "should find match")
+	assert.Equal(t, "/users/{userId}/posts/{postId}", result.matchedPath)
+	assert.Equal(t, map[string]string{"userId": "abc", "postId": "456"}, result.pathParams)
+}
+
+func TestRegexMatcher_NoParams(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          description: OK
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	matcher := &regexMatcher{regexCache: &sync.Map{}}
+	result := matcher.Match("/health", &model.Model)
+
+	require.NotNil(t, result, "should find match")
+	assert.Equal(t, "/health", result.matchedPath)
+	assert.Nil(t, result.pathParams, "literal paths should have nil params")
 }
 
 func TestRegexMatcher_NilDoc(t *testing.T) {
@@ -192,4 +243,57 @@ paths:
 	matcher := &regexMatcher{regexCache: &sync.Map{}}
 	result := matcher.Match("/posts/123", &model.Model)
 	assert.Nil(t, result, "should not find match")
+}
+
+func TestExtractPathParams(t *testing.T) {
+	tests := []struct {
+		name        string
+		template    string
+		requestPath string
+		expected    map[string]string
+	}{
+		{
+			name:        "single param",
+			template:    "/users/{id}",
+			requestPath: "/users/123",
+			expected:    map[string]string{"id": "123"},
+		},
+		{
+			name:        "multiple params",
+			template:    "/users/{userId}/posts/{postId}",
+			requestPath: "/users/abc/posts/456",
+			expected:    map[string]string{"userId": "abc", "postId": "456"},
+		},
+		{
+			name:        "no params",
+			template:    "/health",
+			requestPath: "/health",
+			expected:    nil,
+		},
+		{
+			name:        "param with pattern",
+			template:    "/orders/{id:[0-9]+}",
+			requestPath: "/orders/42",
+			expected:    map[string]string{"id": "42"},
+		},
+		{
+			name:        "segment count mismatch returns nil",
+			template:    "/users/{id}",
+			requestPath: "/users/123/extra",
+			expected:    nil,
+		},
+		{
+			name:        "deep path with mixed segments",
+			template:    "/api/v1/{resource}/items/{itemId}",
+			requestPath: "/api/v1/widgets/items/99",
+			expected:    map[string]string{"resource": "widgets", "itemId": "99"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractPathParams(tt.template, tt.requestPath)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
