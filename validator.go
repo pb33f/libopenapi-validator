@@ -110,7 +110,12 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	}
 	matchers = append(matchers, &regexMatcher{regexCache: options.RegexCache})
 
-	v := &validator{options: options, v3Model: m, matchers: matchers}
+	v := &validator{
+		options:  options,
+		v3Model:  m,
+		matchers: matchers,
+		version:  helpers.VersionToFloat(m.Version),
+	}
 
 	// create a new parameter validator
 	v.paramValidator = parameters.NewParameterValidator(m, config.WithExistingOpts(options))
@@ -417,6 +422,7 @@ type validator struct {
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
 	matchers          matcherChain
+	version           float32 // cached OAS version (3.0 or 3.1)
 }
 
 func runValidation(control, doneChan chan struct{},

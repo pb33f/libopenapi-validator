@@ -144,7 +144,7 @@ func (v *responseBodyValidator) checkResponseSchema(
 				Request:  request,
 				Response: response,
 				Schema:   schema,
-				Version:  helpers.VersionToFloat(v.document.Version),
+				Version:  v.version,
 				Options:  []config.Option{config.WithExistingOpts(v.options)},
 			})
 			if !valid {

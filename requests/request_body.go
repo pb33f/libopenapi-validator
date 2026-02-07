@@ -10,6 +10,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // RequestBodyValidator is an interface that defines the methods for validating request bodies for Operations.
@@ -31,11 +32,15 @@ type RequestBodyValidator interface {
 // NewRequestBodyValidator will create a new RequestBodyValidator from an OpenAPI 3+ document
 func NewRequestBodyValidator(document *v3.Document, opts ...config.Option) RequestBodyValidator {
 	options := config.NewValidationOptions(opts...)
-
-	return &requestBodyValidator{options: options, document: document}
+	return &requestBodyValidator{
+		options:  options,
+		document: document,
+		version:  helpers.VersionToFloat(document.Version),
+	}
 }
 
 type requestBodyValidator struct {
 	options  *config.ValidationOptions
 	document *v3.Document
+	version  float32
 }
