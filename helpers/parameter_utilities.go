@@ -28,81 +28,18 @@ type QueryParam struct {
 // Both the path level params and the method level params will be returned.
 func ExtractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.Parameter {
 	params := item.Parameters
-	switch request.Method {
-	case http.MethodGet:
-		if item.Get != nil {
-			params = append(params, item.Get.Parameters...)
-		}
-	case http.MethodPost:
-		if item.Post != nil {
-			params = append(params, item.Post.Parameters...)
-		}
-	case http.MethodPut:
-		if item.Put != nil {
-			params = append(params, item.Put.Parameters...)
-		}
-	case http.MethodDelete:
-		if item.Delete != nil {
-			params = append(params, item.Delete.Parameters...)
-		}
-	case http.MethodOptions:
-		if item.Options != nil {
-			params = append(params, item.Options.Parameters...)
-		}
-	case http.MethodHead:
-		if item.Head != nil {
-			params = append(params, item.Head.Parameters...)
-		}
-	case http.MethodPatch:
-		if item.Patch != nil {
-			params = append(params, item.Patch.Parameters...)
-		}
-	case http.MethodTrace:
-		if item.Trace != nil {
-			params = append(params, item.Trace.Parameters...)
-		}
+	if op := OperationForMethod(request.Method, item); op != nil {
+		params = append(params, op.Parameters...)
 	}
 	return params
 }
 
 // ExtractSecurityForOperation will extract the security requirements for the operation based on the request method.
 func ExtractSecurityForOperation(request *http.Request, item *v3.PathItem) []*base.SecurityRequirement {
-	var schemes []*base.SecurityRequirement
-	switch request.Method {
-	case http.MethodGet:
-		if item.Get != nil {
-			schemes = append(schemes, item.Get.Security...)
-		}
-	case http.MethodPost:
-		if item.Post != nil {
-			schemes = append(schemes, item.Post.Security...)
-		}
-	case http.MethodPut:
-		if item.Put != nil {
-			schemes = append(schemes, item.Put.Security...)
-		}
-	case http.MethodDelete:
-		if item.Delete != nil {
-			schemes = append(schemes, item.Delete.Security...)
-		}
-	case http.MethodOptions:
-		if item.Options != nil {
-			schemes = append(schemes, item.Options.Security...)
-		}
-	case http.MethodHead:
-		if item.Head != nil {
-			schemes = append(schemes, item.Head.Security...)
-		}
-	case http.MethodPatch:
-		if item.Patch != nil {
-			schemes = append(schemes, item.Patch.Security...)
-		}
-	case http.MethodTrace:
-		if item.Trace != nil {
-			schemes = append(schemes, item.Trace.Security...)
-		}
+	if op := OperationForMethod(request.Method, item); op != nil {
+		return op.Security
 	}
-	return schemes
+	return nil
 }
 
 // ExtractSecurityHeaderNames extracts header names from applicable security schemes.

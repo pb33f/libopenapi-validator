@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func TestNewPathTree(t *testing.T) {
@@ -189,6 +190,102 @@ paths:
 	assert.True(t, found)
 	assert.Equal(t, "/users/{id}", path)
 	assert.Equal(t, "getUserById", pathItem.Get.OperationId)
+}
+
+func TestPathTree_LookupWithParams(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      responses:
+        '200':
+          description: OK
+  /users/{id}:
+    get:
+      responses:
+        '200':
+          description: OK
+  /users/{userId}/posts/{postId}:
+    get:
+      responses:
+        '200':
+          description: OK
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	tree := BuildPathTree(&model.Model)
+
+	tests := []struct {
+		name           string
+		lookupPath     string
+		expectedPath   string
+		expectedParams map[string]string
+		expectedFound  bool
+	}{
+		{
+			name:           "Literal path - no params",
+			lookupPath:     "/users",
+			expectedPath:   "/users",
+			expectedParams: nil,
+			expectedFound:  true,
+		},
+		{
+			name:           "Single param",
+			lookupPath:     "/users/123",
+			expectedPath:   "/users/{id}",
+			expectedParams: map[string]string{"id": "123"},
+			expectedFound:  true,
+		},
+		{
+			name:           "Multiple params",
+			lookupPath:     "/users/abc/posts/xyz",
+			expectedPath:   "/users/{userId}/posts/{postId}",
+			expectedParams: map[string]string{"id": "abc", "postId": "xyz"},
+			expectedFound:  true,
+		},
+		{
+			name:           "Single param matches when multiple paths exist",
+			lookupPath:     "/users/123",
+			expectedPath:   "/users/{id}",
+			expectedParams: map[string]string{"id": "123"},
+			expectedFound:  true,
+		},
+		{
+			name:           "Not found",
+			lookupPath:     "/posts/123",
+			expectedPath:   "",
+			expectedParams: nil,
+			expectedFound:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pathItem, path, params, found := tree.LookupWithParams(tt.lookupPath)
+
+			assert.Equal(t, tt.expectedFound, found, "found mismatch")
+			if tt.expectedFound {
+				assert.NotNil(t, pathItem, "pathItem should not be nil")
+				assert.Equal(t, tt.expectedPath, path, "path mismatch")
+				if tt.expectedParams == nil {
+					assert.Nil(t, params, "params should be nil")
+				} else {
+					assert.Equal(t, tt.expectedParams, params, "params mismatch")
+				}
+			} else {
+				assert.Nil(t, pathItem, "pathItem should be nil")
+				assert.Empty(t, path, "path should be empty")
+				assert.Nil(t, params, "params should be nil")
+			}
+		})
+	}
 }
 
 // Benchmark

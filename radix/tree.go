@@ -129,6 +129,24 @@ func (t *Tree[T]) Lookup(urlPath string) (value T, matchedPath string, found boo
 	return zero, "", false
 }
 
+// LookupWithParams finds the value for a given URL path and extracts path parameter values.
+// Returns the value, matched path template, extracted parameter map, and whether a match was found.
+// The params map is nil if the matched path has no parameters.
+func (t *Tree[T]) LookupWithParams(urlPath string) (value T, matchedPath string, params map[string]string, found bool) {
+	var zero T
+	if t.root == nil {
+		return zero, "", nil, false
+	}
+
+	segments := splitPath(urlPath)
+	leaf, params := t.lookupWithParamsRecursive(t.root, segments, 0, nil)
+
+	if leaf != nil {
+		return leaf.value, leaf.path, params, true
+	}
+	return zero, "", nil, false
+}
+
 // lookupRecursive performs the tree traversal.
 // It prioritizes literal matches over parameter matches.
 func (t *Tree[T]) lookupRecursive(n *node[T], segments []string, depth int) *leafData[T] {
@@ -154,6 +172,39 @@ func (t *Tree[T]) lookupRecursive(n *node[T], segments []string, depth int) *lea
 	}
 
 	return nil
+}
+
+// lookupWithParamsRecursive performs the tree traversal, extracting path parameters.
+// The params map is lazily allocated on first parameter match.
+func (t *Tree[T]) lookupWithParamsRecursive(n *node[T], segments []string, depth int, params map[string]string) (*leafData[T], map[string]string) {
+	if depth == len(segments) {
+		return n.leaf, params
+	}
+
+	seg := segments[depth]
+
+	// Try literal match first (higher specificity)
+	if child, exists := n.children[seg]; exists {
+		if result, p := t.lookupWithParamsRecursive(child, segments, depth+1, params); result != nil {
+			return result, p
+		}
+	}
+
+	// Fall back to parameter match
+	if n.paramChild != nil {
+		// Lazily allocate params map on first param encounter
+		if params == nil {
+			params = make(map[string]string)
+		}
+		params[n.paramChild.paramName] = seg
+		if result, p := t.lookupWithParamsRecursive(n.paramChild, segments, depth+1, params); result != nil {
+			return result, p
+		}
+		// Backtrack: remove param if this branch didn't match
+		delete(params, n.paramChild.paramName)
+	}
+
+	return nil, params
 }
 
 // Size returns the number of paths stored in the tree.

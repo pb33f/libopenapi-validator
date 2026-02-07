@@ -103,7 +103,14 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	// warm the regex cache by pre-compiling all path parameter regexes
 	warmRegexCache(m, options)
 
-	v := &validator{options: options, v3Model: m}
+	// Build the matcher chain: radix first (fast), regex fallback (handles complex patterns)
+	var matchers matcherChain
+	if options.PathTree != nil {
+		matchers = append(matchers, &radixMatcher{pathLookup: options.PathTree})
+	}
+	matchers = append(matchers, &regexMatcher{regexCache: options.RegexCache})
+
+	v := &validator{options: options, v3Model: m, matchers: matchers}
 
 	// create a new parameter validator
 	v.paramValidator = parameters.NewParameterValidator(m, config.WithExistingOpts(options))
@@ -115,6 +122,50 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	v.responseValidator = responses.NewResponseBodyValidator(m, config.WithExistingOpts(options))
 
 	return v
+}
+
+// resolvePath uses the matcher chain to find the matching path for a request.
+// Returns the PathItem, any validation errors, and the matched path template.
+// This is the internal replacement for paths.FindPath that uses the matcher chain.
+func (v *validator) resolvePath(request *http.Request) (*v3.PathItem, []*errors.ValidationError, string) {
+	stripped := paths.StripRequestPath(request, v.v3Model)
+
+	route := v.matchers.Match(stripped, v.v3Model)
+	if route == nil {
+		validationErrors := []*errors.ValidationError{
+			{
+				ValidationType:    helpers.PathValidation,
+				ValidationSubType: helpers.ValidationMissing,
+				Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+				Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
+					"however that path, or the %s method for that path does not exist in the specification",
+					request.Method, request.URL.Path, request.Method),
+				SpecLine: -1,
+				SpecCol:  -1,
+				HowToFix: errors.HowToFixPath,
+			},
+		}
+		errors.PopulateValidationErrors(validationErrors, request, "")
+		return nil, validationErrors, ""
+	}
+
+	// Check if the matched path has the requested HTTP method
+	if helpers.OperationForMethod(request.Method, route.pathItem) == nil {
+		validationErrors := []*errors.ValidationError{{
+			ValidationType:    helpers.PathValidation,
+			ValidationSubType: helpers.ValidationMissingOperation,
+			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+			Reason: fmt.Sprintf("The %s method for that path does not exist in the specification",
+				request.Method),
+			SpecLine: -1,
+			SpecCol:  -1,
+			HowToFix: errors.HowToFixPath,
+		}}
+		errors.PopulateValidationErrors(validationErrors, request, route.matchedPath)
+		return route.pathItem, validationErrors, route.matchedPath
+	}
+
+	return route.pathItem, nil, route.matchedPath
 }
 
 func (v *validator) SetDocument(document libopenapi.Document) {
@@ -160,7 +211,7 @@ func (v *validator) ValidateHttpResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options)
+	pathItem, errs, pathValue = v.resolvePath(request)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -184,7 +235,7 @@ func (v *validator) ValidateHttpRequestResponse(
 	var pathValue string
 	var errs []*errors.ValidationError
 
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options)
+	pathItem, errs, pathValue = v.resolvePath(request)
 	if pathItem == nil || errs != nil {
 		return false, errs
 	}
@@ -208,7 +259,7 @@ func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.
 		return v.ValidateHttpRequestSync(request)
 	}
 
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
+	pathItem, errs, foundPath := v.resolvePath(request)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -319,7 +370,7 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
+	pathItem, errs, foundPath := v.resolvePath(request)
 	if len(errs) > 0 {
 		return false, errs
 	}
@@ -365,6 +416,7 @@ type validator struct {
 	paramValidator    parameters.ParameterValidator
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
+	matchers          matcherChain
 }
 
 func runValidation(control, doneChan chan struct{},

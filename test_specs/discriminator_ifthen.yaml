@@ -1,0 +1,407 @@
+openapi: "3.1.0"
+info:
+  title: Discriminator Benchmark - if/then (optimized)
+  description: |
+    Replaces oneOf+discriminator with allOf of if/then blocks. The jsonschema
+    library only validates the matching schema (the one where the if condition
+    passes), skipping all others with a cheap boolean const check.
+  version: "1.0.0"
+servers:
+  - url: /api/v3
+
+paths:
+  /ad_accounts/{ad_account_id}/bulk_actions:
+    post:
+      operationId: createBulkActions
+      parameters:
+        - name: ad_account_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    $ref: "#/components/schemas/BulkAction"
+      responses:
+        "201":
+          description: Created
+
+components:
+  schemas:
+    BulkAction:
+      type: object
+      required:
+        - type
+        - action
+        - reference_id
+        - entity_data
+      properties:
+        type:
+          type: string
+          enum: [CAMPAIGN, AD_GROUP, AD, POST, ASSET]
+        action:
+          type: string
+          enum: [CREATE, EDIT]
+        reference_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+        entity_data:
+          # Instead of oneOf + discriminator, use allOf with if/then.
+          # Only the matching if/then branch runs full validation.
+          # Non-matching branches just do a cheap const check and skip.
+          type: object
+          allOf:
+            - if:
+                required: [entity_type]
+                properties:
+                  entity_type:
+                    const: CAMPAIGN
+              then:
+                $ref: "#/components/schemas/CampaignInput"
+            - if:
+                required: [entity_type]
+                properties:
+                  entity_type:
+                    const: AD_GROUP
+              then:
+                $ref: "#/components/schemas/AdGroupInput"
+            - if:
+                required: [entity_type]
+                properties:
+                  entity_type:
+                    const: AD
+              then:
+                $ref: "#/components/schemas/AdInput"
+            - if:
+                required: [entity_type]
+                properties:
+                  entity_type:
+                    const: POST
+              then:
+                $ref: "#/components/schemas/PostInput"
+            - if:
+                required: [entity_type]
+                properties:
+                  entity_type:
+                    const: ASSET
+              then:
+                $ref: "#/components/schemas/AssetInput"
+            # Ensure discriminator value is valid
+            - properties:
+                entity_type:
+                  type: string
+                  enum: [CAMPAIGN, AD_GROUP, AD, POST, ASSET]
+              required: [entity_type]
+
+    CampaignInput:
+      type: object
+      required:
+        - entity_type
+        - name
+        - objective
+        - daily_budget_micro
+        - start_time
+        - funding_instrument_id
+      properties:
+        entity_type:
+          type: string
+          const: CAMPAIGN
+        name:
+          type: string
+          minLength: 1
+          maxLength: 400
+        objective:
+          type: string
+          enum: [AWARENESS, CONSIDERATION, CONVERSIONS, TRAFFIC, VIDEO_VIEWS, APP_INSTALLS]
+        daily_budget_micro:
+          type: integer
+          minimum: 500000
+        lifetime_budget_micro:
+          type: integer
+          minimum: 500000
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        funding_instrument_id:
+          type: string
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          default: PAUSED
+
+    AdGroupInput:
+      type: object
+      required:
+        - entity_type
+        - name
+        - campaign_id
+        - bid_strategy
+        - goal_type
+        - start_time
+      properties:
+        entity_type:
+          type: string
+          const: AD_GROUP
+        name:
+          type: string
+          minLength: 1
+          maxLength: 400
+        campaign_id:
+          type: string
+        bid_strategy:
+          type: string
+          enum: [AUTO, MANUAL_CPC, MANUAL_CPM, MANUAL_CPV]
+        bid_micro:
+          type: integer
+          minimum: 10000
+        goal_type:
+          type: string
+          enum: [CLICKS, IMPRESSIONS, VIDEO_VIEWS, CONVERSIONS, APP_INSTALLS]
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        targeting:
+          $ref: "#/components/schemas/Targeting"
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          default: PAUSED
+
+    AdInput:
+      type: object
+      required:
+        - entity_type
+        - name
+        - ad_group_id
+        - post_id
+      properties:
+        entity_type:
+          type: string
+          const: AD
+        name:
+          type: string
+          minLength: 1
+          maxLength: 400
+        ad_group_id:
+          type: string
+        post_id:
+          type: string
+        click_url:
+          type: string
+          format: uri
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          default: PAUSED
+
+    PostInput:
+      type: object
+      required:
+        - entity_type
+        - headline
+        - post_type
+        - content
+      properties:
+        entity_type:
+          type: string
+          const: POST
+        headline:
+          type: string
+          maxLength: 300
+        body:
+          type: string
+          maxLength: 40000
+        post_type:
+          type: string
+          enum: [IMAGE, VIDEO, TEXT, GALLERY, CAROUSEL, LINK]
+        content:
+          type: array
+          minItems: 1
+          items:
+            # Nested discriminator also uses if/then pattern
+            type: object
+            allOf:
+              - if:
+                  required: [content_type]
+                  properties:
+                    content_type:
+                      const: IMAGE
+                then:
+                  $ref: "#/components/schemas/ImageContent"
+              - if:
+                  required: [content_type]
+                  properties:
+                    content_type:
+                      const: VIDEO
+                then:
+                  $ref: "#/components/schemas/VideoContent"
+              - if:
+                  required: [content_type]
+                  properties:
+                    content_type:
+                      const: TEXT
+                then:
+                  $ref: "#/components/schemas/TextContent"
+              - properties:
+                  content_type:
+                    type: string
+                    enum: [IMAGE, VIDEO, TEXT]
+                required: [content_type]
+        destination_url:
+          type: string
+          format: uri
+
+    AssetInput:
+      type: object
+      required:
+        - entity_type
+        - asset_type
+        - url
+      properties:
+        entity_type:
+          type: string
+          const: ASSET
+        asset_type:
+          type: string
+          enum: [IMAGE, VIDEO, LOGO]
+        url:
+          type: string
+          format: uri
+        width:
+          type: integer
+        height:
+          type: integer
+
+    ImageContent:
+      type: object
+      required:
+        - content_type
+        - url
+      properties:
+        content_type:
+          type: string
+          const: IMAGE
+        url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+        destination_url:
+          type: string
+          format: uri
+        width:
+          type: integer
+        height:
+          type: integer
+        call_to_action:
+          type: string
+          enum: [LEARN_MORE, SIGN_UP, SHOP_NOW, INSTALL, DOWNLOAD]
+
+    VideoContent:
+      type: object
+      required:
+        - content_type
+        - url
+      properties:
+        content_type:
+          type: string
+          const: VIDEO
+        url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+        destination_url:
+          type: string
+          format: uri
+        duration_seconds:
+          type: integer
+          minimum: 1
+          maximum: 180
+        call_to_action:
+          type: string
+          enum: [LEARN_MORE, SIGN_UP, SHOP_NOW, INSTALL, DOWNLOAD, WATCH_MORE]
+
+    TextContent:
+      type: object
+      required:
+        - content_type
+        - body
+      properties:
+        content_type:
+          type: string
+          const: TEXT
+        body:
+          type: string
+          maxLength: 40000
+        destination_url:
+          type: string
+          format: uri
+        call_to_action:
+          type: string
+          enum: [LEARN_MORE, SIGN_UP, SHOP_NOW]
+
+    Targeting:
+      type: object
+      properties:
+        geos:
+          type: object
+          properties:
+            included:
+              type: array
+              items:
+                type: object
+                properties:
+                  country:
+                    type: string
+                  region:
+                    type: string
+        interests:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        devices:
+          type: array
+          items:
+            type: string
+            enum: [DESKTOP, MOBILE, TABLET]
+        age_range:
+          type: object
+          properties:
+            min:
+              type: integer
+              minimum: 18
+              maximum: 65
+            max:
+              type: integer
+              minimum: 18
+              maximum: 65
+        gender:
+          type: string
+          enum: [ALL, MALE, FEMALE, OTHER]

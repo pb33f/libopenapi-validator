@@ -1,0 +1,1323 @@
+openapi: "3.0.2"
+info:
+  title: Reddit Ads API - BulkActions (Benchmark Spec)
+  description: |
+    Realistic OpenAPI spec modeled after the Reddit Ads API v3 BulkActions endpoints.
+    Used for benchmarking libopenapi-validator performance with production-like schemas.
+  version: "3.0.0"
+servers:
+  - url: /api/v3
+
+paths:
+  /ad_accounts:
+    get:
+      operationId: listAdAccounts
+      summary: List ad accounts
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdAccount"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /ad_accounts/{ad_account_id}:
+    get:
+      operationId: getAdAccount
+      summary: Get a specific ad account
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AdAccount"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ad_accounts/{ad_account_id}/campaigns:
+    get:
+      operationId: listCampaigns
+      summary: List campaigns for an ad account
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Campaign"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+    post:
+      operationId: createCampaign
+      summary: Create a campaign
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "201":
+          description: Campaign created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Campaign"
+
+  /ad_accounts/{ad_account_id}/campaigns/{campaign_id}:
+    get:
+      operationId: getCampaign
+      summary: Get a specific campaign
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/CampaignId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Campaign"
+    put:
+      operationId: updateCampaign
+      summary: Update a campaign
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/CampaignId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "200":
+          description: Campaign updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Campaign"
+
+  /ad_accounts/{ad_account_id}/ad_groups:
+    get:
+      operationId: listAdGroups
+      summary: List ad groups
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdGroup"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+    post:
+      operationId: createAdGroup
+      summary: Create an ad group
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: "#/components/schemas/AdGroupInput"
+      responses:
+        "201":
+          description: Ad group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AdGroup"
+
+  /ad_accounts/{ad_account_id}/ad_groups/{ad_group_id}:
+    get:
+      operationId: getAdGroup
+      summary: Get a specific ad group
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/AdGroupId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AdGroup"
+    put:
+      operationId: updateAdGroup
+      summary: Update an ad group
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/AdGroupId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: "#/components/schemas/AdGroupInput"
+      responses:
+        "200":
+          description: Ad group updated
+
+  /ad_accounts/{ad_account_id}/ads:
+    get:
+      operationId: listAds
+      summary: List ads
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ad"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+    post:
+      operationId: createAd
+      summary: Create an ad
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: "#/components/schemas/AdInput"
+      responses:
+        "201":
+          description: Ad created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ad"
+
+  /ad_accounts/{ad_account_id}/ads/{ad_id}:
+    get:
+      operationId: getAd
+      summary: Get a specific ad
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/AdId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Ad"
+    put:
+      operationId: updateAd
+      summary: Update an ad
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/AdId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: "#/components/schemas/AdInput"
+      responses:
+        "200":
+          description: Ad updated
+
+  /ad_accounts/{ad_account_id}/bulk_actions:
+    post:
+      operationId: createBulkActions
+      summary: Create bulk actions
+      description: |
+        Submit a batch of campaign management actions (campaign, ad group, ad, post creation/edits)
+        to be processed as a single job. Returns a job ID for status polling.
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    $ref: "#/components/schemas/BulkAction"
+                validate_only:
+                  type: boolean
+                  default: false
+                  description: If true, validate the actions without executing them
+      responses:
+        "201":
+          description: Bulk action job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BulkActionsResponse"
+                  validate_only:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /ad_accounts/{ad_account_id}/bulk_actions/{job_id}:
+    get:
+      operationId: getBulkActions
+      summary: Get bulk action job status
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bulk action job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/BulkActionsResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ad_accounts/{ad_account_id}/posts:
+    get:
+      operationId: listPosts
+      summary: List posts for an ad account
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Post"
+
+  /ad_accounts/{ad_account_id}/posts/{post_id}:
+    get:
+      operationId: getPost
+      summary: Get a specific post
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Post"
+
+  /ad_accounts/{ad_account_id}/pixels:
+    get:
+      operationId: listPixels
+      summary: List pixels
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Pixel"
+
+  /ad_accounts/{ad_account_id}/funding_instruments:
+    get:
+      operationId: listFundingInstruments
+      summary: List funding instruments
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FundingInstrument"
+
+  /ad_accounts/{ad_account_id}/reporting:
+    post:
+      operationId: getReporting
+      summary: Get reporting data
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportingRequest"
+      responses:
+        "200":
+          description: Reporting data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReportingRow"
+
+  /ad_accounts/{ad_account_id}/custom_audiences:
+    get:
+      operationId: listCustomAudiences
+      summary: List custom audiences
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CustomAudience"
+
+  /ad_accounts/{ad_account_id}/custom_audiences/{audience_id}:
+    get:
+      operationId: getCustomAudience
+      summary: Get a custom audience
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+        - name: audience_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+
+  /ad_accounts/{ad_account_id}/saved_audiences:
+    get:
+      operationId: listSavedAudiences
+      summary: List saved audiences
+      parameters:
+        - $ref: "#/components/parameters/AdAccountId"
+      responses:
+        "200":
+          description: Successful response
+
+  /businesses:
+    get:
+      operationId: listBusinesses
+      summary: List businesses
+      responses:
+        "200":
+          description: Successful response
+
+  /businesses/{business_id}:
+    get:
+      operationId: getBusiness
+      summary: Get a business
+      parameters:
+        - name: business_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful response
+
+  /me:
+    get:
+      operationId: getMe
+      summary: Get authenticated user
+      responses:
+        "200":
+          description: Successful response
+
+  /interests:
+    get:
+      operationId: listInterests
+      summary: List interests
+      responses:
+        "200":
+          description: Successful response
+
+  /industries:
+    get:
+      operationId: listIndustries
+      summary: List industries
+      responses:
+        "200":
+          description: Successful response
+
+components:
+  parameters:
+    AdAccountId:
+      name: ad_account_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^t2_[a-z0-9]+$"
+    CampaignId:
+      name: campaign_id
+      in: path
+      required: true
+      schema:
+        type: string
+    AdGroupId:
+      name: ad_group_id
+      in: path
+      required: true
+      schema:
+        type: string
+    AdId:
+      name: ad_id
+      in: path
+      required: true
+      schema:
+        type: string
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    PageToken:
+      name: page_token
+      in: query
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    Pagination:
+      type: object
+      properties:
+        next_url:
+          type: string
+          nullable: true
+        previous_url:
+          type: string
+          nullable: true
+
+    AdAccount:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, SUSPENDED, CLOSED]
+        currency:
+          type: string
+          enum: [USD, GBP, EUR, CAD, AUD]
+        time_zone:
+          type: string
+        business_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, COMPLETED, DRAFT]
+        objective:
+          type: string
+          enum: [AWARENESS, CONSIDERATION, CONVERSIONS, TRAFFIC, VIDEO_VIEWS, APP_INSTALLS, CATALOG_SALES, LEADS]
+        daily_budget_micro:
+          type: integer
+          format: int64
+        lifetime_budget_micro:
+          type: integer
+          format: int64
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        funding_instrument_id:
+          type: string
+        is_paid:
+          type: boolean
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+        effective_status:
+          type: string
+          enum: [ACTIVE, PAUSED, COMPLETED, BUDGET_EXHAUSTED, ENDED]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CampaignInput:
+      type: object
+      required:
+        - name
+        - objective
+        - daily_budget_micro
+        - start_time
+        - funding_instrument_id
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 400
+        objective:
+          type: string
+          enum: [AWARENESS, CONSIDERATION, CONVERSIONS, TRAFFIC, VIDEO_VIEWS, APP_INSTALLS, CATALOG_SALES, LEADS]
+        daily_budget_micro:
+          type: integer
+          format: int64
+          minimum: 500000
+        lifetime_budget_micro:
+          type: integer
+          format: int64
+          minimum: 500000
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        funding_instrument_id:
+          type: string
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          default: PAUSED
+
+    AdGroup:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        campaign_id:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, COMPLETED, DRAFT]
+        bid_strategy:
+          type: string
+          enum: [AUTO, MANUAL_CPC, MANUAL_CPM, MANUAL_CPV]
+        bid_micro:
+          type: integer
+          format: int64
+        goal_type:
+          type: string
+          enum: [CLICKS, IMPRESSIONS, VIDEO_VIEWS, CONVERSIONS, APP_INSTALLS]
+        goal_value_micro:
+          type: integer
+          format: int64
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        targeting:
+          $ref: "#/components/schemas/Targeting"
+        expansion:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            targeting_mode:
+              type: string
+              enum: [BALANCED, AGGRESSIVE, CONSERVATIVE]
+        optimization_strategy:
+          type: string
+          enum: [BALANCED, SPEND, CONVERSIONS]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AdGroupInput:
+      type: object
+      required:
+        - name
+        - campaign_id
+        - bid_strategy
+        - goal_type
+        - start_time
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 400
+        campaign_id:
+          type: string
+        bid_strategy:
+          type: string
+          enum: [AUTO, MANUAL_CPC, MANUAL_CPM, MANUAL_CPV]
+        bid_micro:
+          type: integer
+          format: int64
+          minimum: 10000
+        goal_type:
+          type: string
+          enum: [CLICKS, IMPRESSIONS, VIDEO_VIEWS, CONVERSIONS, APP_INSTALLS]
+        goal_value_micro:
+          type: integer
+          format: int64
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        targeting:
+          $ref: "#/components/schemas/Targeting"
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          default: PAUSED
+
+    Targeting:
+      type: object
+      properties:
+        geos:
+          type: object
+          properties:
+            included:
+              type: array
+              items:
+                type: object
+                properties:
+                  country:
+                    type: string
+                  region:
+                    type: string
+                  city:
+                    type: string
+                  dma:
+                    type: string
+            excluded:
+              type: array
+              items:
+                type: object
+                properties:
+                  country:
+                    type: string
+                  region:
+                    type: string
+        interests:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        communities:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+        devices:
+          type: array
+          items:
+            type: string
+            enum: [DESKTOP, MOBILE, TABLET]
+        os:
+          type: array
+          items:
+            type: string
+            enum: [IOS, ANDROID, WINDOWS, MACOS, LINUX]
+        placements:
+          type: array
+          items:
+            type: string
+            enum: [FEED, CONVERSATION, SIDEBAR]
+        age_range:
+          type: object
+          properties:
+            min:
+              type: integer
+              minimum: 18
+              maximum: 65
+            max:
+              type: integer
+              minimum: 18
+              maximum: 65
+        gender:
+          type: string
+          enum: [ALL, MALE, FEMALE, OTHER]
+        custom_audience_ids:
+          type: array
+          items:
+            type: string
+        excluded_custom_audience_ids:
+          type: array
+          items:
+            type: string
+
+    Ad:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ad_group_id:
+          type: string
+        post_id:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, REJECTED, PENDING_REVIEW, APPROVED]
+        click_url:
+          type: string
+          format: uri
+        third_party_trackers:
+          type: array
+          items:
+            type: object
+            properties:
+              event_type:
+                type: string
+                enum: [IMPRESSION, CLICK, VIDEO_VIEWED]
+              url:
+                type: string
+                format: uri
+        is_dynamic_creative:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AdInput:
+      type: object
+      required:
+        - name
+        - ad_group_id
+        - post_id
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 400
+        ad_group_id:
+          type: string
+        post_id:
+          type: string
+        click_url:
+          type: string
+          format: uri
+        third_party_trackers:
+          type: array
+          items:
+            type: object
+            properties:
+              event_type:
+                type: string
+                enum: [IMPRESSION, CLICK, VIDEO_VIEWED]
+              url:
+                type: string
+                format: uri
+        configured_status:
+          type: string
+          enum: [ACTIVE, PAUSED]
+          default: PAUSED
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+        headline:
+          type: string
+        body:
+          type: string
+        post_type:
+          type: string
+          enum: [IMAGE, VIDEO, TEXT, GALLERY, CAROUSEL, LINK]
+        content:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [IMAGE, VIDEO, TEXT, LINK]
+              url:
+                type: string
+                format: uri
+              thumbnail_url:
+                type: string
+                format: uri
+              destination_url:
+                type: string
+                format: uri
+              width:
+                type: integer
+              height:
+                type: integer
+              call_to_action:
+                type: string
+                enum: [LEARN_MORE, SIGN_UP, SHOP_NOW, INSTALL, DOWNLOAD, GET_QUOTE, CONTACT_US, APPLY_NOW]
+        cta_text:
+          type: string
+        preview_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+
+    BulkAction:
+      type: object
+      required:
+        - type
+        - action
+        - reference_id
+        - entity_data
+      properties:
+        type:
+          type: string
+          enum: [CAMPAIGN, AD_GROUP, AD, POST, ASSET]
+        action:
+          type: string
+          enum: [CREATE, EDIT]
+        reference_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Client-provided reference ID for correlating results
+        entity_data:
+          type: object
+          description: |
+            The entity data varies by type:
+            - CAMPAIGN: CampaignInput fields
+            - AD_GROUP: AdGroupInput fields
+            - AD: AdInput fields
+            - POST: PostInput fields
+          properties:
+            # Campaign fields
+            name:
+              type: string
+              maxLength: 400
+            objective:
+              type: string
+              enum: [AWARENESS, CONSIDERATION, CONVERSIONS, TRAFFIC, VIDEO_VIEWS, APP_INSTALLS, CATALOG_SALES, LEADS]
+            daily_budget_micro:
+              type: integer
+              format: int64
+            lifetime_budget_micro:
+              type: integer
+              format: int64
+            start_time:
+              type: string
+              format: date-time
+            end_time:
+              type: string
+              format: date-time
+            funding_instrument_id:
+              type: string
+            configured_status:
+              type: string
+              enum: [ACTIVE, PAUSED]
+            # Ad Group fields
+            campaign_id:
+              type: string
+            bid_strategy:
+              type: string
+              enum: [AUTO, MANUAL_CPC, MANUAL_CPM, MANUAL_CPV]
+            bid_micro:
+              type: integer
+              format: int64
+            goal_type:
+              type: string
+              enum: [CLICKS, IMPRESSIONS, VIDEO_VIEWS, CONVERSIONS, APP_INSTALLS]
+            targeting:
+              $ref: "#/components/schemas/Targeting"
+            # Ad fields
+            ad_group_id:
+              type: string
+            post_id:
+              type: string
+            click_url:
+              type: string
+              format: uri
+            # Post fields
+            headline:
+              type: string
+              maxLength: 300
+            body:
+              type: string
+              maxLength: 40000
+            post_type:
+              type: string
+              enum: [IMAGE, VIDEO, TEXT, GALLERY, CAROUSEL, LINK]
+            content:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  url:
+                    type: string
+                  destination_url:
+                    type: string
+                  call_to_action:
+                    type: string
+            destination_url:
+              type: string
+              format: uri
+
+    BulkActionsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [PENDING, RUNNING, SUCCESS, FAILED, UNVALIDATED]
+        input:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkAction"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkActionResult"
+
+    BulkActionResult:
+      type: object
+      properties:
+        reference_id:
+          type: string
+        type:
+          type: string
+          enum: [CAMPAIGN, AD_GROUP, AD, POST, ASSET]
+        status:
+          type: string
+          enum: [SUCCESS, FAILED, PENDING]
+        id:
+          type: string
+          nullable: true
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              field:
+                type: string
+              message:
+                type: string
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              field:
+                type: string
+              message:
+                type: string
+
+    Pixel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        last_fired_at:
+          type: string
+          format: date-time
+
+    FundingInstrument:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [CREDIT_CARD, INVOICE, PREPAID]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, EXPIRED]
+        currency:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ReportingRequest:
+      type: object
+      required:
+        - start_date
+        - end_date
+        - level
+      properties:
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        level:
+          type: string
+          enum: [ACCOUNT, CAMPAIGN, AD_GROUP, AD]
+        metrics:
+          type: array
+          items:
+            type: string
+            enum: [IMPRESSIONS, CLICKS, SPEND, CTR, CPC, CPM, CONVERSIONS, ROAS, VIDEO_VIEWS, VIDEO_COMPLETION_RATE]
+        dimensions:
+          type: array
+          items:
+            type: string
+            enum: [DATE, CAMPAIGN_ID, AD_GROUP_ID, AD_ID, COUNTRY, DEVICE, OS, PLACEMENT, AGE, GENDER]
+        filters:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              operator:
+                type: string
+                enum: [EQ, NEQ, GT, GTE, LT, LTE, IN, NOT_IN, CONTAINS]
+              values:
+                type: array
+                items:
+                  type: string
+
+    ReportingRow:
+      type: object
+      properties:
+        dimensions:
+          type: object
+          additionalProperties:
+            type: string
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+
+    CustomAudience:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [CUSTOMER_LIST, WEBSITE, APP, ENGAGEMENT, LOOKALIKE]
+        status:
+          type: string
+          enum: [ACTIVE, PROCESSING, ERROR, EXPIRED]
+        size:
+          type: integer
+        created_at:
+          type: string
+          format: date-time

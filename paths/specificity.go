@@ -4,10 +4,11 @@
 package paths
 
 import (
-	"net/http"
 	"strings"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // pathCandidate represents a potential path match with metadata for selection.
@@ -53,25 +54,7 @@ func isParameterSegment(seg string) bool {
 
 // pathHasMethod checks if the PathItem has an operation for the given HTTP method.
 func pathHasMethod(pathItem *v3.PathItem, method string) bool {
-	switch method {
-	case http.MethodGet:
-		return pathItem.Get != nil
-	case http.MethodPost:
-		return pathItem.Post != nil
-	case http.MethodPut:
-		return pathItem.Put != nil
-	case http.MethodDelete:
-		return pathItem.Delete != nil
-	case http.MethodOptions:
-		return pathItem.Options != nil
-	case http.MethodHead:
-		return pathItem.Head != nil
-	case http.MethodPatch:
-		return pathItem.Patch != nil
-	case http.MethodTrace:
-		return pathItem.Trace != nil
-	}
-	return false
+	return helpers.OperationForMethod(method, pathItem) != nil
 }
 
 // selectMatches finds the best matching candidates in a single pass.

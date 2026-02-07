@@ -17,6 +17,10 @@ type PathLookup interface {
 	// Lookup finds the PathItem for a given URL path.
 	// Returns the matched PathItem, the path template (e.g., "/users/{id}"), and whether found.
 	Lookup(urlPath string) (pathItem *v3.PathItem, matchedPath string, found bool)
+	// LookupWithParams finds the PathItem for a given URL path and extracts path parameter values.
+	// Returns the matched PathItem, path template, extracted parameter map, and whether found.
+	// The params map is nil if the matched path has no parameters.
+	LookupWithParams(urlPath string) (pathItem *v3.PathItem, matchedPath string, params map[string]string, found bool)
 }
 
 // PathTree is a radix tree optimized for OpenAPI path matching.
@@ -49,6 +53,12 @@ func (t *PathTree) Insert(path string, pathItem *v3.PathItem) {
 // Returns the PathItem, the matched path template, and whether a match was found.
 func (t *PathTree) Lookup(urlPath string) (*v3.PathItem, string, bool) {
 	return t.tree.Lookup(urlPath)
+}
+
+// LookupWithParams finds the PathItem for a given request path and extracts path parameter values.
+// Returns the PathItem, matched path template, extracted parameter map, and whether a match was found.
+func (t *PathTree) LookupWithParams(urlPath string) (*v3.PathItem, string, map[string]string, bool) {
+	return t.tree.LookupWithParams(urlPath)
 }
 
 // Size returns the number of paths stored in the tree.

@@ -6,8 +6,9 @@ package paths
 import (
 	"testing"
 
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/assert"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func TestComputeSpecificityScore(t *testing.T) {

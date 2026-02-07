@@ -112,3 +112,102 @@ func TestExtractContentType(t *testing.T) {
 	require.Empty(t, charset)
 	require.Empty(t, boundary)
 }
+
+func TestOperationForMethod(t *testing.T) {
+	pathItem := &v3.PathItem{
+		Get:     &v3.Operation{Summary: "GET operation"},
+		Post:    &v3.Operation{Summary: "POST operation"},
+		Put:     &v3.Operation{Summary: "PUT operation"},
+		Delete:  &v3.Operation{Summary: "DELETE operation"},
+		Options: &v3.Operation{Summary: "OPTIONS operation"},
+		Head:    &v3.Operation{Summary: "HEAD operation"},
+		Patch:   &v3.Operation{Summary: "PATCH operation"},
+		Trace:   &v3.Operation{Summary: "TRACE operation"},
+	}
+
+	tests := []struct {
+		name     string
+		method   string
+		expected string
+		wantNil  bool
+	}{
+		{
+			name:     "GET method",
+			method:   http.MethodGet,
+			expected: "GET operation",
+			wantNil:  false,
+		},
+		{
+			name:     "POST method",
+			method:   http.MethodPost,
+			expected: "POST operation",
+			wantNil:  false,
+		},
+		{
+			name:     "PUT method",
+			method:   http.MethodPut,
+			expected: "PUT operation",
+			wantNil:  false,
+		},
+		{
+			name:     "DELETE method",
+			method:   http.MethodDelete,
+			expected: "DELETE operation",
+			wantNil:  false,
+		},
+		{
+			name:     "OPTIONS method",
+			method:   http.MethodOptions,
+			expected: "OPTIONS operation",
+			wantNil:  false,
+		},
+		{
+			name:     "HEAD method",
+			method:   http.MethodHead,
+			expected: "HEAD operation",
+			wantNil:  false,
+		},
+		{
+			name:     "PATCH method",
+			method:   http.MethodPatch,
+			expected: "PATCH operation",
+			wantNil:  false,
+		},
+		{
+			name:     "TRACE method",
+			method:   http.MethodTrace,
+			expected: "TRACE operation",
+			wantNil:  false,
+		},
+		{
+			name:    "Unknown method",
+			method:  "INVALID",
+			wantNil: true,
+		},
+		{
+			name:    "Empty method",
+			method:  "",
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := OperationForMethod(tt.method, pathItem)
+			if tt.wantNil {
+				require.Nil(t, result, "should return nil for %s", tt.method)
+			} else {
+				require.NotNil(t, result, "should not return nil for %s", tt.method)
+				require.Equal(t, tt.expected, result.Summary)
+			}
+		})
+	}
+
+	t.Run("Method where operation is nil", func(t *testing.T) {
+		pathItemNil := &v3.PathItem{
+			Get: &v3.Operation{Summary: "GET operation"},
+		}
+		result := OperationForMethod(http.MethodPost, pathItemNil)
+		require.Nil(t, result, "should return nil when operation is nil")
+	})
+}

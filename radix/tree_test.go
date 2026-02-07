@@ -745,6 +745,118 @@ func TestTree_PointerValues(t *testing.T) {
 	assert.False(t, found)
 }
 
+func TestTree_LookupWithParams(t *testing.T) {
+	tests := []struct {
+		name           string
+		insertPaths    []string
+		lookupPath     string
+		expectedValue  string
+		expectedPath   string
+		expectedParams map[string]string
+		expectedFound  bool
+	}{
+		{
+			name:           "No params - literal path",
+			insertPaths:    []string{"/users"},
+			lookupPath:     "/users",
+			expectedValue:  "users handler",
+			expectedPath:   "/users",
+			expectedParams: nil,
+			expectedFound:  true,
+		},
+		{
+			name:           "Single param",
+			insertPaths:    []string{"/users/{id}"},
+			lookupPath:     "/users/123",
+			expectedValue:  "user by id",
+			expectedPath:   "/users/{id}",
+			expectedParams: map[string]string{"id": "123"},
+			expectedFound:  true,
+		},
+		{
+			name:           "Multiple params",
+			insertPaths:    []string{"/users/{userId}/posts/{postId}"},
+			lookupPath:     "/users/abc/posts/xyz",
+			expectedValue:  "user post",
+			expectedPath:   "/users/{userId}/posts/{postId}",
+			expectedParams: map[string]string{"userId": "abc", "postId": "xyz"},
+			expectedFound:  true,
+		},
+		{
+			name:           "Literal over param precedence",
+			insertPaths:    []string{"/users/{id}", "/users/admin"},
+			lookupPath:     "/users/admin",
+			expectedValue:  "admin user",
+			expectedPath:   "/users/admin",
+			expectedParams: nil,
+			expectedFound:  true,
+		},
+		{
+			name:           "Param match when literal doesn't match",
+			insertPaths:    []string{"/a/{x}/d"},
+			lookupPath:     "/a/b/d",
+			expectedValue:  "a-x-d",
+			expectedPath:   "/a/{x}/d",
+			expectedParams: map[string]string{"x": "b"},
+			expectedFound:  true,
+		},
+		{
+			name:           "Not found",
+			insertPaths:    []string{"/users/{id}"},
+			lookupPath:     "/posts/123",
+			expectedValue:  "",
+			expectedPath:   "",
+			expectedParams: nil,
+			expectedFound:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tree := New[string]()
+			for i, path := range tt.insertPaths {
+				var value string
+				switch i {
+				case 0:
+					if path == "/users" {
+						value = "users handler"
+					} else if path == "/users/{id}" {
+						value = "user by id"
+					} else if path == "/users/{userId}/posts/{postId}" {
+						value = "user post"
+					} else if path == "/a/b/c" {
+						value = "a-b-c"
+					} else if path == "/a/{x}/d" {
+						value = "a-x-d"
+					}
+				case 1:
+					if path == "/users/admin" {
+						value = "admin user"
+					}
+				}
+				tree.Insert(path, value)
+			}
+
+			val, path, params, found := tree.LookupWithParams(tt.lookupPath)
+
+			assert.Equal(t, tt.expectedFound, found, "found mismatch")
+			if tt.expectedFound {
+				assert.Equal(t, tt.expectedValue, val, "value mismatch")
+				assert.Equal(t, tt.expectedPath, path, "path mismatch")
+				if tt.expectedParams == nil {
+					assert.Nil(t, params, "params should be nil")
+				} else {
+					assert.Equal(t, tt.expectedParams, params, "params mismatch")
+				}
+			} else {
+				assert.Empty(t, val, "value should be empty")
+				assert.Empty(t, path, "path should be empty")
+				assert.Nil(t, params, "params should be nil")
+			}
+		})
+	}
+}
+
 // Benchmark tests
 
 func BenchmarkTree_Insert(b *testing.B) {

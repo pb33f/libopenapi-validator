@@ -173,8 +173,8 @@ func TestWithExistingOpts_PartialOverride(t *testing.T) {
 		WithContentAssertions(), // This should still be true (no change)
 	)
 
-	assert.Nil(t, opts.RegexEngine) // Both should be nil
-	assert.Nil(t, opts.RegexCache)   // Copied from original (nil/zero value)
+	assert.Nil(t, opts.RegexEngine)          // Both should be nil
+	assert.Nil(t, opts.RegexCache)           // Copied from original (nil/zero value)
 	assert.True(t, opts.FormatAssertions)    // From original
 	assert.True(t, opts.ContentAssertions)   // Reapplied, but same value
 	assert.False(t, opts.SecurityValidation) // From original

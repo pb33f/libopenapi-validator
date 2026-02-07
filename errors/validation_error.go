@@ -6,8 +6,9 @@ package errors
 import (
 	"fmt"
 
-	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // SchemaValidationFailure is a wrapper around the jsonschema.ValidationError object, to provide a more

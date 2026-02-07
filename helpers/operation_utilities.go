@@ -10,28 +10,33 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
-// ExtractOperation extracts the operation from the path item based on the request method. If there is no
-// matching operation found, then nil is returned.
-func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
-	switch request.Method {
+// OperationForMethod returns the operation from the PathItem for the given HTTP method string.
+// Returns nil if the method doesn't exist on the PathItem.
+func OperationForMethod(method string, pathItem *v3.PathItem) *v3.Operation {
+	switch method {
 	case http.MethodGet:
-		return item.Get
+		return pathItem.Get
 	case http.MethodPost:
-		return item.Post
+		return pathItem.Post
 	case http.MethodPut:
-		return item.Put
+		return pathItem.Put
 	case http.MethodDelete:
-		return item.Delete
+		return pathItem.Delete
 	case http.MethodOptions:
-		return item.Options
+		return pathItem.Options
 	case http.MethodHead:
-		return item.Head
+		return pathItem.Head
 	case http.MethodPatch:
-		return item.Patch
+		return pathItem.Patch
 	case http.MethodTrace:
-		return item.Trace
+		return pathItem.Trace
 	}
 	return nil
+}
+
+// ExtractOperation extracts the operation from the path item based on the request method.
+func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
+	return OperationForMethod(request.Method, item)
 }
 
 // ExtractContentType extracts the content type from the request header. First return argument is the content type

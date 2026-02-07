@@ -117,6 +117,60 @@ func FindPath(request *http.Request, document *v3.Document, options *config.Vali
 	return bestOverall.pathItem, missingOperationError(request, bestOverall.path), bestOverall.path
 }
 
+// FindPathRegex performs regex-based path matching against the document paths.
+// It tries to match the stripped request path against all path templates using regex.
+// Returns the best matching PathItem, its path template, and whether a match was found.
+// This does NOT check HTTP methods — the caller must do that separately.
+func FindPathRegex(stripped string, doc *v3.Document, regexCache config.RegexCache) (*v3.PathItem, string, bool) {
+	if doc == nil || doc.Paths == nil || doc.Paths.PathItems == nil {
+		return nil, "", false
+	}
+
+	basePaths := getBasePaths(doc)
+
+	reqPathSegments := strings.Split(stripped, "/")
+	if len(reqPathSegments) > 0 && reqPathSegments[0] == "" {
+		reqPathSegments = reqPathSegments[1:]
+	}
+
+	candidates := make([]pathCandidate, 0, doc.Paths.PathItems.Len())
+
+	for pair := orderedmap.First(doc.Paths.PathItems); pair != nil; pair = pair.Next() {
+		path := pair.Key()
+		pathItem := pair.Value()
+
+		pathForMatching := normalizePathForMatching(path, stripped)
+
+		segs := strings.Split(pathForMatching, "/")
+		if len(segs) > 0 && segs[0] == "" {
+			segs = segs[1:]
+		}
+
+		ok := comparePaths(segs, reqPathSegments, basePaths, regexCache)
+		if !ok {
+			continue
+		}
+
+		score := computeSpecificityScore(path)
+		candidates = append(candidates, pathCandidate{
+			pathItem:  pathItem,
+			path:      path,
+			score:     score,
+			hasMethod: true, // We don't check method here — always true for selection
+		})
+	}
+
+	if len(candidates) == 0 {
+		return nil, "", false
+	}
+
+	_, best := selectMatches(candidates)
+	if best != nil {
+		return best.pathItem, best.path, true
+	}
+	return nil, "", false
+}
+
 // normalizePathForMatching removes the fragment from a path template unless
 // the request path itself contains a fragment.
 func normalizePathForMatching(path, requestPath string) string {

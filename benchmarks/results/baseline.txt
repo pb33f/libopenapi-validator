@@ -1,0 +1,138 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/pb33f/libopenapi-validator/benchmarks
+cpu: Apple M4 Max
+BenchmarkValidatorInit_AdsAPI-16                       	      37	  31845823 ns/op	29896622 B/op	  412921 allocs/op
+BenchmarkValidatorInit_AdsAPI-16                       	      37	  31963471 ns/op	29867018 B/op	  412889 allocs/op
+BenchmarkValidatorInit_AdsAPI-16                       	      36	  33446939 ns/op	29873118 B/op	  412883 allocs/op
+BenchmarkValidatorInit_AdsAPI-16                       	      34	  33691553 ns/op	29884717 B/op	  412905 allocs/op
+BenchmarkValidatorInit_AdsAPI-16                       	      34	  33718240 ns/op	29887110 B/op	  412906 allocs/op
+BenchmarkValidatorInit_Petstore-16                     	     174	   6851401 ns/op	 9169513 B/op	   93422 allocs/op
+BenchmarkValidatorInit_Petstore-16                     	     172	   6804370 ns/op	 9169107 B/op	   93421 allocs/op
+BenchmarkValidatorInit_Petstore-16                     	     168	   7010785 ns/op	 9169596 B/op	   93423 allocs/op
+BenchmarkValidatorInit_Petstore-16                     	     171	   6903568 ns/op	 9165393 B/op	   93419 allocs/op
+BenchmarkValidatorInit_Petstore-16                     	     170	   6945661 ns/op	 9171057 B/op	   93424 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutSchemaCache-16    	     246	   4790271 ns/op	 5614971 B/op	   95782 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutSchemaCache-16    	     247	   4773831 ns/op	 5618953 B/op	   95785 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutSchemaCache-16    	     246	   4750365 ns/op	 5613099 B/op	   95783 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutSchemaCache-16    	     248	   4763538 ns/op	 5615521 B/op	   95784 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutSchemaCache-16    	     241	   4734436 ns/op	 5608509 B/op	   95781 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutRadixTree-16      	      34	  33893496 ns/op	29876564 B/op	  412747 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutRadixTree-16      	      33	  34138894 ns/op	29878289 B/op	  412744 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutRadixTree-16      	      34	  34007441 ns/op	29879764 B/op	  412773 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutRadixTree-16      	      34	  33929885 ns/op	29871633 B/op	  412742 allocs/op
+BenchmarkValidatorInit_AdsAPI_WithoutRadixTree-16      	      33	  34277410 ns/op	29875946 B/op	  412756 allocs/op
+BenchmarkValidatorInit_AdsAPI_MemoryFootprint-16       	1000000000	         0.09820 ns/op	     98616 heap-bytes	       136.0 heap-objects	       0 B/op	       0 allocs/op
+BenchmarkValidatorInit_AdsAPI_MemoryFootprint-16       	1000000000	         0.1003 ns/op	     74840 heap-bytes	18446744073709551616 heap-objects	       0 B/op	       0 allocs/op
+BenchmarkValidatorInit_AdsAPI_MemoryFootprint-16       	1000000000	         0.1008 ns/op	     97152 heap-bytes	       114.0 heap-objects	       0 B/op	       0 allocs/op
+BenchmarkValidatorInit_AdsAPI_MemoryFootprint-16       	1000000000	         0.1167 ns/op	     92800 heap-bytes	        73.00 heap-objects	       0 B/op	       0 allocs/op
+BenchmarkValidatorInit_AdsAPI_MemoryFootprint-16       	1000000000	         0.09793 ns/op	     98352 heap-bytes	       133.0 heap-objects	       0 B/op	       0 allocs/op
+BenchmarkPathMatch_RadixTree_LiteralPath-16            	 6888436	       166.1 ns/op	     192 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_LiteralPath-16            	 6999037	       166.6 ns/op	     192 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_LiteralPath-16            	 7080998	       165.7 ns/op	     192 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_LiteralPath-16            	 7071448	       167.3 ns/op	     192 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_LiteralPath-16            	 6959179	       167.3 ns/op	     192 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_SingleParam-16            	 5792608	       199.2 ns/op	     224 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_SingleParam-16            	 5889310	       200.3 ns/op	     224 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_SingleParam-16            	 5927266	       201.0 ns/op	     224 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_SingleParam-16            	 5650443	       198.4 ns/op	     224 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_SingleParam-16            	 5945851	       201.9 ns/op	     224 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_DeepParam-16              	 4863294	       246.8 ns/op	     256 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_DeepParam-16              	 4771252	       245.4 ns/op	     256 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_DeepParam-16              	 4897012	       244.0 ns/op	     256 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_DeepParam-16              	 4867572	       244.8 ns/op	     256 B/op	       4 allocs/op
+BenchmarkPathMatch_RadixTree_DeepParam-16              	 4757554	       242.3 ns/op	     256 B/op	       4 allocs/op
+BenchmarkPathMatch_RegexFallback_LiteralPath-16        	  498646	      2446 ns/op	    3272 B/op	      70 allocs/op
+BenchmarkPathMatch_RegexFallback_LiteralPath-16        	  506763	      2414 ns/op	    3272 B/op	      70 allocs/op
+BenchmarkPathMatch_RegexFallback_LiteralPath-16        	  509208	      2437 ns/op	    3272 B/op	      70 allocs/op
+BenchmarkPathMatch_RegexFallback_LiteralPath-16        	  521298	      2451 ns/op	    3272 B/op	      70 allocs/op
+BenchmarkPathMatch_RegexFallback_LiteralPath-16        	  474408	      2456 ns/op	    3272 B/op	      70 allocs/op
+BenchmarkPathMatch_RegexFallback_SingleParam-16        	  474920	      2449 ns/op	    3224 B/op	      64 allocs/op
+BenchmarkPathMatch_RegexFallback_SingleParam-16        	  504646	      2478 ns/op	    3224 B/op	      64 allocs/op
+BenchmarkPathMatch_RegexFallback_SingleParam-16        	  494508	      2482 ns/op	    3224 B/op	      64 allocs/op
+BenchmarkPathMatch_RegexFallback_SingleParam-16        	  497023	      2470 ns/op	    3224 B/op	      64 allocs/op
+BenchmarkPathMatch_RegexFallback_SingleParam-16        	  489286	      2454 ns/op	    3224 B/op	      64 allocs/op
+BenchmarkPathMatch_RegexFallback_DeepParam-16          	  188653	      6372 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_DeepParam-16          	  191170	      6319 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_DeepParam-16          	  188857	      6405 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_DeepParam-16          	  194233	      6335 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_DeepParam-16          	  190417	      6312 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_WithCache-16          	  188481	      6346 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_WithCache-16          	  190741	      6315 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_WithCache-16          	  194611	      6294 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_WithCache-16          	  193052	      6222 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_RegexFallback_WithCache-16          	  193116	      6306 ns/op	    5736 B/op	     140 allocs/op
+BenchmarkPathMatch_AllEndpoints_RadixTree-16           	 4832920	       245.3 ns/op	     252 B/op	       4 allocs/op
+BenchmarkPathMatch_AllEndpoints_RadixTree-16           	 4724572	       241.9 ns/op	     252 B/op	       4 allocs/op
+BenchmarkPathMatch_AllEndpoints_RadixTree-16           	 4797300	       241.1 ns/op	     252 B/op	       4 allocs/op
+BenchmarkPathMatch_AllEndpoints_RadixTree-16           	 4798866	       244.5 ns/op	     252 B/op	       4 allocs/op
+BenchmarkPathMatch_AllEndpoints_RadixTree-16           	 4853188	       242.0 ns/op	     252 B/op	       4 allocs/op
+BenchmarkPathMatch_AllEndpoints_RegexFallback-16       	  225037	      5215 ns/op	    4867 B/op	     117 allocs/op
+BenchmarkPathMatch_AllEndpoints_RegexFallback-16       	  226687	      5237 ns/op	    4867 B/op	     117 allocs/op
+BenchmarkPathMatch_AllEndpoints_RegexFallback-16       	  228123	      5205 ns/op	    4867 B/op	     117 allocs/op
+BenchmarkPathMatch_AllEndpoints_RegexFallback-16       	  229370	      5185 ns/op	    4867 B/op	     117 allocs/op
+BenchmarkPathMatch_AllEndpoints_RegexFallback-16       	  231621	      5150 ns/op	    4867 B/op	     117 allocs/op
+BenchmarkRequestValidation_BulkActions_Small-16        	   69162	     16918 ns/op	   12058 B/op	     250 allocs/op
+BenchmarkRequestValidation_BulkActions_Small-16        	   71664	     17019 ns/op	   12058 B/op	     250 allocs/op
+BenchmarkRequestValidation_BulkActions_Small-16        	   67645	     17422 ns/op	   12058 B/op	     250 allocs/op
+BenchmarkRequestValidation_BulkActions_Small-16        	   72026	     17006 ns/op	   12058 B/op	     250 allocs/op
+BenchmarkRequestValidation_BulkActions_Small-16        	   69945	     17660 ns/op	   12058 B/op	     250 allocs/op
+BenchmarkRequestValidation_BulkActions_Medium-16       	   32778	     36665 ns/op	   33642 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Medium-16       	   32732	     36099 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Medium-16       	   32616	     35939 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Medium-16       	   32516	     35940 ns/op	   33642 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Medium-16       	   32648	     35903 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Large-16        	    8478	    137676 ns/op	  188610 B/op	    3169 allocs/op
+BenchmarkRequestValidation_BulkActions_Large-16        	    8655	    137980 ns/op	  188611 B/op	    3169 allocs/op
+BenchmarkRequestValidation_BulkActions_Large-16        	    8578	    138862 ns/op	  188609 B/op	    3169 allocs/op
+BenchmarkRequestValidation_BulkActions_Large-16        	    8728	    139138 ns/op	  188610 B/op	    3169 allocs/op
+BenchmarkRequestValidation_BulkActions_Large-16        	    9008	    139634 ns/op	  188611 B/op	    3169 allocs/op
+BenchmarkRequestValidation_Petstore_AddPet-16          	   77982	     15758 ns/op	   10200 B/op	     195 allocs/op
+BenchmarkRequestValidation_Petstore_AddPet-16          	   75740	     15754 ns/op	   10200 B/op	     195 allocs/op
+BenchmarkRequestValidation_Petstore_AddPet-16          	   76636	     16090 ns/op	   10200 B/op	     195 allocs/op
+BenchmarkRequestValidation_Petstore_AddPet-16          	   77540	     16147 ns/op	   10200 B/op	     195 allocs/op
+BenchmarkRequestValidation_Petstore_AddPet-16          	   77868	     15664 ns/op	   10199 B/op	     195 allocs/op
+BenchmarkRequestValidation_BulkActions_Sync-16         	   47379	     24592 ns/op	   32105 B/op	     615 allocs/op
+BenchmarkRequestValidation_BulkActions_Sync-16         	   45340	     24131 ns/op	   32105 B/op	     615 allocs/op
+BenchmarkRequestValidation_BulkActions_Sync-16         	   47442	     24858 ns/op	   32105 B/op	     615 allocs/op
+BenchmarkRequestValidation_BulkActions_Sync-16         	   47438	     24701 ns/op	   32105 B/op	     615 allocs/op
+BenchmarkRequestValidation_BulkActions_Sync-16         	   46831	     24289 ns/op	   32105 B/op	     615 allocs/op
+BenchmarkRequestValidation_BulkActions_Async-16        	   33015	     36250 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Async-16        	   33194	     35255 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Async-16        	   32665	     35810 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Async-16        	   32641	     35885 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_BulkActions_Async-16        	   32396	     35694 ns/op	   33643 B/op	     644 allocs/op
+BenchmarkRequestValidation_GET_Simple-16               	  258800	      4583 ns/op	    4680 B/op	     115 allocs/op
+BenchmarkRequestValidation_GET_Simple-16               	  263222	      4590 ns/op	    4680 B/op	     115 allocs/op
+BenchmarkRequestValidation_GET_Simple-16               	  260364	      4659 ns/op	    4680 B/op	     115 allocs/op
+BenchmarkRequestValidation_GET_Simple-16               	  260710	      4567 ns/op	    4680 B/op	     115 allocs/op
+BenchmarkRequestValidation_GET_Simple-16               	  264927	      4537 ns/op	    4680 B/op	     115 allocs/op
+BenchmarkRequestValidation_GET_WithQueryParams-16      	  214705	      5577 ns/op	    6074 B/op	     149 allocs/op
+BenchmarkRequestValidation_GET_WithQueryParams-16      	  211640	      5639 ns/op	    6074 B/op	     149 allocs/op
+BenchmarkRequestValidation_GET_WithQueryParams-16      	  211063	      5562 ns/op	    6075 B/op	     149 allocs/op
+BenchmarkRequestValidation_GET_WithQueryParams-16      	  209749	      5638 ns/op	    6074 B/op	     149 allocs/op
+BenchmarkRequestValidation_GET_WithQueryParams-16      	  208587	      5671 ns/op	    6076 B/op	     149 allocs/op
+BenchmarkConcurrentValidation_BulkActions-16           	  228832	      7233 ns/op	   33640 B/op	     644 allocs/op
+BenchmarkConcurrentValidation_BulkActions-16           	  201777	      7387 ns/op	   33640 B/op	     644 allocs/op
+BenchmarkConcurrentValidation_BulkActions-16           	  206076	      7288 ns/op	   33640 B/op	     644 allocs/op
+BenchmarkConcurrentValidation_BulkActions-16           	  162788	      7545 ns/op	   33640 B/op	     644 allocs/op
+BenchmarkConcurrentValidation_BulkActions-16           	  192658	      7593 ns/op	   33640 B/op	     644 allocs/op
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x2 addr=0x18 pc=0x1051a5e70]
+
+goroutine 26326172 [running]:
+bytes.(*Reader).Len(...)
+	/usr/local/go/src/bytes/reader.go:27
+net/http.NewRequestWithContext({0x1056f6a98, 0x105be45e0}, {0x105410bb9?, 0x104fc60cc?}, {0x10541d299?, 0x104f5fa08?}, {0x1056f09e0, 0x0})
+	/usr/local/go/src/net/http/request.go:933 +0x3b0
+net/http.NewRequest(...)
+	/usr/local/go/src/net/http/request.go:863
+github.com/pb33f/libopenapi-validator/benchmarks.BenchmarkConcurrentValidation_MixedEndpoints.func1(0x1402a24e060)
+	/Users/zach.hamm/src/libopenapi-validator/benchmarks/validator_bench_test.go:800 +0x1bc
+testing.(*B).RunParallel.func1()
+	/usr/local/go/src/testing/benchmark.go:977 +0xac
+created by testing.(*B).RunParallel in goroutine 26326396
+	/usr/local/go/src/testing/benchmark.go:970 +0xfc
+exit status 2
+FAIL	github.com/pb33f/libopenapi-validator/benchmarks	281.740s
+FAIL

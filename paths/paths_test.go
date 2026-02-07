@@ -12,8 +12,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pb33f/libopenapi-validator/config"
 )
 
 func TestNewValidator_BadParam(t *testing.T) {
