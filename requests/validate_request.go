@@ -32,17 +32,20 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // ValidateRequestSchemaInput contains parameters for request schema validation.
 type ValidateRequestSchemaInput struct {
-	Request *http.Request   // Required: The HTTP request to validate
-	Schema  *base.Schema    // Required: The OpenAPI schema to validate against
-	Version float32         // Required: OpenAPI version (3.0 or 3.1)
-	Options []config.Option // Optional: Functional options (defaults applied if empty/nil)
+	Request *http.Request             // Required: The HTTP request to validate
+	Schema  *base.Schema              // Required: The OpenAPI schema to validate against
+	Version float32                   // Required: OpenAPI version (3.0 or 3.1)
+	Options *config.ValidationOptions // Optional: Validation options (defaults applied if nil)
 }
 
 // ValidateRequestSchema will validate a http.Request pointer against a schema.
 // If validation fails, it will return a list of validation errors as the second return value.
 // The schema will be stored and reused from cache if available, otherwise it will be compiled on each call.
 func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.ValidationError) {
-	validationOptions := config.NewValidationOptions(input.Options...)
+	validationOptions := input.Options
+	if validationOptions == nil {
+		validationOptions = config.NewValidationOptions()
+	}
 	var validationErrors []*errors.ValidationError
 	var renderedSchema, jsonSchema []byte
 	var referenceSchema string

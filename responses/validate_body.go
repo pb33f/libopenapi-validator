@@ -145,7 +145,7 @@ func (v *responseBodyValidator) checkResponseSchema(
 				Response: response,
 				Schema:   schema,
 				Version:  v.version,
-				Options:  []config.Option{config.WithExistingOpts(v.options)},
+				Options:  v.options,
 			})
 			if !valid {
 				validationErrors = append(validationErrors, vErrs...)

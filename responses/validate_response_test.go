@@ -154,7 +154,7 @@ properties:
 		Response: responseWithBody(`{"name": "test"}`),
 		Schema:   schema,
 		Version:  3.1,
-		Options:  []config.Option{config.WithExistingOpts(opts)},
+		Options:  opts,
 	})
 
 	assert.True(t, valid)

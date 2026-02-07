@@ -72,23 +72,7 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 func WithExistingOpts(options *ValidationOptions) Option {
 	return func(o *ValidationOptions) {
 		if options != nil {
-			o.RegexEngine = options.RegexEngine
-			o.RegexCache = options.RegexCache
-			o.FormatAssertions = options.FormatAssertions
-			o.ContentAssertions = options.ContentAssertions
-			o.SecurityValidation = options.SecurityValidation
-			o.OpenAPIMode = options.OpenAPIMode
-			o.AllowScalarCoercion = options.AllowScalarCoercion
-			o.Formats = options.Formats
-			o.SchemaCache = options.SchemaCache
-			o.PathTree = options.PathTree
-			o.pathTreeSet = options.pathTreeSet
-			o.Logger = options.Logger
-			o.StrictMode = options.StrictMode
-			o.StrictIgnorePaths = options.StrictIgnorePaths
-			o.StrictIgnoredHeaders = options.StrictIgnoredHeaders
-			o.strictIgnoredHeadersMerge = options.strictIgnoredHeadersMerge
-			o.LazyErrors = options.LazyErrors
+			*o = *options
 		}
 	}
 }

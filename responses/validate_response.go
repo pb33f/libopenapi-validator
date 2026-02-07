@@ -32,11 +32,11 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // ValidateResponseSchemaInput contains parameters for response schema validation.
 type ValidateResponseSchemaInput struct {
-	Request  *http.Request   // Required: The HTTP request (for context)
-	Response *http.Response  // Required: The HTTP response to validate
-	Schema   *base.Schema    // Required: The OpenAPI schema to validate against
-	Version  float32         // Required: OpenAPI version (3.0 or 3.1)
-	Options  []config.Option // Optional: Functional options (defaults applied if empty/nil)
+	Request  *http.Request             // Required: The HTTP request (for context)
+	Response *http.Response            // Required: The HTTP response to validate
+	Schema   *base.Schema              // Required: The OpenAPI schema to validate against
+	Version  float32                   // Required: OpenAPI version (3.0 or 3.1)
+	Options  *config.ValidationOptions // Optional: Validation options (defaults applied if nil)
 }
 
 // ValidateResponseSchema will validate the response body for a http.Response pointer. The request is used to
@@ -46,7 +46,10 @@ type ValidateResponseSchemaInput struct {
 // This function is used by the ValidateResponseBody function, but can be used independently.
 // The schema will be compiled from cache if available, otherwise it will be compiled and cached.
 func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors.ValidationError) {
-	validationOptions := config.NewValidationOptions(input.Options...)
+	validationOptions := input.Options
+	if validationOptions == nil {
+		validationOptions = config.NewValidationOptions()
+	}
 	var validationErrors []*errors.ValidationError
 	var renderedSchema, jsonSchema []byte
 	var referenceSchema string

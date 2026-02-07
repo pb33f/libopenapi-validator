@@ -146,7 +146,7 @@ properties:
 		Request: postRequestWithBody(`{"name": "test"}`),
 		Schema:  schema,
 		Version: openAPIVersion,
-		Options: []config.Option{config.WithExistingOpts(opts)},
+		Options: opts,
 	})
 
 	assert.True(t, valid)

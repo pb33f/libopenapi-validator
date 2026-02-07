@@ -10,7 +10,6 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
-	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
@@ -84,7 +83,7 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 		Request: request,
 		Schema:  schema,
 		Version: v.version,
-		Options: []config.Option{config.WithExistingOpts(v.options)},
+		Options: v.options,
 	})
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
