@@ -37,12 +37,12 @@ func ValidateSingleParameterSchema(
 	var jsonSchema []byte
 	var compiledSchema *jsonschema.Schema
 	var referenceSchema string
+	var hash uint64
 
 	// Check cache first
 	if o != nil && o.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
-		hash := schema.GoLow().Hash()
+		hash = schema.GoLow().Hash()
 		if cached, ok := o.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
-			jsonSchema = cached.RenderedJSON
 			compiledSchema = cached.CompiledSchema
 			referenceSchema = cached.ReferenceSchema
 		}
@@ -63,7 +63,9 @@ func ValidateSingleParameterSchema(
 
 		// Store in cache for future use
 		if o != nil && o.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
-			hash := schema.GoLow().Hash()
+			if hash == 0 {
+				hash = schema.GoLow().Hash()
+			}
 			renderCtx := base.NewInlineRenderContext()
 			renderedSchema, _ := schema.RenderInlineWithContext(renderCtx)
 			referenceSchema = string(renderedSchema)
@@ -127,10 +129,11 @@ func ValidateParameterSchema(
 	var jsonSchema []byte
 	var compiledSchema *jsonschema.Schema
 	var referenceSchema string
+	var hash uint64
 
 	// Check cache first
 	if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
-		hash := schema.GoLow().Hash()
+		hash = schema.GoLow().Hash()
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
 			jsonSchema = cached.RenderedJSON
 			compiledSchema = cached.CompiledSchema
@@ -200,7 +203,9 @@ func ValidateParameterSchema(
 
 		// Store in cache for future use
 		if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
-			hash := schema.GoLow().Hash()
+			if hash == 0 {
+				hash = schema.GoLow().Hash()
+			}
 			renderCtx := base.NewInlineRenderContext()
 			renderedSchema, _ := schema.RenderInlineWithContext(renderCtx)
 			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
@@ -286,7 +291,7 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 		er := schFlatErrs[q]
 
 		errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
-		if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
+		if er.KeywordLocation == "" || helpers.ShouldIgnoreError(errMsg) {
 			continue // ignore this error, it's not useful
 		}
 

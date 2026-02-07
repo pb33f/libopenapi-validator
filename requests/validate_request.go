@@ -65,8 +65,8 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 		}}
 	}
 
+	hash := input.Schema.GoLow().Hash()
 	if validationOptions.SchemaCache != nil {
-		hash := input.Schema.GoLow().Hash()
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
 			renderedSchema = cached.RenderedInline
 			referenceSchema = cached.ReferenceSchema
@@ -109,7 +109,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
 
 		var err error
-		schemaName := fmt.Sprintf("%x", input.Schema.GoLow().Hash())
+		schemaName := fmt.Sprintf("%x", hash)
 		compiledSchema, err = helpers.NewCompiledSchemaWithVersion(
 			schemaName,
 			jsonSchema,
@@ -138,7 +138,6 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 		}
 
 		if validationOptions.SchemaCache != nil {
-			hash := input.Schema.GoLow().Hash()
 			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
 				Schema:          input.Schema,
 				RenderedInline:  renderedSchema,
@@ -242,7 +241,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 
 			errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
 
-			if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
+			if er.KeywordLocation == "" || helpers.ShouldIgnoreError(errMsg) {
 				continue // ignore this error, it's useless tbh, utter noise.
 			}
 			if er.Error != nil {

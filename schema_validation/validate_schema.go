@@ -277,7 +277,7 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 		er := schFlatErrs[q]
 
 		errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
-		if helpers.IgnoreRegex.MatchString(errMsg) {
+		if helpers.ShouldIgnoreError(errMsg) {
 			continue // ignore this error, it's useless tbh, utter noise.
 		}
 		if er.Error != nil {
