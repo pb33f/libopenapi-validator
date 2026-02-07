@@ -41,6 +41,8 @@ type ValidationOptions struct {
 	StrictIgnorePaths         []string // Instance JSONPath patterns to exclude from strict checks
 	StrictIgnoredHeaders      []string // Headers to always ignore in strict mode (nil = use defaults)
 	strictIgnoredHeadersMerge bool     // Internal: true if merging with defaults
+
+	LazyErrors bool // When true, defer expensive error field population
 }
 
 // Option Enables an 'Options pattern' approach
@@ -86,6 +88,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.StrictIgnorePaths = options.StrictIgnorePaths
 			o.StrictIgnoredHeaders = options.StrictIgnoredHeaders
 			o.strictIgnoredHeadersMerge = options.strictIgnoredHeadersMerge
+			o.LazyErrors = options.LazyErrors
 		}
 	}
 }
@@ -234,6 +237,16 @@ func WithStrictIgnoredHeadersExtra(headers ...string) Option {
 	return func(o *ValidationOptions) {
 		o.StrictIgnoredHeaders = headers
 		o.strictIgnoredHeadersMerge = true
+	}
+}
+
+// WithLazyErrors enables deferred population of expensive error fields.
+// When enabled, ReferenceSchema and ReferenceObject in SchemaValidationFailure
+// are left empty during error construction. Use GetReferenceSchema() and
+// GetReferenceObject() to resolve them on demand.
+func WithLazyErrors() Option {
+	return func(o *ValidationOptions) {
+		o.LazyErrors = true
 	}
 }
 

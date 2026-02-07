@@ -4,12 +4,19 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
+	"regexp"
+	"strconv"
+	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
+
+var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // SchemaValidationFailure is a wrapper around the jsonschema.ValidationError object, to provide a more
 // user-friendly way to break down what went wrong.
@@ -45,11 +52,15 @@ type SchemaValidationFailure struct {
 	// the Context object held by the ValidationError object).
 	Column int `json:"column,omitempty" yaml:"column,omitempty"`
 
-	// ReferenceSchema is the schema that was referenced in the validation failure.
+	// Deprecated: Use GetReferenceSchema() instead for forward-compatible access.
 	ReferenceSchema string `json:"referenceSchema,omitempty" yaml:"referenceSchema,omitempty"`
 
-	// ReferenceObject is the object that was referenced in the validation failure.
+	// Deprecated: Use GetReferenceObject() instead for forward-compatible access.
 	ReferenceObject string `json:"referenceObject,omitempty" yaml:"referenceObject,omitempty"`
+
+	// lazySrc holds state for deferred resolution of ReferenceSchema and ReferenceObject.
+	// This is only set when WithLazyErrors is enabled.
+	lazySrc *lazySchemaSource
 
 	// ReferenceExample is an example object generated from the schema that was referenced in the validation failure.
 	ReferenceExample string `json:"referenceExample,omitempty" yaml:"referenceExample,omitempty"`
@@ -58,9 +69,82 @@ type SchemaValidationFailure struct {
 	OriginalError *jsonschema.ValidationError `json:"-" yaml:"-"`
 }
 
+// lazySchemaSource holds the data needed to resolve ReferenceSchema and ReferenceObject
+// on demand when WithLazyErrors is enabled.
+type lazySchemaSource struct {
+	renderedInline []byte    // raw rendered schema bytes (for ReferenceSchema)
+	decodedObj     any       // decoded request/response body
+	bodyBytes      []byte    // raw request/response body bytes
+	instanceLoc    string    // instance location from validation error (e.g. "/0")
+	schemaOnce     sync.Once // ensures ReferenceSchema is resolved exactly once
+	objectOnce     sync.Once // ensures ReferenceObject is resolved exactly once
+}
+
 // Error returns a string representation of the error
 func (s *SchemaValidationFailure) Error() string {
 	return fmt.Sprintf("Reason: %s, Location: %s", s.Reason, s.Location)
+}
+
+// GetReferenceSchema returns the reference schema string. In eager mode (default),
+// this returns the pre-populated ReferenceSchema field. In lazy mode (WithLazyErrors),
+// it resolves from the cached schema data on first call. Thread-safe via sync.Once.
+func (s *SchemaValidationFailure) GetReferenceSchema() string {
+	if s.ReferenceSchema != "" {
+		return s.ReferenceSchema
+	}
+	if s.lazySrc != nil {
+		s.lazySrc.schemaOnce.Do(func() {
+			if s.lazySrc.renderedInline != nil {
+				s.ReferenceSchema = string(s.lazySrc.renderedInline)
+			}
+		})
+	}
+	return s.ReferenceSchema
+}
+
+// GetReferenceObject returns the reference object string. In eager mode (default),
+// this returns the pre-populated ReferenceObject field. In lazy mode (WithLazyErrors),
+// it resolves from the decoded object data on first call.
+func (s *SchemaValidationFailure) GetReferenceObject() string {
+	if s.ReferenceObject != "" {
+		return s.ReferenceObject
+	}
+	if s.lazySrc == nil {
+		return s.ReferenceObject
+	}
+	s.resolveReferenceObject()
+	return s.ReferenceObject
+}
+
+func (s *SchemaValidationFailure) resolveReferenceObject() {
+	s.lazySrc.objectOnce.Do(func() {
+		if s.lazySrc.decodedObj != nil && s.lazySrc.instanceLoc != "" {
+			val := instanceLocationRegex.FindStringSubmatch(s.lazySrc.instanceLoc)
+			if len(val) > 0 {
+				referenceIndex, _ := strconv.Atoi(val[1])
+				if reflect.ValueOf(s.lazySrc.decodedObj).Type().Kind() == reflect.Slice {
+					found := s.lazySrc.decodedObj.([]any)[referenceIndex]
+					recoded, _ := json.Marshal(found)
+					s.ReferenceObject = string(recoded)
+					return
+				}
+			}
+		}
+		if s.lazySrc.bodyBytes != nil {
+			s.ReferenceObject = string(s.lazySrc.bodyBytes)
+		}
+	})
+}
+
+// SetLazySource configures the lazy resolution source for this failure.
+// This is called by the validation code when WithLazyErrors is enabled.
+func (s *SchemaValidationFailure) SetLazySource(renderedInline []byte, decodedObj any, bodyBytes []byte, instanceLoc string) {
+	s.lazySrc = &lazySchemaSource{
+		renderedInline: renderedInline,
+		decodedObj:     decodedObj,
+		bodyBytes:      bodyBytes,
+		instanceLoc:    instanceLoc,
+	}
 }
 
 // ValidationError is a struct that contains all the information about a validation error.

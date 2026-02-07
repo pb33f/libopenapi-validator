@@ -270,27 +270,35 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
 				var referenceObject string
 
-				if len(val) > 0 {
-					referenceIndex, _ := strconv.Atoi(val[1])
-					if reflect.ValueOf(decodedObj).Type().Kind() == reflect.Slice {
-						found := decodedObj.([]any)[referenceIndex]
-						recoded, _ := json.MarshalIndent(found, "", "  ")
-						referenceObject = string(recoded)
+				if !validationOptions.LazyErrors {
+					if len(val) > 0 {
+						referenceIndex, _ := strconv.Atoi(val[1])
+						if reflect.ValueOf(decodedObj).Type().Kind() == reflect.Slice {
+							found := decodedObj.([]any)[referenceIndex]
+							recoded, _ := json.Marshal(found)
+							referenceObject = string(recoded)
+						}
 					}
-				}
-				if referenceObject == "" {
-					referenceObject = string(responseBody)
+					if referenceObject == "" {
+						referenceObject = string(responseBody)
+					}
 				}
 
 				violation := &errors.SchemaValidationFailure{
-					Reason:          errMsg,
-					Location:        er.KeywordLocation,
-					FieldName:       helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-					FieldPath:       helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-					InstancePath:    helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-					ReferenceSchema: referenceSchema,
-					ReferenceObject: referenceObject,
-					OriginalError:   jk,
+					Reason:        errMsg,
+					Location:      er.KeywordLocation,
+					FieldName:     helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+					FieldPath:     helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+					InstancePath:  helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+					OriginalError: jk,
+				}
+				if validationOptions.LazyErrors {
+					violation.SetLazySource(renderedSchema, decodedObj, responseBody, er.InstanceLocation)
+				} else {
+					//nolint:staticcheck // Backward compatibility: set deprecated fields directly in eager mode
+					violation.ReferenceSchema = referenceSchema
+					//nolint:staticcheck // Backward compatibility: set deprecated fields directly in eager mode
+					violation.ReferenceObject = referenceObject
 				}
 				// if we have a location within the schema, add it to the error
 				if located != nil {

@@ -6,11 +6,12 @@ package validator
 import (
 	"strings"
 
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/radix"
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // resolvedRoute carries everything learned during path matching.

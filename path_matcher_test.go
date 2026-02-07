@@ -7,13 +7,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pb33f/libopenapi"
-	"github.com/pb33f/libopenapi-validator/radix"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/pb33f/libopenapi/orderedmap"
+
+	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 func createTestDocument(paths map[string]bool) *v3.Document {
