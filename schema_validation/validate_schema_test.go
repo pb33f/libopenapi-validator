@@ -1097,3 +1097,218 @@ components:
 		})
 	}
 }
+
+// TestValidateSchema_Discriminator_OneOf_WithRefs_Issue788 tests that validation works correctly
+// when a schema has discriminator + oneOf with $ref to component schemas.
+// This was a regression in vacuum v0.21.2+ where the validator would fail with
+// "JSON schema compile failed: json-pointer not found" because discriminator refs
+// were being preserved instead of inlined.
+// https://github.com/daveshanley/vacuum/issues/788
+func TestValidateSchema_Discriminator_OneOf_WithRefs_Issue788(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test Discriminator OneOf With Refs
+  version: 1.0.0
+components:
+  schemas:
+    ProductWidget:
+      type: object
+      required:
+        - productName
+        - quantity
+        - color
+      properties:
+        productName:
+          type: string
+          enum:
+            - Widget
+        quantity:
+          type: integer
+          minimum: 1
+        color:
+          type: string
+          enum:
+            - Red
+            - Blue
+            - Green
+    ProductGadget:
+      type: object
+      required:
+        - productName
+        - quantity
+        - size
+      properties:
+        productName:
+          type: string
+          enum:
+            - Gadget
+        quantity:
+          type: integer
+          minimum: 1
+        size:
+          type: string
+          enum:
+            - Small
+            - Medium
+            - Large
+    Product:
+      oneOf:
+        - $ref: '#/components/schemas/ProductWidget'
+        - $ref: '#/components/schemas/ProductGadget'
+      discriminator:
+        propertyName: productName`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	productSchema := model.Model.Components.Schemas.GetOrZero("Product").Schema()
+
+	// Valid Widget product
+	validWidget := map[string]interface{}{
+		"productName": "Widget",
+		"quantity":    1,
+		"color":       "Green",
+	}
+
+	validator := NewSchemaValidator()
+	valid, validationErrors := validator.ValidateSchemaObject(productSchema, validWidget)
+
+	// This should pass without "json-pointer not found" error
+	assert.True(t, valid, "validation should pass for valid product with discriminator oneOf refs")
+	assert.Empty(t, validationErrors, "no validation errors should be present")
+}
+
+// TestValidateSchema_Discriminator_AnyOf_WithRefs tests anyOf with discriminator and $refs
+func TestValidateSchema_Discriminator_AnyOf_WithRefs(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test Discriminator AnyOf With Refs
+  version: 1.0.0
+components:
+  schemas:
+    Cat:
+      type: object
+      required:
+        - petType
+        - meow
+      properties:
+        petType:
+          type: string
+          const: cat
+        meow:
+          type: boolean
+    Dog:
+      type: object
+      required:
+        - petType
+        - bark
+      properties:
+        petType:
+          type: string
+          const: dog
+        bark:
+          type: boolean
+    Pet:
+      anyOf:
+        - $ref: '#/components/schemas/Cat'
+        - $ref: '#/components/schemas/Dog'
+      discriminator:
+        propertyName: petType`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	petSchema := model.Model.Components.Schemas.GetOrZero("Pet").Schema()
+
+	// Valid cat
+	validCat := map[string]interface{}{
+		"petType": "cat",
+		"meow":    true,
+	}
+
+	validator := NewSchemaValidator()
+	valid, validationErrors := validator.ValidateSchemaObject(petSchema, validCat)
+
+	assert.True(t, valid, "validation should pass for valid cat with discriminator anyOf refs")
+	assert.Empty(t, validationErrors, "no validation errors should be present")
+}
+
+// TestValidateSchema_Discriminator_OneOf_WithRefs_InvalidData tests that invalid data
+// still fails validation correctly (not a false negative)
+func TestValidateSchema_Discriminator_OneOf_WithRefs_InvalidData(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test Discriminator OneOf Invalid
+  version: 1.0.0
+components:
+  schemas:
+    ProductWidget:
+      type: object
+      required:
+        - productName
+        - quantity
+        - color
+      properties:
+        productName:
+          type: string
+          enum:
+            - Widget
+        quantity:
+          type: integer
+          minimum: 1
+        color:
+          type: string
+          enum:
+            - Red
+            - Blue
+    ProductGadget:
+      type: object
+      required:
+        - productName
+        - quantity
+        - size
+      properties:
+        productName:
+          type: string
+          enum:
+            - Gadget
+        quantity:
+          type: integer
+          minimum: 1
+        size:
+          type: string
+    Product:
+      oneOf:
+        - $ref: '#/components/schemas/ProductWidget'
+        - $ref: '#/components/schemas/ProductGadget'
+      discriminator:
+        propertyName: productName`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	assert.Empty(t, errs)
+
+	productSchema := model.Model.Components.Schemas.GetOrZero("Product").Schema()
+
+	// Invalid product - missing required field 'color' for Widget
+	invalidProduct := map[string]interface{}{
+		"productName": "Widget",
+		"quantity":    1,
+		// missing required 'color' field
+	}
+
+	validator := NewSchemaValidator()
+	valid, validationErrors := validator.ValidateSchemaObject(productSchema, invalidProduct)
+
+	// This should fail because 'color' is required for Widget
+	assert.False(t, valid, "validation should fail for invalid product")
+	assert.NotEmpty(t, validationErrors, "validation errors should be present")
+}

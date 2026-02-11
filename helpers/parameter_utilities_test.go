@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/require"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -113,6 +114,345 @@ func TestExtractSecurityForOperation(t *testing.T) {
 		// Check if the number of security requirements matches the expected count (1 in all cases)
 		require.Len(t, security, 1, "Failed for method: "+tt.method)
 	}
+}
+
+// Test ExtractSecurityHeaderNames with various security scheme types
+func TestExtractSecurityHeaderNames(t *testing.T) {
+	t.Run("nil inputs", func(t *testing.T) {
+		require.Nil(t, ExtractSecurityHeaderNames(nil, nil))
+		require.Nil(t, ExtractSecurityHeaderNames([]*base.SecurityRequirement{}, nil))
+		require.Nil(t, ExtractSecurityHeaderNames(nil, map[string]*v3.SecurityScheme{}))
+	})
+
+	t.Run("apiKey with in:header", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-API-Key",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"ApiKeyAuth": {"read"},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"X-API-Key"}, headers)
+	})
+
+	t.Run("apiKey with in:query should not add header", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyQuery": {
+				Type: "apiKey",
+				In:   "query",
+				Name: "api_key",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"ApiKeyQuery": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("apiKey with in:cookie should not add header", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyCookie": {
+				Type: "apiKey",
+				In:   "cookie",
+				Name: "session_id",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"ApiKeyCookie": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("http bearer scheme", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"BearerAuth": {
+				Type:   "http",
+				Scheme: "bearer",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"BearerAuth": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"Authorization"}, headers)
+	})
+
+	t.Run("http basic scheme", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"BasicAuth": {
+				Type:   "http",
+				Scheme: "basic",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"BasicAuth": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"Authorization"}, headers)
+	})
+
+	t.Run("oauth2 scheme", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"OAuth2": {
+				Type: "oauth2",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"OAuth2": {"read:users"},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"Authorization"}, headers)
+	})
+
+	t.Run("openIdConnect scheme", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"OpenID": {
+				Type:             "openIdConnect",
+				OpenIdConnectUrl: "https://example.com/.well-known/openid-configuration",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"OpenID": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"Authorization"}, headers)
+	})
+
+	t.Run("empty security requirement (ContainsEmptyRequirement)", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-API-Key",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				ContainsEmptyRequirement: true,
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("nil security requirement in slice", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-API-Key",
+			},
+		}
+		security := []*base.SecurityRequirement{nil}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("security requirement with nil Requirements map", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-API-Key",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: nil,
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("multiple security options OR - different headers", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-API-Key",
+			},
+			"BearerAuth": {
+				Type:   "http",
+				Scheme: "bearer",
+			},
+		}
+		// OR logic: separate security requirements
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"ApiKeyAuth": {},
+				}),
+			},
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"BearerAuth": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Len(t, headers, 2)
+		require.Contains(t, headers, "X-API-Key")
+		require.Contains(t, headers, "Authorization")
+	})
+
+	t.Run("combined requirements AND - both headers", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-API-Key",
+			},
+			"BearerAuth": {
+				Type:   "http",
+				Scheme: "bearer",
+			},
+		}
+		// AND logic: multiple schemes in one requirement
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"ApiKeyAuth": {},
+					"BearerAuth": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Len(t, headers, 2)
+		require.Contains(t, headers, "X-API-Key")
+		require.Contains(t, headers, "Authorization")
+	})
+
+	t.Run("security scheme not found in schemes map", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"SomeOtherScheme": {
+				Type: "apiKey",
+				In:   "header",
+				Name: "X-Other",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"NonExistent": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("nil scheme in schemes map", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"NilScheme": nil,
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"NilScheme": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
+
+	t.Run("deduplication of Authorization header", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"BearerAuth": {
+				Type:   "http",
+				Scheme: "bearer",
+			},
+			"OAuth2": {
+				Type: "oauth2",
+			},
+		}
+		// Both use Authorization header
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"BearerAuth": {},
+				}),
+			},
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"OAuth2": {"read"},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"Authorization"}, headers)
+	})
+
+	t.Run("case insensitive type matching", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"ApiKeyAuth": {
+				Type: "APIKEY", // uppercase
+				In:   "HEADER", // uppercase
+				Name: "X-API-Key",
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"ApiKeyAuth": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Equal(t, []string{"X-API-Key"}, headers)
+	})
+
+	t.Run("unknown security type is ignored", func(t *testing.T) {
+		schemes := map[string]*v3.SecurityScheme{
+			"Unknown": {
+				Type: "mutualTLS", // valid OpenAPI type but doesn't use headers
+			},
+		}
+		security := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"Unknown": {},
+				}),
+			},
+		}
+		headers := ExtractSecurityHeaderNames(security, schemes)
+		require.Nil(t, headers)
+	})
 }
 
 func TestConstructParamMapFromDeepObjectEncoding(t *testing.T) {

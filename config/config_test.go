@@ -4,6 +4,7 @@
 package config
 
 import (
+	"log/slog"
 	"sync"
 	"testing"
 
@@ -367,4 +368,106 @@ func TestWithRegexpCache(t *testing.T) {
 	opts := NewValidationOptions(WithRegexCache(syncMap))
 
 	assert.NotNil(t, opts.RegexCache)
+}
+
+// Tests for strict mode configuration options
+
+func TestWithStrictMode(t *testing.T) {
+	opts := NewValidationOptions(WithStrictMode())
+
+	assert.True(t, opts.StrictMode)
+	assert.Nil(t, opts.StrictIgnorePaths)
+	assert.Nil(t, opts.StrictIgnoredHeaders)
+}
+
+func TestWithStrictIgnorePaths(t *testing.T) {
+	paths := []string{"$.body.metadata.*", "$.headers.X-*"}
+	opts := NewValidationOptions(WithStrictIgnorePaths(paths...))
+
+	assert.Equal(t, paths, opts.StrictIgnorePaths)
+	assert.False(t, opts.StrictMode) // Not enabled by default
+}
+
+func TestWithStrictIgnoredHeaders(t *testing.T) {
+	headers := []string{"x-custom-header", "x-another-header"}
+	opts := NewValidationOptions(WithStrictIgnoredHeaders(headers...))
+
+	assert.Equal(t, headers, opts.StrictIgnoredHeaders)
+	assert.False(t, opts.strictIgnoredHeadersMerge)
+}
+
+func TestWithStrictIgnoredHeadersExtra(t *testing.T) {
+	headers := []string{"x-extra-header"}
+	opts := NewValidationOptions(WithStrictIgnoredHeadersExtra(headers...))
+
+	assert.Equal(t, headers, opts.StrictIgnoredHeaders)
+	assert.True(t, opts.strictIgnoredHeadersMerge)
+}
+
+func TestGetEffectiveStrictIgnoredHeaders_Default(t *testing.T) {
+	opts := NewValidationOptions()
+
+	headers := opts.GetEffectiveStrictIgnoredHeaders()
+
+	assert.NotNil(t, headers)
+	assert.Contains(t, headers, "content-type")
+	assert.Contains(t, headers, "authorization")
+}
+
+func TestGetEffectiveStrictIgnoredHeaders_Replace(t *testing.T) {
+	customHeaders := []string{"x-only-this"}
+	opts := NewValidationOptions(WithStrictIgnoredHeaders(customHeaders...))
+
+	headers := opts.GetEffectiveStrictIgnoredHeaders()
+
+	assert.Equal(t, customHeaders, headers)
+	assert.NotContains(t, headers, "content-type") // Default headers are replaced
+}
+
+func TestGetEffectiveStrictIgnoredHeaders_Merge(t *testing.T) {
+	extraHeaders := []string{"x-extra-header"}
+	opts := NewValidationOptions(WithStrictIgnoredHeadersExtra(extraHeaders...))
+
+	headers := opts.GetEffectiveStrictIgnoredHeaders()
+
+	// Should have both defaults and extras
+	assert.Contains(t, headers, "content-type")   // From defaults
+	assert.Contains(t, headers, "x-extra-header") // From extras
+	assert.Contains(t, headers, "authorization")  // From defaults
+}
+
+func TestWithLogger(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(nil, nil))
+	opts := NewValidationOptions(WithLogger(logger))
+
+	assert.Equal(t, logger, opts.Logger)
+}
+
+func TestWithExistingOpts_StrictFields(t *testing.T) {
+	original := &ValidationOptions{
+		StrictMode:                true,
+		StrictIgnorePaths:         []string{"$.body.*"},
+		StrictIgnoredHeaders:      []string{"x-custom"},
+		strictIgnoredHeadersMerge: true,
+		Logger:                    slog.New(slog.NewTextHandler(nil, nil)),
+	}
+
+	opts := NewValidationOptions(WithExistingOpts(original))
+
+	assert.True(t, opts.StrictMode)
+	assert.Equal(t, original.StrictIgnorePaths, opts.StrictIgnorePaths)
+	assert.Equal(t, original.StrictIgnoredHeaders, opts.StrictIgnoredHeaders)
+	assert.True(t, opts.strictIgnoredHeadersMerge)
+	assert.Equal(t, original.Logger, opts.Logger)
+}
+
+func TestStrictModeWithIgnorePaths(t *testing.T) {
+	paths := []string{"$.body.metadata.*"}
+	opts := NewValidationOptions(
+		WithStrictMode(),
+		WithStrictIgnorePaths(paths...),
+	)
+
+	assert.True(t, opts.StrictMode)
+	assert.Equal(t, paths, opts.StrictIgnorePaths)
 }

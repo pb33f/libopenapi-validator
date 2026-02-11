@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,8 +83,8 @@ func TestValidationError_Error_WithSchemaValidationErrors_AndSpecLineColumn(t *t
 func TestValidationError_IsPathMissingError(t *testing.T) {
 	// Test the IsPathMissingError method
 	v := &ValidationError{
-		ValidationType:    "path",
-		ValidationSubType: "missing",
+		ValidationType:    helpers.PathValidation,
+		ValidationSubType: helpers.ValidationMissing,
 	}
 
 	require.True(t, v.IsPathMissingError())
@@ -93,16 +94,16 @@ func TestValidationError_IsPathMissingError(t *testing.T) {
 	require.False(t, v.IsPathMissingError())
 
 	// Test with different ValidationType
-	v.ValidationType = "request"
-	v.ValidationSubType = "missing"
+	v.ValidationType = helpers.RequestValidation
+	v.ValidationSubType = helpers.ValidationMissing
 	require.False(t, v.IsPathMissingError())
 }
 
 func TestValidationError_IsOperationMissingError(t *testing.T) {
 	// Test the IsOperationMissingError method
 	v := &ValidationError{
-		ValidationType:    "path",
-		ValidationSubType: "missingOperation",
+		ValidationType:    helpers.PathValidation,
+		ValidationSubType: helpers.ValidationMissingOperation,
 	}
 
 	require.True(t, v.IsOperationMissingError())
@@ -112,7 +113,7 @@ func TestValidationError_IsOperationMissingError(t *testing.T) {
 	require.False(t, v.IsOperationMissingError())
 
 	// Test with different ValidationType
-	v.ValidationType = "request"
-	v.ValidationSubType = "missingOperation"
+	v.ValidationType = helpers.RequestValidation
+	v.ValidationSubType = helpers.ValidationMissingOperation
 	require.False(t, v.IsOperationMissingError())
 }

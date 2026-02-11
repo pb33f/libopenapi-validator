@@ -1495,3 +1495,84 @@ components:
 	assert.Len(t, errors[0].SchemaValidationErrors, 1)
 	assert.Equal(t, "'test' is not valid email: missing @", errors[0].SchemaValidationErrors[0].Reason)
 }
+
+func TestValidateBody_StrictMode_UndeclaredProperty(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model, config.WithStrictMode())
+
+	// Include an undeclared property 'extra'
+	body := map[string]interface{}{
+		"name":    "Big Mac",
+		"patties": 2,
+		"extra":   "undeclared property",
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "extra")
+	assert.Contains(t, errors[0].Message, "not declared")
+}
+
+func TestValidateBody_StrictMode_ValidRequest(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model, config.WithStrictMode())
+
+	// Only declared properties
+	body := map[string]interface{}{
+		"name":    "Big Mac",
+		"patties": 2,
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}

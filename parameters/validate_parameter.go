@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
@@ -269,24 +268,17 @@ func formatJsonSchemaValidationError(schema *base.Schema, scErrs *jsonschema.Val
 				}
 			}
 		}
-		processPoly := func(schemas []*base.SchemaProxy, wg *sync.WaitGroup) {
-			if len(schemas) > 0 {
-				for _, s := range schemas {
-					extractTypes(s)
-				}
+		processPoly := func(schemas []*base.SchemaProxy) {
+			for _, s := range schemas {
+				extractTypes(s)
 			}
-			wg.Done()
 		}
 
 		// check if there is polymorphism going on here.
 		if len(schema.AnyOf) > 0 || len(schema.AllOf) > 0 || len(schema.OneOf) > 0 {
-
-			wg := sync.WaitGroup{}
-			wg.Add(3)
-			go processPoly(schema.AnyOf, &wg)
-			go processPoly(schema.AllOf, &wg)
-			go processPoly(schema.OneOf, &wg)
-			wg.Wait()
+			processPoly(schema.AnyOf)
+			processPoly(schema.AllOf)
+			processPoly(schema.OneOf)
 
 			sep := "or"
 			if len(schema.AllOf) > 0 {

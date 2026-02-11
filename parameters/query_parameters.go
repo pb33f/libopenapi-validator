@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -19,6 +19,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 const rx = `[:\/\?#\[\]\@!\$&'\(\)\*\+,;=]`
@@ -36,8 +37,8 @@ func (v *paramValidator) ValidateQueryParams(request *http.Request) (bool, []*er
 func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
-			ValidationType:    helpers.ParameterValidationPath,
-			ValidationSubType: "missing",
+			ValidationType:    helpers.PathValidation,
+			ValidationSubType: helpers.ValidationMissing,
 			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
 			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
 				"however that path, or the %s method for that path does not exist in the specification",
@@ -52,9 +53,24 @@ func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, 
 	queryParams := make(map[string][]*helpers.QueryParam)
 	var validationErrors []*errors.ValidationError
 
+	// build a set of spec parameter names for exact matching
+	specParamNames := make(map[string]bool)
+	for _, p := range params {
+		if p.In == helpers.Query {
+			specParamNames[p.Name] = true
+		}
+	}
+
 	for qKey, qVal := range request.URL.Query() {
-		// check if the param is encoded as a property / deepObject
-		if strings.IndexRune(qKey, '[') > 0 && strings.IndexRune(qKey, ']') > 0 {
+		// check if the query key exactly matches a spec parameter name (e.g., "match[]")
+		// if so, store it literally without deepObject stripping
+		if specParamNames[qKey] {
+			queryParams[qKey] = append(queryParams[qKey], &helpers.QueryParam{
+				Key:    qKey,
+				Values: qVal,
+			})
+		} else if strings.IndexRune(qKey, '[') > 0 && strings.IndexRune(qKey, ']') > 0 {
+			// check if the param is encoded as a property / deepObject
 			stripped := qKey[:strings.IndexRune(qKey, '[')]
 			value := qKey[strings.IndexRune(qKey, '[')+1 : strings.IndexRune(qKey, ']')]
 			queryParams[stripped] = append(queryParams[stripped], &helpers.QueryParam{
@@ -260,6 +276,26 @@ doneLooking:
 	}
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared query parameters
+	if v.options.StrictMode {
+		undeclaredParams := strict.ValidateQueryParams(request, params, v.options)
+		for _, undeclared := range undeclaredParams {
+			validationErrors = append(validationErrors,
+				errors.UndeclaredQueryParamError(
+					undeclared.Path,
+					undeclared.Name,
+					undeclared.Value,
+					undeclared.DeclaredProperties,
+					request.URL.Path,
+					request.Method,
+				))
+		}
+	}
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors

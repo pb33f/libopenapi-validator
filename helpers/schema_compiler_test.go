@@ -174,6 +174,38 @@ func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version31(t *testing.T) {
 	require.NotNil(t, jsch, "Should return compiled schema")
 }
 
+func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version32(t *testing.T) {
+	schemaJSON := `{
+		"type": "string"
+	}`
+
+	options := config.NewValidationOptions(
+		config.WithOpenAPIMode(),
+	)
+
+	// Test version 3.2 (>= 3.15)
+	jsch, err := NewCompiledSchemaWithVersion("test", []byte(schemaJSON), options, 3.2)
+	require.NoError(t, err, "Should compile OpenAPI 3.2 schema")
+	require.NotNil(t, jsch, "Should return compiled schema")
+}
+
+func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version32_NullableRejected(t *testing.T) {
+	schemaJSON := `{
+		"type": "string",
+		"nullable": true
+	}`
+
+	options := config.NewValidationOptions(
+		config.WithOpenAPIMode(),
+	)
+
+	// Test version 3.2 (>= 3.15) with nullable should fail (same as 3.1+)
+	jsch, err := NewCompiledSchemaWithVersion("test", []byte(schemaJSON), options, 3.2)
+	assert.Error(t, err, "Should fail for nullable in OpenAPI 3.2")
+	assert.Nil(t, jsch, "Should not return compiled schema")
+	assert.Contains(t, err.Error(), "The `nullable` keyword is not supported in OpenAPI 3.1+")
+}
+
 func TestNewCompiledSchemaWithVersion_OpenAPIMode_Version31_NullableRejected(t *testing.T) {
 	schemaJSON := `{
 		"type": "string",
@@ -419,6 +451,132 @@ func TestTransformNullableSchema_ArrayTypeWithNull(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, nullCount)
+
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+}
+
+func TestTransformNullableSchema_NullableAllOf(t *testing.T) {
+	schema := map[string]interface{}{
+		"type": []interface{}{"object"},
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "object")
+	assert.Contains(t, typeArray, "null")
+
+	oneOf, ok := result["oneOf"]
+	require.True(t, ok)
+
+	oneOfSlice, ok := oneOf.([]interface{})
+	require.True(t, ok)
+
+	assert.Len(t, oneOfSlice, 2)
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+	})
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"type": "null",
+	})
+
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+}
+
+func TestTransformNullableSchema_NullableAllOfWithExistingOneOf(t *testing.T) {
+	schema := map[string]interface{}{
+		"type": []interface{}{"object"},
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+		"oneOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type":  "string",
+						"const": []any{"val"},
+					},
+				},
+			},
+		},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "object")
+	assert.Contains(t, typeArray, "null")
+
+	oneOf, ok := result["oneOf"]
+	require.True(t, ok)
+
+	oneOfSlice, ok := oneOf.([]interface{})
+	require.True(t, ok)
+
+	assert.Len(t, oneOfSlice, 3)
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"allOf": []interface{}{
+			map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "string",
+					},
+				},
+			},
+		},
+	})
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"type": "null",
+	})
+	assert.Contains(t, oneOfSlice, map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"id": map[string]interface{}{
+				"type":  "string",
+				"const": []any{"val"},
+			},
+		},
+	})
 
 	_, hasNullable := result["nullable"]
 	assert.False(t, hasNullable)

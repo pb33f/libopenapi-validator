@@ -5,25 +5,90 @@ package responses
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
+type validateResponseTestBed struct {
+	responseBodyValidator ResponseBodyValidator
+	httpTestServer        *httptest.Server
+	responseHandlerFunc   http.HandlerFunc
+}
+
+func newvalidateResponseTestBed(
+	t *testing.T,
+	openApiSpec []byte,
+) *validateResponseTestBed {
+	doc, err := libopenapi.NewDocument(openApiSpec)
+	if err != nil {
+		t.Fatalf("failed to create openapi document: %v", err)
+	}
+
+	m, buildV3ModelErr := doc.BuildV3Model()
+	if buildV3ModelErr != nil {
+		t.Fatalf("failed to build v3 model: %v", err)
+	}
+
+	tb := validateResponseTestBed{responseBodyValidator: NewResponseBodyValidator(&m.Model)}
+	tb.httpTestServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if tb.responseHandlerFunc != nil {
+			tb.responseHandlerFunc(w, r)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	t.Cleanup(func() {
+		tb.httpTestServer.Close()
+	})
+
+	return &tb
+}
+
+func (tb *validateResponseTestBed) makeRequestWithReponse(
+	t *testing.T,
+	method string,
+	path string,
+	responseHandler http.HandlerFunc,
+) (
+	*http.Request,
+	*http.Response,
+) {
+	tb.responseHandlerFunc = responseHandler
+
+	req, err := http.NewRequestWithContext(context.TODO(), method, tb.httpTestServer.URL+path, nil)
+	if err != nil {
+		t.Fatalf("failed to create http request: %v", err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to perform http request: %v", err)
+	}
+
+	return req, res
+}
+
 func TestValidateBody_MissingContentType(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -39,54 +104,37 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"name":"Big Mac","patties":false,"vegetarian":2}`))
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST / 200 operation response content type 'cheeky/monkey' does not exist", errors[0].Message)
-	assert.Equal(t, "The content type is invalid, Use one of the 1 "+
-		"supported types for this operation: application/json", errors[0].HowToFix)
-	assert.Equal(t, request.Method, errors[0].RequestMethod)
-	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "The content type is invalid, Use one of the 1 supported types for this operation: application/json", errors[0].HowToFix)
+	assert.Equal(t, req.Method, errors[0].RequestMethod)
+	assert.Equal(t, req.URL.Path, errors[0].RequestPath)
 	assert.Equal(t, "/burgers/createBurger", errors[0].SpecPath)
 }
 
 func TestValidateBody_MissingContentType4XX(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -98,54 +146,45 @@ paths:
                 type: object
                 properties:
                   error:
-                    type: string`
+                    type: string`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    false,
+				"vegetarian": 2,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey")
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST / 4XX operation response content type 'cheeky/monkey' does not exist", errors[0].Message)
-	assert.Equal(t, "The content type is invalid, Use one of the 1 "+
-		"supported types for this operation: application/json", errors[0].HowToFix)
-	assert.Equal(t, request.Method, errors[0].RequestMethod)
-	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, "The content type is invalid, Use one of the 1 supported types for this operation: application/json", errors[0].HowToFix)
+	assert.Equal(t, req.Method, errors[0].RequestMethod)
+	assert.Equal(t, req.URL.Path, errors[0].RequestPath)
 	assert.Equal(t, "/burgers/createBurger", errors[0].SpecPath)
 }
 
 func TestValidateBody_MissingPath(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -161,52 +200,44 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/I do not exist",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    false,
+				"vegetarian": 2,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
-		w.WriteHeader(http.StatusUnprocessableEntity)              // does not matter.
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
+			w.WriteHeader(http.StatusUnprocessableEntity)              // does not matter.
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST Path '/I do not exist' not found", errors[0].Message)
-	assert.Equal(t, request.Method, errors[0].RequestMethod)
-	assert.Equal(t, request.URL.Path, errors[0].RequestPath)
+	assert.Equal(t, req.Method, errors[0].RequestMethod)
+	assert.Equal(t, req.URL.Path, errors[0].RequestPath)
 	assert.Equal(t, "", errors[0].SpecPath)
 }
 
 func TestValidateBody_SetPath(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -222,44 +253,35 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/I do not exist",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    false,
+				"vegetarian": 2,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/I do not exist", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
+			w.WriteHeader(http.StatusUnprocessableEntity)              // does not matter.
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
-		w.WriteHeader(http.StatusUnprocessableEntity)              // does not matter.
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	m := tb.responseBodyValidator.(*responseBodyValidator).document
+	path, _, pv := paths.FindPath(req, m, nil)
 
 	// validate!
-	valid, errors := v.ValidateResponseBodyWithPathItem(request, response, path, pv)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBodyWithPathItem(req, res, path, pv)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -267,7 +289,9 @@ paths:
 }
 
 func TestValidateBody_SetPath_missing_operation(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -283,47 +307,39 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    2,
-		"vegetarian": false,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType) // won't even matter!
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, nil)
+	m := tb.responseBodyValidator.(*responseBodyValidator).document
+	path, _, pv := paths.FindPath(req, m, nil)
 
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType) // won't even matter!
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
-
-	request2, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
+	// Create a different request with GET method to test missing operation
+	request2, _ := http.NewRequest(http.MethodGet, req.URL.String(), nil)
 	request2.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 
 	// validate!
-	valid, errors := v.ValidateResponseBodyWithPathItem(request2, response, path, pv)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBodyWithPathItem(request2, res, path, pv)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -331,7 +347,9 @@ paths:
 }
 
 func TestValidateBody_MissingStatusCode(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -347,41 +365,31 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    false,
+				"vegetarian": 2,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
-		w.WriteHeader(http.StatusUnprocessableEntity)              // undefined in the spec.
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, "cheeky/monkey") // won't even matter!
+			w.WriteHeader(http.StatusUnprocessableEntity)              // undefined in the spec.
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -390,7 +398,9 @@ paths:
 }
 
 func TestValidateBody_InvalidBasicSchema(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -406,44 +416,35 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			// mix up the primitives to fire two schema violations.
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    false,
+				"vegetarian": 2,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	// mix up the primitives to fire two schema violations.
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    false,
-		"vegetarian": 2,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
 	// doubletap to hit cache
-	_, _ = v.ValidateResponseBody(request, response)
+	_, _ = tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -451,7 +452,9 @@ paths:
 }
 
 func TestValidateBody_NoBody(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -467,43 +470,37 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", http.NoBody)
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(nil)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			// Don't write anything - this creates a response with no body
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
-	// doubletap to hit cache
-	_, _ = v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
-	assert.True(t, valid)
-	assert.Len(t, errors, 0)
-	// assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	// doubletap to hit cache
+	_, _ = tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	// With the real HTTP server, an empty body is now properly detected
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "POST response object is missing for '/burgers/createBurger'", errors[0].Message)
 }
 
 func TestValidateBody_InvalidResponseBodyNil(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -519,38 +516,36 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", http.NoBody)
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// invalid response
-	response := &http.Response{
-		Header:     http.Header{},
-		StatusCode: http.StatusOK,
-		// The http Client and Transport guarantee that Body is always non-nil
-		// and will be set to [http.NoBody] if no body is present.
-		Body: http.NoBody,
-	}
-	response.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			// Don't write anything - this creates a response with no body
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
 	// doubletap to hit cache
-	_, _ = v.ValidateResponseBody(request, response)
+	_, _ = tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
-	assert.Len(t, errors, 1)
+	require.Len(t, errors, 1)
+	assert.ErrorContains(t, errors[0], "response object is missing")
 }
 
 func TestValidateBody_InvalidResponseBodyError(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -566,32 +561,33 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			// Don't write anything - this creates a response with no body
+		},
+	)
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", http.NoBody)
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// invalid response
-	response := &http.Response{
-		Header:     http.Header{},
-		StatusCode: http.StatusOK,
-		Body:       &errorReader{},
-	}
-	response.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+	// simulate an error reading the body
+	res.Body = &errorReader{}
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
 	// doubletap to hit cache
-	_, _ = v.ValidateResponseBody(request, response)
+	_, _ = tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
-	assert.Len(t, errors, 1)
+	require.Len(t, errors, 1)
+	assert.ErrorContains(t, errors[0], "The response body cannot be decoded: some io error")
 }
 
 func TestValidateBody_InvalidBasicSchema_SetPath(t *testing.T) {
@@ -646,7 +642,7 @@ paths:
 	response := res.Result()
 
 	// preset the path
-	path, _, pv := paths.FindPath(request, &m.Model, &sync.Map{})
+	path, _, pv := paths.FindPath(request, &m.Model, nil)
 
 	// validate!
 	valid, errors := v.ValidateResponseBodyWithPathItem(request, response, path, pv)
@@ -658,7 +654,9 @@ paths:
 }
 
 func TestValidateBody_ValidComplexSchema(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -715,12 +713,9 @@ components:
           type: integer
         vegetarian:
           type: boolean
-      required: [name, patties, vegetarian]`
-
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+      required: [name, patties, vegetarian]`,
+		),
+	)
 
 	body := map[string]interface{}{
 		"name":          "Big Mac",
@@ -735,33 +730,28 @@ components:
 
 	bodyBytes, _ := json.Marshal(body)
 
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_InvalidComplexSchema(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -818,46 +808,36 @@ components:
           type: integer
         vegetarian:
           type: boolean
-      required: [name, patties, vegetarian]`
+      required: [name, patties, vegetarian]`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":          "Big Mac",
+				"patties":       2,
+				"vegetarian":    true,
+				"fat":           10.0,
+				"salt":          0.5,
+				"meat":          "beef",
+				"usedOil":       12345, // invalid, should be bool
+				"usedAnimalFat": false,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":          "Big Mac",
-		"patties":       2,
-		"vegetarian":    true,
-		"fat":           10.0,
-		"salt":          0.5,
-		"meat":          "beef",
-		"usedOil":       12345, // invalid, should be bool
-		"usedAnimalFat": false,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -866,7 +846,9 @@ components:
 }
 
 func TestValidateBody_ValidBasicSchema(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -882,48 +864,40 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    2,
-		"vegetarian": false,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -939,50 +913,42 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    2,
-		"vegetarian": false,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		// inject a full content type header, including charset and boundary
-		w.Header().Set(helpers.ContentTypeHeader,
-			fmt.Sprintf("%s; charset=utf-8; boundary=---12223344", helpers.JSONContentType))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			// inject a full content type header, including charset and boundary
+			w.Header().Set(helpers.ContentTypeHeader,
+				fmt.Sprintf("%s; charset=utf-8; boundary=---12223344", helpers.JSONContentType))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_ValidBasicSchemaUsingDefault(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -998,48 +964,40 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    2,
-		"vegetarian": false,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_InvalidBasicSchemaUsingDefault_MissingContentType(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -1055,42 +1013,32 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			// primitives are now correct.
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	// primitives are now correct.
-	body := map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    2,
-		"vegetarian": false,
-	}
-
-	bodyBytes, _ := json.Marshal(body)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, "chicken/nuggets;chicken=soup")
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, r.Header.Get(helpers.ContentTypeHeader))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, "chicken/nuggets;chicken=soup")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -1098,7 +1046,9 @@ paths:
 }
 
 func TestValidateBody_InvalidSchemaMultiple(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -1118,51 +1068,42 @@ paths:
                     patties:
                       type: integer
                     vegetarian:
-                      type: boolean`
+                      type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal([]map[string]interface{}{
+				{
+					"patties":    1,
+					"vegetarian": true,
+				},
+				{
+					"name":       "Quarter Pounder",
+					"patties":    true,
+					"vegetarian": false,
+				},
+				{
+					"name":       "Big Mac",
+					"patties":    2,
+					"vegetarian": false,
+				},
+			})
 
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
+			require.NoError(t, err, "failed to marshal body")
 
-	var items []map[string]interface{}
-	items = append(items, map[string]interface{}{
-		"patties":    1,
-		"vegetarian": true,
-	})
-	items = append(items, map[string]interface{}{
-		"name":       "Quarter Pounder",
-		"patties":    true,
-		"vegetarian": false,
-	})
-	items = append(items, map[string]interface{}{
-		"name":       "Big Mac",
-		"patties":    2,
-		"vegetarian": false,
-	})
-
-	bodyBytes, _ := json.Marshal(items)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(bodyBytes))
-	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bodyBytes)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -1171,7 +1112,9 @@ paths:
 }
 
 func TestValidateBody_EmptyContentType_Valid(t *testing.T) {
-	spec := `openapi: "3.0.0"
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: "3.0.0"
 info:
   title: Healthcheck
   version: '0.1.0'
@@ -1181,39 +1124,32 @@ paths:
       responses:
         '200':
           description: pet response
-          content: {}`
+          content: {}`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/health", nil)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(nil)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodGet,
+		"/health",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(nil)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_InvalidBodyJSON(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 paths:
   /burgers/createBurger:
     post:
@@ -1229,35 +1165,23 @@ paths:
                   patties:
                     type: integer
                   vegetarian:
-                    type: boolean`
+                    type: boolean`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	badJson := []byte("{\"bad\": \"json\",}")
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader(badJson))
-	request.Header.Set(helpers.ContentTypeHeader, "application/json")
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, r.Header.Get(helpers.ContentTypeHeader))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(badJson)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("{\"bad\": \"json\",}"))
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -1267,7 +1191,9 @@ paths:
 }
 
 func TestValidateBody_NoContentType_Valid(t *testing.T) {
-	spec := `openapi: "3.0.0"
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: "3.0.0"
 info:
   title: Healthcheck
   version: '0.1.0'
@@ -1276,32 +1202,23 @@ paths:
     get:
       responses:
         '200':
-          description: pet response`
+          description: pet response`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	// build a request
-	request, _ := http.NewRequest(http.MethodGet, "https://things.com/health", nil)
-
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(nil)
-	}
-
-	// fire the request
-	handler(res, request)
-
-	// record response
-	response := res.Result()
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodGet,
+		"/health",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(nil)
+		},
+	)
 
 	// validate!
-	valid, errors := v.ValidateResponseBody(request, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
@@ -1310,7 +1227,9 @@ paths:
 // https://github.com/pb33f/libopenapi-validator/issues/107
 // https://github.com/pb33f/libopenapi-validator/issues/103
 func TestNewValidator_TestCircularRefsInValidation_Response(t *testing.T) {
-	spec := `openapi: 3.1.0
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
 info:
   title: Panic at response validation
   version: 1.0.0
@@ -1336,34 +1255,22 @@ components:
         details:
           type: array
           items:
-            $ref: '#/components/schemas/Error'`
+            $ref: '#/components/schemas/Error'`,
+		),
+	)
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	m, _ := doc.BuildV3Model()
-	v := NewResponseBodyValidator(&m.Model)
-
-	req := &http.Request{
-		Method: http.MethodDelete,
-		URL: &url.URL{
-			Path: "/operations",
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodDelete,
+		"/operations",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(nil)
 		},
-	}
-	// simulate a request/response
-	res := httptest.NewRecorder()
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(nil)
-	}
+	)
 
-	// fire the request
-	handler(res, req)
-
-	// record response
-	response := res.Result()
-
-	valid, errors := v.ValidateResponseBody(req, response)
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -1507,6 +1414,86 @@ paths:
 		assert.True(t, valid)
 		assert.Empty(t, validationErrors)
 	}
+}
+
+func TestValidateBody_StrictMode_UndeclaredProperty(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/getBurger:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/getBurger", nil)
+
+	// Response with undeclared property 'extra'
+	responseBody := `{"name": "Big Mac", "patties": 2, "extra": "undeclared"}`
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}
+	response.Header.Set("Content-Type", "application/json")
+
+	valid, errs := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "extra")
+	assert.Contains(t, errs[0].Message, "not declared")
+}
+
+func TestValidateBody_StrictMode_ValidResponse(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/getBurger:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/getBurger", nil)
+
+	// Response with only declared properties
+	responseBody := `{"name": "Big Mac", "patties": 2}`
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}
+	response.Header.Set("Content-Type", "application/json")
+
+	valid, errs := v.ValidateResponseBody(request, response)
+
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
 }
 
 type errorReader struct{}

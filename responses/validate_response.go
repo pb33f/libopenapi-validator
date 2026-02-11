@@ -25,6 +25,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
@@ -50,6 +51,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	var renderedSchema, jsonSchema []byte
 	var referenceSchema string
 	var compiledSchema *jsonschema.Schema
+	var cachedNode *yaml.Node
 
 	if input.Schema == nil {
 		return false, []*errors.ValidationError{{
@@ -73,6 +75,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			renderedSchema = cached.RenderedInline
 			referenceSchema = cached.ReferenceSchema
 			compiledSchema = cached.CompiledSchema
+			cachedNode = cached.RenderedNode
 		}
 	}
 
@@ -87,7 +90,6 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 		if renderErr != nil {
 			violation := &errors.SchemaValidationFailure{
 				Reason:          renderErr.Error(),
-				Location:        "schema rendering",
 				ReferenceSchema: referenceSchema,
 			}
 			validationErrors = append(validationErrors, &errors.ValidationError{
@@ -220,9 +222,11 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 		schFlatErrs := jk.BasicOutput().Errors
 		var schemaValidationErrors []*errors.SchemaValidationFailure
 
-		// re-encode the schema once for error reporting
-		var renderedNode yaml.Node
-		_ = yaml.Unmarshal(renderedSchema, &renderedNode)
+		renderedNode := cachedNode
+		if renderedNode == nil {
+			renderedNode = new(yaml.Node)
+			_ = yaml.Unmarshal(renderedSchema, renderedNode)
+		}
 
 		for q := range schFlatErrs {
 			er := schFlatErrs[q]
@@ -303,6 +307,40 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			Context:                schema,
 		})
 	}
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared properties in response body
+	if validationOptions.StrictMode && decodedObj != nil {
+		strictValidator := strict.NewValidator(validationOptions, input.Version)
+		strictResult := strictValidator.Validate(strict.Input{
+			Schema:    schema,
+			Data:      decodedObj,
+			Direction: strict.DirectionResponse,
+			Options:   validationOptions,
+			BasePath:  "$.body",
+			Version:   input.Version,
+		})
+
+		if !strictResult.Valid {
+			for _, undeclared := range strictResult.UndeclaredValues {
+				validationErrors = append(validationErrors,
+					errors.UndeclaredPropertyError(
+						undeclared.Path,
+						undeclared.Name,
+						undeclared.Value,
+						undeclared.DeclaredProperties,
+						undeclared.Direction.String(),
+						request.URL.Path,
+						request.Method,
+						undeclared.SpecLine,
+						undeclared.SpecCol,
+					))
+			}
+		}
+	}
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/parameters"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 // ValidateResponseHeaders validates the response headers against the OpenAPI spec.
@@ -96,8 +97,35 @@ func ValidateResponseHeaders(
 			}
 		}
 	}
-	if len(validationErrors) == 0 {
-		return true, nil
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
 	}
-	return false, validationErrors
+
+	// strict mode: check for undeclared response headers
+	if options.StrictMode {
+		// convert orderedmap to regular map for strict validation
+		declaredMap := make(map[string]*v3.Header)
+		for name, header := range headers.FromOldest() {
+			declaredMap[name] = header
+		}
+
+		undeclaredHeaders := strict.ValidateResponseHeaders(response.Header, &declaredMap, options)
+		for _, undeclared := range undeclaredHeaders {
+			validationErrors = append(validationErrors,
+				errors.UndeclaredHeaderError(
+					undeclared.Name,
+					undeclared.Value.(string),
+					undeclared.DeclaredProperties,
+					undeclared.Direction.String(),
+					request.URL.Path,
+					request.Method,
+				))
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+	return true, nil
 }

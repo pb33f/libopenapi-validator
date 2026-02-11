@@ -18,6 +18,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
+	"github.com/pb33f/libopenapi-validator/strict"
 )
 
 func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*errors.ValidationError) {
@@ -31,8 +32,8 @@ func (v *paramValidator) ValidateHeaderParams(request *http.Request) (bool, []*e
 func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
-			ValidationType:    helpers.ParameterValidationPath,
-			ValidationSubType: "missing",
+			ValidationType:    helpers.PathValidation,
+			ValidationSubType: helpers.ValidationMissing,
 			Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
 			Reason: fmt.Sprintf("The %s request contains a path of '%s' "+
 				"however that path, or the %s method for that path does not exist in the specification",
@@ -174,8 +175,22 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 							if !matchFound {
 								validationErrors = append(validationErrors,
 									errors.IncorrectHeaderParamEnum(p, strings.ToLower(param), sch, pathValue, operation, renderedSchema))
+								break
 							}
 						}
+						validationErrors = append(validationErrors,
+							ValidateSingleParameterSchema(
+								sch,
+								param,
+								"Header parameter",
+								"The header parameter",
+								p.Name,
+								helpers.ParameterValidation,
+								helpers.ParameterValidationHeader,
+								v.options,
+								pathValue,
+								operation,
+							)...)
 					}
 				}
 				if len(pType) == 0 {
@@ -206,6 +221,38 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 	}
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)
+
+	if len(validationErrors) > 0 {
+		return false, validationErrors
+	}
+
+	// strict mode: check for undeclared headers
+	if v.options.StrictMode {
+		// Extract security headers applicable to this operation
+		var securityHeaders []string
+		if v.document.Components != nil && v.document.Components.SecuritySchemes != nil {
+			security := helpers.ExtractSecurityForOperation(request, pathItem)
+			// Convert orderedmap to regular map for the helper
+			schemesMap := make(map[string]*v3.SecurityScheme)
+			for pair := v.document.Components.SecuritySchemes.First(); pair != nil; pair = pair.Next() {
+				schemesMap[pair.Key()] = pair.Value()
+			}
+			securityHeaders = helpers.ExtractSecurityHeaderNames(security, schemesMap)
+		}
+
+		undeclaredHeaders := strict.ValidateRequestHeaders(request.Header, params, securityHeaders, v.options)
+		for _, undeclared := range undeclaredHeaders {
+			validationErrors = append(validationErrors,
+				errors.UndeclaredHeaderError(
+					undeclared.Name,
+					undeclared.Value.(string),
+					undeclared.DeclaredProperties,
+					undeclared.Direction.String(),
+					request.URL.Path,
+					request.Method,
+				))
+		}
+	}
 
 	if len(validationErrors) > 0 {
 		return false, validationErrors
