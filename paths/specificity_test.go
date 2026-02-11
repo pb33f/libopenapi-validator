@@ -173,6 +173,12 @@ func TestPathHasMethod(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "HEAD if GET exists",
+			pathItem: &v3.PathItem{Get: &v3.Operation{}},
+			method:   "HEAD",
+			expected: true,
+		},
+		{
 			name:     "PATCH exists",
 			pathItem: &v3.PathItem{Patch: &v3.Operation{}},
 			method:   "PATCH",

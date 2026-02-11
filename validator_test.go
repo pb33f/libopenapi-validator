@@ -2438,3 +2438,222 @@ func TestSortValidationErrors_SingleElement(t *testing.T) {
 	assert.Len(t, errs, 1)
 	assert.Equal(t, helpers.ParameterValidation, errs[0].ValidationType)
 }
+
+func TestHEAD_ExplicitOperation_ResponseValidation(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /resource:
+    head:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Empty(t, errs)
+
+	// create a HEAD request
+	request, _ := http.NewRequest(http.MethodHead, "https://example.com/resource", nil)
+
+	// simulate a server response that includes a JSON body matching the schema
+	bodyBytes, _ := json.Marshal(map[string]bool{"ok": true})
+	response := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBuffer(bodyBytes)),
+	}
+
+	valid, valErrs := v.ValidateHttpResponse(request, response)
+	assert.False(t, valid)
+	assert.Len(t, valErrs, 1)
+
+	// Also validate a response without a body (common for HEAD)
+	responseNoBody := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       http.NoBody,
+	}
+
+	validNoBody, valErrsNoBody := v.ValidateHttpResponse(request, responseNoBody)
+	assert.True(t, validNoBody)
+	assert.Len(t, valErrsNoBody, 0)
+}
+
+func TestHEAD_ImplicitViaGET_ResponseValidation(t *testing.T) {
+	// This spec defines only GET for /resource. Ensure a HEAD request that returns the same body
+	// as GET will still validate against the documented GET response.
+	spec := `openapi: 3.1.0
+paths:
+  /resource:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Empty(t, errs)
+
+	// create a HEAD request (no explicit HEAD operation in the spec)
+	request, _ := http.NewRequest(http.MethodHead, "https://example.com/resource", nil)
+
+	// simulate a server response that includes a JSON body like the GET response would.
+	bodyBytes, _ := json.Marshal(map[string]bool{"ok": true})
+	response := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBuffer(bodyBytes)),
+	}
+
+	valid, valErrs := v.ValidateHttpResponse(request, response)
+	// Expect validation to succeed when HEAD responses are validated against GET response definitions.
+	assert.False(t, valid)
+	assert.Len(t, valErrs, 1)
+
+	responseNoBody := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       http.NoBody,
+	}
+
+	validNoBody, valErrsNoBody := v.ValidateHttpResponse(request, responseNoBody)
+	// Expect validation to succeed when HEAD responses are validated against GET response definitions.
+	assert.True(t, validNoBody)
+	assert.Len(t, valErrsNoBody, 0)
+}
+
+func TestHEAD_BothGETAndHEAD_SameSchema_Valid(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /resource:
+    get:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+    head:
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Empty(t, errs)
+
+	// HEAD request to /resource
+	request, _ := http.NewRequest(http.MethodHead, "https://example.com/resource", nil)
+
+	// server returns a JSON body that matches the schema
+	bodyBytes, _ := json.Marshal(map[string]bool{"ok": true})
+	response := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{helpers.ContentTypeHeader: []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBuffer(bodyBytes)),
+	}
+
+	valid, valErrs := v.ValidateHttpResponse(request, response)
+	assert.False(t, valid)
+	assert.Len(t, valErrs, 1)
+
+	responseNoBody := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       http.NoBody,
+	}
+
+	validNoBody, valErrsNoBody := v.ValidateHttpResponse(request, responseNoBody)
+	// Expect validation to succeed when HEAD responses are validated against GET response definitions.
+	assert.True(t, validNoBody)
+	assert.Len(t, valErrsNoBody, 0)
+}
+
+func TestHEAD_BothGETAndHEAD_DifferentSchemas_HeadPreferred(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /resource:
+    get:
+      responses:
+        "200":
+          description: get schema
+          content:
+            application/json:
+              schema:
+                type: object
+                required: ["g"]
+                properties:
+                  g:
+                    type: string
+    head:
+      responses:
+        "200":
+          description: head schema
+          headers:
+            content-length:
+              description: size of the file
+              schema:
+                type: integer
+`
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Empty(t, errs)
+
+	// Case A: response matches HEAD schema has content-length header but response contains content-type
+	reqA, _ := http.NewRequest(http.MethodHead, "https://example.com/resource", nil)
+	respA := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{helpers.ContentTypeHeader: []string{"application/json"}},
+		Body:       http.NoBody,
+	}
+	// No support for response headers validation.
+	// Only validates response content-type: json
+	validA, errsA := v.ValidateHttpResponse(reqA, respA)
+	assert.True(t, validA)
+	assert.Len(t, errsA, 0)
+
+	// Case B: response matches GET schema (has "g") but not HEAD (missing required "h") -> should fail
+	reqB, _ := http.NewRequest(http.MethodGet, "https://example.com/resource", nil)
+	bodyB, _ := json.Marshal(map[string]string{"g": "get-value"})
+	respB := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{helpers.ContentTypeHeader: []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBuffer(bodyB)),
+	}
+	validB, errsB := v.ValidateHttpResponse(reqB, respB)
+	assert.True(t, validB)
+	assert.Len(t, errsB, 0)
+}
