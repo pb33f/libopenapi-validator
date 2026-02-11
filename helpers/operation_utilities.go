@@ -7,7 +7,7 @@ import (
 	"mime"
 	"net/http"
 
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // ExtractOperation extracts the operation from the path item based on the request method. If there is no
@@ -25,7 +25,10 @@ func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
 	case http.MethodOptions:
 		return item.Options
 	case http.MethodHead:
-		return item.Head
+		if item.Head != nil {
+			return item.Head
+		}
+		return item.Get
 	case http.MethodPatch:
 		return item.Patch
 	case http.MethodTrace:

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/pb33f/libopenapi/datamodel/high/v3"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -111,4 +111,26 @@ func TestExtractContentType(t *testing.T) {
 	require.Equal(t, "text/plain", contentType)
 	require.Empty(t, charset)
 	require.Empty(t, boundary)
+}
+func TestExtractOperationHeadFallback(t *testing.T) {
+	pathItem := &v3.PathItem{
+		Get:  &v3.Operation{Summary: "GET operation"},
+		Head: nil,
+	}
+
+	req, _ := http.NewRequest(http.MethodHead, "/", nil)
+	operation := ExtractOperation(req, pathItem)
+	require.NotNil(t, operation)
+	require.Equal(t, "GET operation", operation.Summary)
+}
+
+func TestExtractOperationHeadFallbackNoGet(t *testing.T) {
+	pathItem := &v3.PathItem{
+		Head: nil,
+		Get:  nil,
+	}
+
+	req, _ := http.NewRequest(http.MethodHead, "/", nil)
+	operation := ExtractOperation(req, pathItem)
+	require.Nil(t, operation)
 }

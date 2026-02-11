@@ -138,7 +138,6 @@ func (v *responseBodyValidator) checkResponseSchema(
 		// extract schema from media type
 		if mediaType.Schema != nil {
 			schema := mediaType.Schema.Schema()
-
 			// Validate response schema
 			valid, vErrs := ValidateResponseSchema(&ValidateResponseSchemaInput{
 				Request:  request,
