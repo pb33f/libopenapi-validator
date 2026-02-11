@@ -1729,7 +1729,7 @@ paths:
 	assert.Equal(t, "The query parameter (which is an array) 'fishy' is defined as an object, "+
 		"however it failed to pass a schema validation", errors[0].Reason)
 	assert.Equal(t, "missing properties 'vinegar', 'chips'", errors[0].SchemaValidationErrors[0].Reason)
-	assert.Equal(t, "/required", errors[0].SchemaValidationErrors[0].Location)
+	assert.Equal(t, "/required", errors[0].SchemaValidationErrors[0].KeywordLocation)
 }
 
 func TestNewValidator_QueryParamValidTypeObjectPropType_Invalid(t *testing.T) {

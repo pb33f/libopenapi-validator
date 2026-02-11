@@ -99,7 +99,9 @@ func (v *requestBodyValidator) extractContentType(contentType string, operation 
 		return mediaType, true
 	}
 	ctMediaRange := strings.SplitN(ct, "/", 2)
-	for s, mediaTypeValue := range operation.RequestBody.Content.FromOldest() {
+	for contentPair := operation.RequestBody.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+		s := contentPair.Key()
+		mediaTypeValue := contentPair.Value()
 		opMediaRange := strings.SplitN(s, "/", 2)
 		if (opMediaRange[0] == "*" || opMediaRange[0] == ctMediaRange[0]) &&
 			(opMediaRange[1] == "*" || opMediaRange[1] == ctMediaRange[1]) {

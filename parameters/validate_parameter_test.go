@@ -2,6 +2,7 @@ package parameters
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
@@ -17,7 +18,7 @@ import (
 
 func Test_ForceCompilerError(t *testing.T) {
 	// Try to force a panic
-	result := ValidateSingleParameterSchema(nil, nil, "", "", "", "", "", nil)
+	result := ValidateSingleParameterSchema(nil, nil, "", "", "", "", "", nil, "", "")
 
 	// Ideally this would result in an error response, current behavior swallows the error
 	require.Empty(t, result)
@@ -264,7 +265,7 @@ func TestUnifiedErrorFormatWithFormatValidation(t *testing.T) {
 	// verify unified error format - SchemaValidationErrors should be populated
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 1)
 	assert.Contains(t, valErrs[0].SchemaValidationErrors[0].Reason, "is not valid email")
-	assert.Equal(t, "/format", valErrs[0].SchemaValidationErrors[0].Location)
+	assert.Equal(t, "/paths/test/get/parameters/email_param/schema/format", valErrs[0].SchemaValidationErrors[0].KeywordLocation)
 	assert.NotEmpty(t, valErrs[0].SchemaValidationErrors[0].ReferenceSchema)
 }
 
@@ -319,8 +320,9 @@ func TestParameterNameFieldPopulation(t *testing.T) {
 	assert.Equal(t, "integer_param", valErrs[0].ParameterName)
 	assert.Equal(t, "Query parameter 'integer_param' is not a valid integer", valErrs[0].Message)
 
-	// basic type errors should NOT have SchemaValidationErrors (no JSONSchema validation occurred)
-	assert.Empty(t, valErrs[0].SchemaValidationErrors)
+	// basic type errors SHOULD have SchemaValidationErrors because we know the parameter schema
+	assert.Len(t, valErrs[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "integer_param", valErrs[0].SchemaValidationErrors[0].FieldName)
 }
 
 func TestHeaderSchemaStringNoJSON(t *testing.T) {
@@ -467,16 +469,13 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 		found := false
 		for _, err := range valErrs {
 			if err.ParameterName == "complexParam" &&
-				err.SchemaValidationErrors != nil &&
-				len(err.SchemaValidationErrors) > 0 {
-				for _, schemaErr := range err.SchemaValidationErrors {
-					if schemaErr.Location == "schema compilation" &&
-						schemaErr.Reason != "" {
-						found = true
-						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
-						assert.Contains(t, err.HowToFix, "complex regex patterns")
-						break
-					}
+				len(err.SchemaValidationErrors) == 0 {
+				// Schema compilation errors don't have SchemaValidationFailure objects
+				if strings.Contains(err.Reason, "failed to compile JSON schema") {
+					found = true
+					assert.Contains(t, err.Reason, "failed to compile JSON schema")
+					assert.Contains(t, err.HowToFix, "complex regex patterns")
+					break
 				}
 			}
 		}
@@ -555,15 +554,14 @@ func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
 		for _, validationError := range validationErrors {
 			if validationError.ParameterName == "failParam" &&
 				validationError.ValidationSubType == helpers.ParameterValidationQuery &&
-				validationError.SchemaValidationErrors != nil {
-				for _, schemaErr := range validationError.SchemaValidationErrors {
-					if schemaErr.Location == "schema compilation" {
-						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
-						assert.Contains(t, validationError.HowToFix, "complex regex patterns")
-						assert.Equal(t, "Query parameter 'failParam' failed schema compilation", validationError.Message)
-						found = true
-						break
-					}
+				len(validationError.SchemaValidationErrors) == 0 {
+				// Schema compilation errors don't have SchemaValidationFailure objects
+				if strings.Contains(validationError.Reason, "failed to compile JSON schema") {
+					assert.Contains(t, validationError.Reason, "failed to compile JSON schema")
+					assert.Contains(t, validationError.HowToFix, "complex regex patterns")
+					assert.Equal(t, "Query parameter 'failParam' failed schema compilation", validationError.Message)
+					found = true
+					break
 				}
 			}
 		}

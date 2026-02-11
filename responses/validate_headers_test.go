@@ -56,7 +56,7 @@ paths:
 	headers := m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
 
 	// validate!
-	valid, errors := ValidateResponseHeaders(request, response, headers)
+	valid, errors := ValidateResponseHeaders(request, response, headers, "/health", "200")
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -78,7 +78,7 @@ paths:
 	headers = m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
 
 	// validate!
-	valid, errors = ValidateResponseHeaders(request, response, headers)
+	valid, errors = ValidateResponseHeaders(request, response, headers, "/health", "200")
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -127,7 +127,7 @@ paths:
 	headers := m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
 
 	// validate!
-	valid, errors := ValidateResponseHeaders(request, response, headers)
+	valid, errors := ValidateResponseHeaders(request, response, headers, "/health", "200")
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
@@ -171,7 +171,7 @@ paths:
 	headers := m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
 
 	// validate with strict mode - should find undeclared header
-	valid, errors := ValidateResponseHeaders(request, response, headers, config.WithStrictMode())
+	valid, errors := ValidateResponseHeaders(request, response, headers, "/health", "200", config.WithStrictMode())
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
@@ -215,7 +215,7 @@ paths:
 	headers := m.Model.Paths.PathItems.GetOrZero("/health").Get.Responses.Codes.GetOrZero("200").Headers
 
 	// validate with strict mode - should pass (no undeclared headers)
-	valid, errors := ValidateResponseHeaders(request, response, headers, config.WithStrictMode())
+	valid, errors := ValidateResponseHeaders(request, response, headers, "/health", "200", config.WithStrictMode())
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)

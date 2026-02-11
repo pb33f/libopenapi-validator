@@ -452,7 +452,7 @@ paths:
 	assert.Equal(t, "POST request body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
 	require.Len(t, errors[0].SchemaValidationErrors, 1)
 	require.NotNil(t, errors[0].SchemaValidationErrors[0])
-	assert.Equal(t, "/properties/name/format", errors[0].SchemaValidationErrors[0].Location)
+	assert.Equal(t, "/properties/name/format", errors[0].SchemaValidationErrors[0].KeywordLocation)
 	assert.Equal(t, "'big mac' is not valid capital: expected first latter to be uppercase", errors[0].SchemaValidationErrors[0].Reason)
 }
 

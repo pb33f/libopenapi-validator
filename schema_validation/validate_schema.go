@@ -136,22 +136,15 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 	renderedSchema, e = schema.RenderInlineWithContext(renderCtx)
 	if e != nil {
 		// schema cannot be rendered, so it's not valid!
-		violation := &liberrors.SchemaValidationFailure{
-			Reason:          e.Error(),
-			Location:        "unavailable",
-			ReferenceSchema: string(renderedSchema),
-			ReferenceObject: string(payload),
-		}
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:         helpers.RequestBodyValidation,
-			ValidationSubType:      helpers.Schema,
-			Message:                "schema does not pass validation",
-			Reason:                 fmt.Sprintf("The schema cannot be decoded: %s", e.Error()),
-			SpecLine:               schema.GoLow().GetRootNode().Line,
-			SpecCol:                schema.GoLow().GetRootNode().Column,
-			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-			HowToFix:               liberrors.HowToFixInvalidSchema,
-			Context:                string(renderedSchema),
+			ValidationType:    helpers.RequestBodyValidation,
+			ValidationSubType: helpers.Schema,
+			Message:           "schema does not pass validation",
+			Reason:            fmt.Sprintf("The schema cannot be decoded: %s", e.Error()),
+			SpecLine:          schema.GoLow().GetRootNode().Line,
+			SpecCol:           schema.GoLow().GetRootNode().Column,
+			HowToFix:          liberrors.HowToFixInvalidSchema,
+			Context:           string(renderedSchema),
 		})
 		s.lock.Unlock()
 		return false, validationErrors
@@ -166,12 +159,6 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 		if err != nil {
 
 			// cannot decode the request body, so it's not valid
-			violation := &liberrors.SchemaValidationFailure{
-				Reason:          err.Error(),
-				Location:        "unavailable",
-				ReferenceSchema: string(renderedSchema),
-				ReferenceObject: string(payload),
-			}
 			line := 1
 			col := 0
 			if schema.GoLow().Type.KeyNode != nil {
@@ -179,15 +166,14 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 				col = schema.GoLow().Type.KeyNode.Column
 			}
 			validationErrors = append(validationErrors, &liberrors.ValidationError{
-				ValidationType:         helpers.RequestBodyValidation,
-				ValidationSubType:      helpers.Schema,
-				Message:                "schema does not pass validation",
-				Reason:                 fmt.Sprintf("The schema cannot be decoded: %s", err.Error()),
-				SpecLine:               line,
-				SpecCol:                col,
-				SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-				HowToFix:               liberrors.HowToFixInvalidSchema,
-				Context:                string(renderedSchema),
+				ValidationType:    helpers.RequestBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message:           "schema does not pass validation",
+				Reason:            fmt.Sprintf("The schema cannot be decoded: %s", err.Error()),
+				SpecLine:          line,
+				SpecCol:           col,
+				HowToFix:          liberrors.HowToFixInvalidSchema,
+				Context:           string(renderedSchema),
 			})
 			return false, validationErrors
 		}
@@ -202,12 +188,6 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 
 	var schemaValidationErrors []*liberrors.SchemaValidationFailure
 	if err != nil {
-		violation := &liberrors.SchemaValidationFailure{
-			Reason:          err.Error(),
-			Location:        "schema compilation",
-			ReferenceSchema: string(renderedSchema),
-			ReferenceObject: string(payload),
-		}
 		line := 1
 		col := 0
 		if schema.GoLow().Type.KeyNode != nil {
@@ -215,15 +195,14 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 			col = schema.GoLow().Type.KeyNode.Column
 		}
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:         helpers.Schema,
-			ValidationSubType:      helpers.Schema,
-			Message:                "schema compilation failed",
-			Reason:                 fmt.Sprintf("Schema compilation failed: %s", err.Error()),
-			SpecLine:               line,
-			SpecCol:                col,
-			SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-			HowToFix:               liberrors.HowToFixInvalidSchema,
-			Context:                string(renderedSchema),
+			ValidationType:    helpers.Schema,
+			ValidationSubType: helpers.Schema,
+			Message:           "schema compilation failed",
+			Reason:            fmt.Sprintf("Schema compilation failed: %s", err.Error()),
+			SpecLine:          line,
+			SpecCol:           col,
+			HowToFix:          liberrors.HowToFixInvalidSchema,
+			Context:           string(renderedSchema),
 		})
 		return false, validationErrors
 	}
@@ -306,16 +285,14 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 			}
 
 			violation := &liberrors.SchemaValidationFailure{
-				Reason:           errMsg,
-				Location:         er.InstanceLocation,
-				FieldName:        helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-				FieldPath:        helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-				InstancePath:     helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-				DeepLocation:     er.KeywordLocation,
-				AbsoluteLocation: er.AbsoluteKeywordLocation,
-				ReferenceSchema:  string(renderedSchema),
-				ReferenceObject:  referenceObject,
-				OriginalError:    jk,
+				Reason:                  errMsg,
+				FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+				FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+				InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+				KeywordLocation:         er.KeywordLocation,
+				ReferenceSchema:         string(renderedSchema),
+				ReferenceObject:         referenceObject,
+				OriginalJsonSchemaError: jk,
 			}
 			// if we have a location within the schema, add it to the error
 			if located != nil {
