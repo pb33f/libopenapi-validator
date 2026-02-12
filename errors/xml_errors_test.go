@@ -69,7 +69,7 @@ func TestInvalidNamespaceError(t *testing.T) {
 }
 
 func TestInvalidParsing(t *testing.T) {
-	err := InvalidXmlParsing("no data sent", "invalid-xml")
+	err := InvalidXMLParsing("no data sent", "invalid-xml")
 
 	assert.NotNil(t, (*err))
 	assert.Equal(t, (*err).SchemaValidationErrors[0].Location, "xml parsing")

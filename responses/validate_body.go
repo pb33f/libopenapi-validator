@@ -139,34 +139,45 @@ func (v *responseBodyValidator) checkResponseSchema(
 		return validationErrors
 	}
 
-	// currently, we can only validate JSON and XML based responses, so check for the presence
-	// of 'json' (what ever it may be) and for XML content type so we can perform a schema check on it.
-	// anything other than JSON or XML, will be ignored.
+	// currently, we can only validate JSON, XML and URL Encoded based responses, so check for the presence
+	// of 'json' (what ever it may be) and for XML/URLEncoded content type so we can perform a schema check on it.
+	// anything other than JSON XML, or URL Encoded will be ignored.
 
 	isXml := schema_validation.IsXMLContentType(contentType)
+	isUrlEncoded := schema_validation.IsURLEncodedContentType(contentType)
+	isJson := strings.Contains(strings.ToLower(contentType), helpers.JSONType)
 
-	if !strings.Contains(strings.ToLower(contentType), helpers.JSONType) && (!v.options.AllowXMLBodyValidation || !isXml) {
+	xmlValid := isXml && v.options.AllowXMLBodyValidation
+	urlEncodedValid := isUrlEncoded && v.options.AllowURLEncodedBodyValidation
+
+	if !isJson && !xmlValid && !urlEncodedValid {
 		return validationErrors
 	}
 
 	schema := mediaType.Schema.Schema()
 
-	if isXml {
+	if !isJson {
 		if response != nil && response.Body != http.NoBody {
 			responseBody, _ := io.ReadAll(response.Body)
 			_ = response.Body.Close()
 
 			stringedBody := string(responseBody)
-			jsonBody, prevalidationErrors := schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
+			var jsonBody any
+			var prevalidationErrors []*errors.ValidationError
+
+			switch {
+			case xmlValid:
+				jsonBody, prevalidationErrors = schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
+			case urlEncodedValid:
+				jsonBody, prevalidationErrors = schema_validation.TransformURLEncodedToSchemaJSON(stringedBody, schema, mediaType.Encoding)
+			}
 
 			if len(prevalidationErrors) > 0 {
 				return prevalidationErrors
 			}
 
-			transformedBytes, err := json.Marshal(jsonBody)
-			if err != nil {
-				return []*errors.ValidationError{errors.InvalidXmlParsing(err.Error(), stringedBody)}
-			}
+			// If prevalidationErrors has no items, jsonBody is a valid JSON structure
+			transformedBytes, _ := json.Marshal(jsonBody)
 
 			response.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
 		}

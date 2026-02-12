@@ -15,7 +15,9 @@ const (
 	HowToFixInvalidXml                              string = "Ensure xml is well-formed and matches schema structure"
 	HowToFixXmlPrefix                               string = "Make sure to prepend the correct prefix '%s' to the declared fields"
 	HowToFixXmlNamespace                            string = "Make sure to declare the 'xmlns:%s' with the correct namespace URI"
+	HowToFixFormDataReservedCharacters              string = "Make sure to correcly encode specials characters to percent encoding, or set allowReserved to true"
 	HowToFixInvalidSchema                           string = "Ensure that the object being submitted, matches the schema correctly"
+	HowToFixInvalidTypeEncoding                     string = "Ensure that the object being submitted matches the property encoding Content-Type"
 	HowToFixParamInvalidSpaceDelimitedObjectExplode string = "When using 'explode' with space delimited parameters, " +
 		"they should be separated by spaces. For example: '%s'"
 	HowToFixParamInvalidPipeDelimitedObjectExplode string = "When using 'explode' with pipe delimited parameters, " +
@@ -23,6 +25,7 @@ const (
 	HowToFixParamInvalidDeepObjectMultipleValues string = "There can only be a single value per property name, " +
 		"deepObject parameters should contain the property key in square brackets next to the parameter name. For example: '%s'"
 	HowToFixInvalidJSON           string = "The JSON submitted is invalid, please check the syntax"
+	HowToFixInvalidUrlEncoded     string = "Ensure URL Encoded submitted is well-formed and matches schema structure"
 	HowToFixDecodingError         string = "The object can't be decoded, so make sure it's being encoded correctly according to the spec."
 	HowToFixInvalidContentType    string = "The content type is invalid, Use one of the %d supported types for this operation: %s"
 	HowToFixInvalidResponseCode   string = "The service is responding with a code that is not defined in the spec, fix the service or add the code to the specification"
