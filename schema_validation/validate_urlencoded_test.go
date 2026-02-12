@@ -72,7 +72,6 @@ func TestBuildDeepMap_BranchCoverage(t *testing.T) {
 }
 
 func TestTransformURLEncodedToSchemaJSON(t *testing.T) {
-
 	t.Run("Malformed URL Encoding", func(t *testing.T) {
 		res, errs := TransformURLEncodedToSchemaJSON("bad_encoding=%zz", nil, nil)
 		assert.Nil(t, res)
@@ -87,7 +86,6 @@ func TestTransformURLEncodedToSchemaJSON(t *testing.T) {
 	})
 
 	t.Run("Apply Encoding Rules & Reserved Characters", func(t *testing.T) {
-
 		props := orderedmap.New[string, *base.SchemaProxy]()
 		props.Set("jsonField", base.CreateSchemaProxy(&base.Schema{Type: []string{helpers.Object}}))
 		props.Set("restricted", base.CreateSchemaProxy(&base.Schema{Type: []string{helpers.String}}))
@@ -118,7 +116,7 @@ func TestTransformURLEncodedToSchemaJSON(t *testing.T) {
 
 		res, errs := TransformURLEncodedToSchemaJSON(`badJson={invalid`, schema, encodings)
 		assert.Len(t, errs, 1)
-		
+
 		assert.Equal(t, helpers.URLEncodedValidation, errs[0].ValidationType)
 
 		assert.Equal(t, "{invalid", res["badJson"])
@@ -136,7 +134,6 @@ func TestTransformURLEncodedToSchemaJSON(t *testing.T) {
 }
 
 func TestApplyEncodingRules(t *testing.T) {
-
 	boolPtr := func(b bool) *bool { return &b }
 
 	t.Run("DeepObject Style", func(t *testing.T) {
@@ -190,14 +187,12 @@ func TestValidateEncodingRecursive(t *testing.T) {
 }
 
 func TestCoerceValue(t *testing.T) {
-
 	schemaInt := &base.Schema{Type: []string{helpers.Integer}}
 	schemaNum := &base.Schema{Type: []string{helpers.Number}}
 	schemaBool := &base.Schema{Type: []string{helpers.Boolean}}
 	schemaStr := &base.Schema{Type: []string{helpers.String}}
 
 	t.Run("Complex Schema Aggregation (AllOf)", func(t *testing.T) {
-
 		s := &base.Schema{
 			AllOf: []*base.SchemaProxy{
 				base.CreateSchemaProxy(schemaInt),
@@ -463,7 +458,6 @@ func TestComplexBodies(t *testing.T) {
 }
 
 func TestValidateURLEncoded(t *testing.T) {
-
 	spec := `openapi: 3.0.0
 paths:
   /collection:
@@ -490,13 +484,14 @@ paths:
 	valid, errs := v.ValidateURLEncodedStringWithVersion(schema, encoding, "a=1", 3.1)
 	assert.True(t, valid)
 	assert.Empty(t, errs)
-	valid, errs = v.ValidateURLEncodedStringWithVersion(nil, nil, "a=1", 3.1)
+
+	valid, _ = v.ValidateURLEncodedStringWithVersion(nil, nil, "a=1", 3.1)
 	assert.False(t, valid)
 
 	valid, errs = v.ValidateURLEncodedString(schema, encoding, "a=1")
 	assert.True(t, valid)
 	assert.Empty(t, errs)
 
-	valid, errs = v.ValidateURLEncodedString(nil, nil, "a=1")
+	valid, _ = v.ValidateURLEncodedString(nil, nil, "a=1")
 	assert.False(t, valid)
 }
