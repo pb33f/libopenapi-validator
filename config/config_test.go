@@ -19,9 +19,10 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.False(t, opts.FormatAssertions)
 	assert.False(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
-	assert.True(t, opts.OpenAPIMode)             // Default is true
-	assert.False(t, opts.AllowScalarCoercion)    // Default is false
-	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
+	assert.True(t, opts.OpenAPIMode)                    // Default is true
+	assert.False(t, opts.AllowScalarCoercion)           // Default is false
+	assert.False(t, opts.AllowXMLBodyValidation)        // Default is false
+	assert.False(t, opts.AllowURLEncodedBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
 }
@@ -97,12 +98,13 @@ func TestWithExistingOpts(t *testing.T) {
 	// Create original options with all settings enabled
 	var testEngine jsonschema.RegexpEngine = nil
 	original := &ValidationOptions{
-		RegexEngine:            testEngine,
-		RegexCache:             &sync.Map{},
-		FormatAssertions:       true,
-		AllowXMLBodyValidation: true,
-		ContentAssertions:      true,
-		SecurityValidation:     false,
+		RegexEngine:                   testEngine,
+		RegexCache:                    &sync.Map{},
+		FormatAssertions:              true,
+		AllowXMLBodyValidation:        true,
+		AllowURLEncodedBodyValidation: true,
+		ContentAssertions:             true,
+		SecurityValidation:            false,
 	}
 
 	// Create new options using existing options
@@ -111,6 +113,7 @@ func TestWithExistingOpts(t *testing.T) {
 	assert.Nil(t, opts.RegexEngine) // Both should be nil
 	assert.NotNil(t, opts.RegexCache)
 	assert.Equal(t, original.AllowXMLBodyValidation, opts.AllowXMLBodyValidation)
+	assert.Equal(t, original.AllowURLEncodedBodyValidation, opts.AllowURLEncodedBodyValidation)
 	assert.Equal(t, original.FormatAssertions, opts.FormatAssertions)
 	assert.Equal(t, original.ContentAssertions, opts.ContentAssertions)
 	assert.Equal(t, original.SecurityValidation, opts.SecurityValidation)
@@ -187,6 +190,14 @@ func TestWithExistingOpts_PartialOverride(t *testing.T) {
 	assert.True(t, opts.FormatAssertions)    // From original
 	assert.True(t, opts.ContentAssertions)   // Reapplied, but same value
 	assert.False(t, opts.SecurityValidation) // From original
+}
+
+func TestWithUrlEncodedBodyValidation(t *testing.T) {
+	opts := NewValidationOptions(
+		WithURLEncodedBodyValidation(),
+	)
+
+	assert.True(t, opts.AllowURLEncodedBodyValidation)
 }
 
 func TestComplexScenario(t *testing.T) {

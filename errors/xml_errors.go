@@ -88,7 +88,7 @@ func InvalidNamespace(schema *base.Schema, namespace, expectedNamespace, prefix 
 	}
 }
 
-func InvalidXmlParsing(reason, referenceObject string) *ValidationError {
+func InvalidXMLParsing(reason, referenceObject string) *ValidationError {
 	return &ValidationError{
 		ValidationType:    helpers.XmlValidation,
 		ValidationSubType: helpers.Schema,

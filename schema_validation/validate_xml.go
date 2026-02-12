@@ -37,13 +37,13 @@ func (x *xmlValidator) validateXMLWithVersion(schema *base.Schema, xmlString str
 // applies xml object transformations: name, attribute, wrapped.
 func TransformXMLToSchemaJSON(xmlString string, schema *base.Schema) (any, []*liberrors.ValidationError) {
 	if xmlString == "" {
-		return nil, []*liberrors.ValidationError{liberrors.InvalidXmlParsing("empty xml content", xmlString)}
+		return nil, []*liberrors.ValidationError{liberrors.InvalidXMLParsing("empty xml content", xmlString)}
 	}
 
 	// parse xml using goxml2json. we convert types manually
 	jsonBuf, err := xj.Convert(strings.NewReader(xmlString))
 	if err != nil {
-		return nil, []*liberrors.ValidationError{liberrors.InvalidXmlParsing(fmt.Sprintf("malformed xml: %s", err.Error()), xmlString)}
+		return nil, []*liberrors.ValidationError{liberrors.InvalidXMLParsing(fmt.Sprintf("malformed xml: %s", err.Error()), xmlString)}
 	}
 
 	jsonBytes := jsonBuf.Bytes()
@@ -51,12 +51,12 @@ func TransformXMLToSchemaJSON(xmlString string, schema *base.Schema) (any, []*li
 	// the smallest valid XML possible "<a></a>" generates a 10 bytes buffer.
 	// any other invalid XML generates a smaller buffer
 	if len(jsonBytes) < 10 {
-		return nil, []*liberrors.ValidationError{liberrors.InvalidXmlParsing("malformed xml", xmlString)}
+		return nil, []*liberrors.ValidationError{liberrors.InvalidXMLParsing("malformed xml", xmlString)}
 	}
 
 	var rawJSON any
 	if err := json.Unmarshal(jsonBytes, &rawJSON); err != nil {
-		return nil, []*liberrors.ValidationError{liberrors.InvalidXmlParsing(fmt.Sprintf("failed to decode converted xml to json: %s", err.Error()), xmlString)}
+		return nil, []*liberrors.ValidationError{liberrors.InvalidXMLParsing(fmt.Sprintf("failed to decode converted xml to json: %s", err.Error()), xmlString)}
 	}
 
 	xmlNsMap := make(map[string]string, 2)

@@ -78,10 +78,17 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	// extract schema from media type
 	schema := mediaType.Schema.Schema()
 
-	if !strings.Contains(strings.ToLower(contentType), helpers.JSONType) {
-		// we currently only support JSON and XML validation for request bodies
-		// this will capture *everything* that contains some form of 'json' in the content type
-		if !v.options.AllowXMLBodyValidation || !schema_validation.IsXMLContentType(contentType) {
+	isJson := strings.Contains(strings.ToLower(contentType), helpers.JSONType)
+
+	// we currently only support JSON, XML and URLEncoded validation for request bodies
+	if !isJson {
+		isXml := schema_validation.IsXMLContentType(contentType)
+		isUrlEncoded := schema_validation.IsURLEncodedContentType(contentType)
+
+		xmlValid := isXml && v.options.AllowXMLBodyValidation
+		urlEncodedValid := isUrlEncoded && v.options.AllowURLEncodedBodyValidation
+
+		if !xmlValid && !urlEncodedValid {
 			return true, nil
 		}
 
@@ -90,15 +97,22 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 			_ = request.Body.Close()
 
 			stringedBody := string(requestBody)
-			jsonBody, prevalidationErrors := schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
+			var jsonBody any
+			var prevalidationErrors []*errors.ValidationError
+
+			switch {
+			case xmlValid:
+				jsonBody, prevalidationErrors = schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
+			case urlEncodedValid:
+				jsonBody, prevalidationErrors = schema_validation.TransformURLEncodedToSchemaJSON(stringedBody, schema, mediaType.Encoding)
+			}
+
 			if len(prevalidationErrors) > 0 {
 				return false, prevalidationErrors
 			}
 
-			transformedBytes, err := json.Marshal(jsonBody)
-			if err != nil {
-				return false, []*errors.ValidationError{errors.InvalidXmlParsing(err.Error(), stringedBody)}
-			}
+			// If prevalidationErrors has no items, jsonBody is a valid JSON structure
+			transformedBytes, _ := json.Marshal(jsonBody)
 
 			request.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
 		}
