@@ -22,7 +22,6 @@ var rxReserved = regexp.MustCompile(`[:/?#\[\]@!$&'()*+,;=]`)
 
 func TransformURLEncodedToSchemaJSON(bodyString string, schema *base.Schema, encoding *orderedmap.Map[string, *v3.Encoding]) (map[string]any, []*errors.ValidationError) {
 	rawValues, err := url.ParseQuery(bodyString)
-
 	if err != nil {
 		return nil, []*errors.ValidationError{errors.InvalidURLEncodedParsing("empty form-urlencoded context", bodyString)}
 	}
