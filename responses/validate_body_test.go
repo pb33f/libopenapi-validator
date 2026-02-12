@@ -1578,6 +1578,90 @@ paths:
 	assert.Len(t, errs, 0)
 }
 
+func TestValidateBody_ValidURLEncodedBody(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithURLEncodedBodyValidation())
+
+	body := "name=test&patties=2"
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader([]byte(body)))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.URLEncodedContentType)
+
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.URLEncodedContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	handler(res, request)
+	response := res.Result()
+
+	valid, errors := v.ValidateResponseBody(request, response)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_InvalidURLEncoded(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model, config.WithURLEncodedBodyValidation())
+
+	body := "name=test&patties=true"
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger", bytes.NewReader([]byte(body)))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.URLEncodedContentType)
+
+	res := httptest.NewRecorder()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(helpers.ContentTypeHeader, helpers.URLEncodedContentType)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(body))
+	}
+
+	handler(res, request)
+	response := res.Result()
+
+	valid, errors := v.ValidateResponseBody(request, response)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+}
+
 func TestValidateBody_ValidXmlDecode(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
