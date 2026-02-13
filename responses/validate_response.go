@@ -156,7 +156,6 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	request := input.Request
 	response := input.Response
 	schema := input.Schema
-	
 
 	if response == nil || response.Body == http.NoBody {
 
@@ -215,7 +214,6 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 	var decodedObj interface{}
 
-	
 	if len(responseBody) > 0 {
 		// Per RFC7231, a response to a HEAD request MUST NOT include a message body.
 		if request != nil && request.Method == http.MethodHead {

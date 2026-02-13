@@ -112,6 +112,7 @@ func TestExtractContentType(t *testing.T) {
 	require.Empty(t, charset)
 	require.Empty(t, boundary)
 }
+
 func TestExtractOperationHeadFallback(t *testing.T) {
 	pathItem := &v3.PathItem{
 		Get:  &v3.Operation{Summary: "GET operation"},
