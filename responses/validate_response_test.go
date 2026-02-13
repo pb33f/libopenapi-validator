@@ -291,6 +291,7 @@ components:
 	assert.Contains(t, errors[0].Message, "failed schema rendering")
 	assert.Contains(t, errors[0].Reason, "circular reference")
 }
+
 func TestValidateResponseSchema_ResponseMissing(t *testing.T) {
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
