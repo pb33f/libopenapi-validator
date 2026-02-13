@@ -7,7 +7,7 @@ import (
 	"mime"
 	"net/http"
 
-	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 // ExtractOperation extracts the operation from the path item based on the request method. If there is no

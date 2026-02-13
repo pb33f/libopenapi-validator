@@ -156,14 +156,14 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	request := input.Request
 	response := input.Response
 	schema := input.Schema
+	
 
 	if response == nil || response.Body == http.NoBody {
 
 		// skip response body validation for head request after processing schema
-		if request != nil && request.Method == http.MethodHead {
-			return true, validationErrors
+		if response != nil && request != nil && request.Method == http.MethodHead {
+			return len(validationErrors) == 0, validationErrors
 		}
-
 		// cannot decode the response body, so it's not valid
 		violation := &errors.SchemaValidationFailure{
 			Reason:          "response is empty",
@@ -215,6 +215,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 	var decodedObj interface{}
 
+	
 	if len(responseBody) > 0 {
 		// Per RFC7231, a response to a HEAD request MUST NOT include a message body.
 		if request != nil && request.Method == http.MethodHead {

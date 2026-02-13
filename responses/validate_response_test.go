@@ -295,7 +295,7 @@ func TestValidateResponseSchema_ResponseMissing(t *testing.T) {
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
   name:
-	type: string`, 3.1)
+    type: string`, 3.1)
 
 	// Response body missing (NoBody) for a non-HEAD request should error
 	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
