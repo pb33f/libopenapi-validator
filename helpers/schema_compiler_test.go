@@ -704,3 +704,98 @@ func TestTransformTypeForCoercion_EdgeCases(t *testing.T) {
 	result = transformTypeForCoercion([]interface{}{"string"})
 	assert.Equal(t, []interface{}{"string"}, result)
 }
+
+func TestTransformNullableSchema_EnumWithoutNull(t *testing.T) {
+	// Test case: nullable: true with enum that doesn't contain null
+	// Expected: null should be automatically added to the enum
+	schema := map[string]interface{}{
+		"type": "string",
+		"enum": []interface{}{
+			"active",
+			"inactive",
+			"pending",
+			"archived",
+		},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	// nullable keyword should be removed
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+
+	// type should be converted to array including null
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "string")
+	assert.Contains(t, typeArray, "null")
+
+	// enum should contain null
+	enum, ok := result["enum"]
+	require.True(t, ok)
+
+	enumSlice, ok := enum.([]interface{})
+	require.True(t, ok)
+	assert.Len(t, enumSlice, 5) // original 4 values + null
+	assert.Contains(t, enumSlice, "active")
+	assert.Contains(t, enumSlice, "inactive")
+	assert.Contains(t, enumSlice, "pending")
+	assert.Contains(t, enumSlice, "archived")
+	assert.Contains(t, enumSlice, nil)
+}
+
+func TestTransformNullableSchema_EnumWithNull(t *testing.T) {
+	// Test case: nullable: true with enum that already contains null
+	// Expected: null should NOT be added twice
+	schema := map[string]interface{}{
+		"type": "string",
+		"enum": []interface{}{
+			"active",
+			"inactive",
+			"pending",
+			"archived",
+			nil,
+		},
+		"nullable": true,
+	}
+
+	result := transformNullableSchema(schema)
+
+	// nullable keyword should be removed
+	_, hasNullable := result["nullable"]
+	assert.False(t, hasNullable)
+
+	// type should be converted to array including null
+	schemaType, ok := result["type"]
+	require.True(t, ok)
+
+	typeArray, ok := schemaType.([]interface{})
+	require.True(t, ok)
+	assert.Contains(t, typeArray, "string")
+	assert.Contains(t, typeArray, "null")
+
+	// enum should still contain only one null (not duplicated)
+	enum, ok := result["enum"]
+	require.True(t, ok)
+
+	enumSlice, ok := enum.([]interface{})
+	require.True(t, ok)
+	assert.Len(t, enumSlice, 5) // original 5 values (no duplication)
+	assert.Contains(t, enumSlice, "active")
+	assert.Contains(t, enumSlice, "inactive")
+	assert.Contains(t, enumSlice, "pending")
+	assert.Contains(t, enumSlice, "archived")
+
+	// Count how many nulls are in the enum
+	nullCount := 0
+	for _, v := range enumSlice {
+		if v == nil {
+			nullCount++
+		}
+	}
+	assert.Equal(t, 1, nullCount, "enum should contain exactly one null value")
+}
