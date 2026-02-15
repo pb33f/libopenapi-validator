@@ -44,7 +44,7 @@ func newvalidateResponseTestBed(
 		t.Fatalf("failed to build v3 model: %v", err)
 	}
 
-	tb := validateResponseTestBed{responseBodyValidator: NewResponseBodyValidator(&m.Model)}
+	tb := validateResponseTestBed{responseBodyValidator: NewResponseBodyValidator(&m.Model, config.WithXmlBodyValidation())}
 	tb.httpTestServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if tb.responseHandlerFunc != nil {
 			tb.responseHandlerFunc(w, r)
@@ -1280,6 +1280,85 @@ components:
 			strings.Contains(errors[0].Reason, "json-pointer") ||
 			strings.Contains(errors[0].Reason, "not found"),
 		"Expected error about circular reference or JSON pointer not found, got: %s", errors[0].Reason)
+}
+func TestValidateResponseBody_XMLMarshalError(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`
+openapi: 3.1.0
+info:
+  title: Test Spec
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  bad_number:
+                    type: number
+`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodGet,
+		"/test",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, "application/xml")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("<bad_number>NaN</bad_number>"))
+		},
+	)
+
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Message, "xml example is malformed")
+}
+
+func TestValidateResponseBody_NilSchema(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`
+openapi: 3.1.0
+info:
+  title: Test Spec
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json: {}
+`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodGet,
+		"/test",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(nil)
+		},
+	)
+
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 func TestValidateBody_CheckHeader(t *testing.T) {

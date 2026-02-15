@@ -1578,6 +1578,45 @@ paths:
 	assert.Len(t, errors, 0)
 }
 
+func TestValidateRequestBody_XMLMarshalError(t *testing.T) {
+	spec := []byte(`
+openapi: 3.1.0
+info:
+  title: Test Spec
+  version: 1.0.0
+paths:
+  /test:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: object
+              properties:
+                bad_number:
+                  type: number
+      responses:
+        '200':
+          description: Success
+`)
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model, config.WithXmlBodyValidation())
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/test",
+		bytes.NewBuffer([]byte("<bad_number>NaN</bad_number>")))
+	request.Header.Set("Content-Type", "application/xml")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Message, "xml example is malformed")
+}
+
 func TestValidateBody_XmlRequest(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:

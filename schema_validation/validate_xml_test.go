@@ -8,6 +8,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1231,4 +1232,22 @@ func TestApplyXMLTransformations_IncorrectSchema(t *testing.T) {
 	assert.False(t, valid)
 	assert.Equal(t, "got string, want boolean", err[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "schema does not pass validation", err[0].Message)
+}
+func TestApplyXMLTransformations_NilPropSchema(t *testing.T) {
+	schema := &base.Schema{
+		Properties: orderedmap.New[string, *base.SchemaProxy](),
+	}
+
+	emptyProxy := &base.SchemaProxy{}
+	schema.Properties.Set("broken_ref_prop", emptyProxy)
+
+	data := map[string]any{
+		"broken_ref_prop": "some_value",
+	}
+	xmlNsMap := make(map[string]string)
+
+	result, errs := applyXMLTransformations(data, schema, &xmlNsMap)
+
+	assert.Len(t, errs, 0)
+	assert.NotNil(t, result)
 }
