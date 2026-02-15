@@ -21,16 +21,17 @@ type RegexCache interface {
 //
 // Generally fluent With... style functions are used to establish the desired behavior.
 type ValidationOptions struct {
-	RegexEngine         jsonschema.RegexpEngine
-	RegexCache          RegexCache // Enable compiled regex caching
-	FormatAssertions    bool
-	ContentAssertions   bool
-	SecurityValidation  bool
-	OpenAPIMode         bool // Enable OpenAPI-specific vocabulary validation
-	AllowScalarCoercion bool // Enable string->boolean/number coercion
-	Formats             map[string]func(v any) error
-	SchemaCache         cache.SchemaCache // Optional cache for compiled schemas
-	Logger              *slog.Logger      // Logger for debug/error output (nil = silent)
+	RegexEngine            jsonschema.RegexpEngine
+	RegexCache             RegexCache // Enable compiled regex caching
+	FormatAssertions       bool
+	ContentAssertions      bool
+	SecurityValidation     bool
+	OpenAPIMode            bool // Enable OpenAPI-specific vocabulary validation
+	AllowScalarCoercion    bool // Enable string->boolean/number coercion
+	Formats                map[string]func(v any) error
+	SchemaCache            cache.SchemaCache // Optional cache for compiled schemas
+	Logger                 *slog.Logger      // Logger for debug/error output (nil = silent)
+	AllowXMLBodyValidation bool              // Allows to convert XML to JSON when validating a request/response body.
 
 	// strict mode options - detect undeclared properties even when additionalProperties: true
 	StrictMode                bool     // Enable strict property validation
@@ -75,6 +76,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.Formats = options.Formats
 			o.SchemaCache = options.SchemaCache
 			o.Logger = options.Logger
+			o.AllowXMLBodyValidation = options.AllowXMLBodyValidation
 			o.StrictMode = options.StrictMode
 			o.StrictIgnorePaths = options.StrictIgnorePaths
 			o.StrictIgnoredHeaders = options.StrictIgnoredHeaders
@@ -158,6 +160,14 @@ func WithoutOpenAPIMode() Option {
 func WithScalarCoercion() Option {
 	return func(o *ValidationOptions) {
 		o.AllowScalarCoercion = true
+	}
+}
+
+// WithXmlBodyValidation enables converting an XML body to a JSON when validating the schema from a request and response body
+// The default option is set to false
+func WithXmlBodyValidation() Option {
+	return func(o *ValidationOptions) {
+		o.AllowXMLBodyValidation = true
 	}
 }
 
