@@ -998,8 +998,8 @@ components:
 	assert.Empty(t, errors)
 }
 
-func TestParamValidator_ValidateSecurity_UnknownHTTPScheme(t *testing.T) {
-	// Test custom HTTP scheme - unknown to our validator, should pass through (not fail)
+func TestParamValidator_ValidateSecurity_CustomHTTPScheme(t *testing.T) {
+	// Test custom HTTP scheme - should pass with correct scheme in header
 	spec := `openapi: 3.1.0
 paths:
   /products:
@@ -1017,8 +1017,9 @@ components:
 	m, _ := doc.BuildV3Model()
 	v := NewParameterValidator(&m.Model)
 
-	// Request with no auth - should pass because custom scheme is not validated
+	// Request with custom auth header - should pass
 	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request.Header.Add("Authorization", "Custom dXNlcjpwYXNz")
 
 	valid, errors := v.ValidateSecurity(request)
 	assert.True(t, valid)
@@ -1052,4 +1053,33 @@ components:
 	valid, errors := v.ValidateSecurity(request)
 	assert.True(t, valid)
 	assert.Empty(t, errors)
+}
+
+func TestParamValidator_ValidateSecurity_HTTPScheme_Mismatch(t *testing.T) {
+	// Test http scheme with mismatch in header: should return errors
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - CustomAuth: []
+components:
+  securitySchemes:
+    CustomAuth:
+      type: http
+      scheme: custom
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with auth header - should fail as header scheme is incorrect
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request.Header.Add("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "Authorization header scheme 'custom' mismatch")
 }
