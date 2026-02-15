@@ -1233,6 +1233,7 @@ func TestApplyXMLTransformations_IncorrectSchema(t *testing.T) {
 	assert.Equal(t, "got string, want boolean", err[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "schema does not pass validation", err[0].Message)
 }
+
 func TestApplyXMLTransformations_NilPropSchema(t *testing.T) {
 	schema := &base.Schema{
 		Properties: orderedmap.New[string, *base.SchemaProxy](),
