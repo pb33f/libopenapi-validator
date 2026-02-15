@@ -44,7 +44,7 @@ func newvalidateResponseTestBed(
 		t.Fatalf("failed to build v3 model: %v", err)
 	}
 
-	tb := validateResponseTestBed{responseBodyValidator: NewResponseBodyValidator(&m.Model, config.WithXmlBodyValidation())}
+	tb := validateResponseTestBed{responseBodyValidator: NewResponseBodyValidator(&m.Model, config.WithXmlBodyValidation(), config.WithURLEncodedBodyValidation())}
 	tb.httpTestServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if tb.responseHandlerFunc != nil {
 			tb.responseHandlerFunc(w, r)
@@ -1323,6 +1323,49 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, errors[0].Message, "xml example is malformed")
+}
+
+func TestValidateResponseBody_URLEncodedMarshalError(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`
+openapi: 3.1.0
+info:
+  title: Test Spec
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: Success
+          content:
+            application/x-www-form-urlencoded:
+              schema:
+                type: object
+                properties:
+                  bad_number:
+                    type: number
+`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodGet,
+		"/test",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(helpers.ContentTypeHeader, helpers.URLEncodedContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("bad_number=NaN"))
+		},
+	)
+
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, errors[0].Message, "Unable to parse form-urlencoded body")
 }
 
 func TestValidateResponseBody_NilSchema(t *testing.T) {

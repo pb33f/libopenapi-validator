@@ -111,8 +111,15 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 				return false, prevalidationErrors
 			}
 
-			// If prevalidationErrors has no items, jsonBody is a valid JSON structure
-			transformedBytes, _ := json.Marshal(jsonBody)
+			transformedBytes, err := json.Marshal(jsonBody)
+			if err != nil {
+				switch {
+				case isXml:
+					return false, []*errors.ValidationError{errors.InvalidXMLParsing(err.Error(), stringedBody)}
+				case isUrlEncoded:
+					return false, []*errors.ValidationError{errors.InvalidURLEncodedParsing(err.Error(), stringedBody)}
+				}
+			}
 
 			request.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
 		}
