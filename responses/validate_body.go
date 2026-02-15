@@ -176,8 +176,15 @@ func (v *responseBodyValidator) checkResponseSchema(
 				return prevalidationErrors
 			}
 
-			// If prevalidationErrors has no items, jsonBody is a valid JSON structure
-			transformedBytes, _ := json.Marshal(jsonBody)
+			transformedBytes, err := json.Marshal(jsonBody)
+			if err != nil {
+				switch {
+				case isXml:
+					return []*errors.ValidationError{errors.InvalidXMLParsing(err.Error(), stringedBody)}
+				case isUrlEncoded:
+					return []*errors.ValidationError{errors.InvalidURLEncodedParsing(err.Error(), stringedBody)}
+				}
+			}
 
 			response.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
 		}
