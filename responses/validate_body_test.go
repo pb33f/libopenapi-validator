@@ -1281,6 +1281,7 @@ components:
 			strings.Contains(errors[0].Reason, "not found"),
 		"Expected error about circular reference or JSON pointer not found, got: %s", errors[0].Reason)
 }
+
 func TestValidateResponseBody_XMLMarshalError(t *testing.T) {
 	tb := newvalidateResponseTestBed(
 		t,
