@@ -90,8 +90,8 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	options := config.NewValidationOptions(opts...)
 
 	// Build radix tree for O(k) path lookup (where k = path depth)
-	// Skip if explicitly set via WithPathTree (including nil to disable)
-	if options.PathTree == nil && !options.IsPathTreeSet() {
+	// Skip if path tree is disabled or a custom tree was provided
+	if options.PathTree == nil && !options.IsPathTreeDisabled() {
 		options.PathTree = radix.BuildPathTree(m)
 	}
 
