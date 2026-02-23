@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2026 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 // Package radix provides a radix tree (prefix tree) implementation optimized for

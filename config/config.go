@@ -32,7 +32,7 @@ type ValidationOptions struct {
 	Formats                       map[string]func(v any) error
 	SchemaCache                   cache.SchemaCache // Optional cache for compiled schemas
 	PathTree                      radix.PathLookup  // O(k) path lookup via radix tree (built automatically)
-	pathTreeSet                   bool              // Internal: true if PathTree was explicitly set via WithPathTree
+	pathTreeDisabled              bool              // Internal: true if radix tree auto-build was disabled via DisablePathTree
 	Logger                        *slog.Logger      // Logger for debug/error output (nil = silent)
 	AllowXMLBodyValidation        bool              // Allows to convert XML to JSON for validating a request/response body.
 	AllowURLEncodedBodyValidation bool              // Allows to convert URL Encoded to JSON for validating a request/response body.
@@ -80,7 +80,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.Formats = options.Formats
 			o.SchemaCache = options.SchemaCache
 			o.PathTree = options.PathTree
-			o.pathTreeSet = options.pathTreeSet
+			o.pathTreeDisabled = options.pathTreeDisabled
 			o.Logger = options.Logger
 			o.AllowXMLBodyValidation = options.AllowXMLBodyValidation
 			o.AllowURLEncodedBodyValidation = options.AllowURLEncodedBodyValidation
@@ -197,11 +197,17 @@ func WithSchemaCache(schemaCache cache.SchemaCache) Option {
 
 // WithPathTree sets a custom radix tree for path matching.
 // The default is built automatically from the OpenAPI specification.
-// Pass nil to disable the radix tree and use regex-based matching only.
 func WithPathTree(pathTree radix.PathLookup) Option {
 	return func(o *ValidationOptions) {
 		o.PathTree = pathTree
-		o.pathTreeSet = true
+	}
+}
+
+// DisablePathTree prevents automatic radix tree construction.
+// Use this to fall back to regex-based path matching only.
+func DisablePathTree() Option {
+	return func(o *ValidationOptions) {
+		o.pathTreeDisabled = true
 	}
 }
 
@@ -268,9 +274,9 @@ var defaultIgnoredHeaders = []string{
 	"request-start-time", // Added by some API clients for timing
 }
 
-// IsPathTreeSet returns true if PathTree was explicitly configured via WithPathTree.
-func (o *ValidationOptions) IsPathTreeSet() bool {
-	return o.pathTreeSet
+// IsPathTreeDisabled returns true if radix tree auto-build was disabled via DisablePathTree.
+func (o *ValidationOptions) IsPathTreeDisabled() bool {
+	return o.pathTreeDisabled
 }
 
 // GetEffectiveStrictIgnoredHeaders returns the list of headers to ignore
