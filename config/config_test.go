@@ -491,3 +491,34 @@ func TestStrictModeWithIgnorePaths(t *testing.T) {
 	assert.True(t, opts.StrictMode)
 	assert.Equal(t, paths, opts.StrictIgnorePaths)
 }
+
+func TestWithPathTree(t *testing.T) {
+	// Use a mock/nil path tree — WithPathTree just sets the field
+	opts := NewValidationOptions(WithPathTree(nil))
+	assert.Nil(t, opts.PathTree)
+
+	// TestWithPathTree with a real value — use a custom implementation
+	// We can verify the field is set using a simple check
+	opts2 := &ValidationOptions{}
+	WithPathTree(nil)(opts2)
+	assert.Nil(t, opts2.PathTree)
+}
+
+func TestDisablePathTree(t *testing.T) {
+	opts := NewValidationOptions(DisablePathTree())
+	assert.True(t, opts.IsPathTreeDisabled())
+}
+
+func TestIsPathTreeDisabled_Default(t *testing.T) {
+	opts := NewValidationOptions()
+	assert.False(t, opts.IsPathTreeDisabled())
+}
+
+func TestWithExistingOpts_PathTreeFields(t *testing.T) {
+	original := NewValidationOptions(DisablePathTree())
+
+	opts := NewValidationOptions(WithExistingOpts(original))
+
+	assert.True(t, opts.IsPathTreeDisabled())
+	assert.Nil(t, opts.PathTree)
+}

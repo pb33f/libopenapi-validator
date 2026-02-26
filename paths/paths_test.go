@@ -13,6 +13,7 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/radix"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1508,4 +1509,64 @@ paths:
 	assert.Len(t, errs, 1)
 	assert.Equal(t, "missingOperation", errs[0].ValidationSubType)
 	assert.Equal(t, "/entities('{id}')", foundPath)
+}
+
+func TestFindPath_WithPathTree_MethodMatch(t *testing.T) {
+	// Exercise radix tree fast-path: options.PathTree != nil, method matches → return pathItem, nil, matchedPath
+	spec := `openapi: 3.1.0
+info:
+  title: Radix Tree Test
+  version: 1.0.0
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	pathTree := radix.BuildPathTree(&m.Model)
+	opts := config.NewValidationOptions(config.WithPathTree(pathTree))
+
+	request, _ := http.NewRequest(http.MethodGet, "https://api.com/users/123", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, opts)
+
+	assert.Nil(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "getUser", pathItem.Get.OperationId)
+	assert.Equal(t, "/users/{id}", foundPath)
+}
+
+func TestFindPath_WithPathTree_MethodMismatch(t *testing.T) {
+	// Exercise radix tree fast-path: options.PathTree != nil, path found but wrong method
+	// → return pathItem, missingOperationError(...), matchedPath
+	spec := `openapi: 3.1.0
+info:
+  title: Radix Tree Test
+  version: 1.0.0
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      responses:
+        '200':
+          description: OK
+`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	pathTree := radix.BuildPathTree(&m.Model)
+	opts := config.NewValidationOptions(config.WithPathTree(pathTree))
+
+	request, _ := http.NewRequest(http.MethodPost, "https://api.com/users/123", nil)
+	pathItem, errs, foundPath := FindPath(request, &m.Model, opts)
+
+	assert.NotNil(t, pathItem)
+	assert.NotNil(t, errs)
+	assert.Len(t, errs, 1)
+	assert.True(t, errs[0].IsOperationMissingError())
+	assert.Equal(t, "/users/{id}", foundPath)
 }
