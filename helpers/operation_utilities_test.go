@@ -112,3 +112,26 @@ func TestExtractContentType(t *testing.T) {
 	require.Empty(t, charset)
 	require.Empty(t, boundary)
 }
+
+func TestExtractOperationHeadFallback(t *testing.T) {
+	pathItem := &v3.PathItem{
+		Get:  &v3.Operation{Summary: "GET operation"},
+		Head: nil,
+	}
+
+	req, _ := http.NewRequest(http.MethodHead, "/", nil)
+	operation := ExtractOperation(req, pathItem)
+	require.NotNil(t, operation)
+	require.Equal(t, "GET operation", operation.Summary)
+}
+
+func TestExtractOperationHeadFallbackNoGet(t *testing.T) {
+	pathItem := &v3.PathItem{
+		Head: nil,
+		Get:  nil,
+	}
+
+	req, _ := http.NewRequest(http.MethodHead, "/", nil)
+	operation := ExtractOperation(req, pathItem)
+	require.Nil(t, operation)
+}

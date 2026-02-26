@@ -99,7 +99,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 				SpecLine:               1,
 				SpecCol:                0,
 				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
-				HowToFix:               "check the request schema for circular references or invalid structures",
+				HowToFix:               errors.HowToFixInvalidRenderedSchema,
 				Context:                referenceSchema,
 			})
 			return false, validationErrors

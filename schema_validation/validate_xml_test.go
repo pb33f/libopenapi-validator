@@ -1,13 +1,14 @@
 // Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
 // SPDX-License-Identifier: MIT
-
 package schema_validation
 
 import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/libopenapi/orderedmap"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -751,15 +752,16 @@ func TestValidateXML_NilSchema(t *testing.T) {
 
 func TestValidateXML_NilSchemaInTransformation(t *testing.T) {
 	// directly test applyXMLTransformations with nil schema (line 94)
-	result := applyXMLTransformations(map[string]interface{}{"test": "value"}, nil)
+	xmlNsMap := make(map[string]string, 2)
+	result, err := applyXMLTransformations(map[string]interface{}{"test": "value"}, nil, &xmlNsMap)
 	assert.NotNil(t, result)
+	assert.Len(t, err, 0)
 	assert.Equal(t, map[string]interface{}{"test": "value"}, result)
 }
 
 func TestValidateXML_TransformWithNilPropertySchemaProxy(t *testing.T) {
 	// directly test applyXMLTransformations when a property schema proxy returns nil (line 119)
 	// this can happen with circular refs or unresolved refs in edge cases
-
 	// create a schema with properties but we'll simulate a nil schema scenario
 	// by testing the transformation directly
 	data := map[string]interface{}{
@@ -770,8 +772,9 @@ func TestValidateXML_TransformWithNilPropertySchemaProxy(t *testing.T) {
 	schema := &base.Schema{
 		Properties: nil, // will trigger line 109 early return
 	}
-
-	result := applyXMLTransformations(data, schema)
+	xmlNsMap := make(map[string]string, 2)
+	result, err := applyXMLTransformations(data, schema, &xmlNsMap)
+	assert.Len(t, err, 0)
 	assert.Equal(t, data, result)
 }
 
@@ -891,6 +894,7 @@ paths:
                     xml:
                       wrapped: true
                     items:
+                      additionalProperties: false
                       type: object
                       properties:
                         value:
@@ -914,11 +918,12 @@ paths:
 	// wrapper contains items with wrong name (item instead of record)
 	// this tests the fallback path where unwrapped element is not found
 	xmlWithWrongItemName := `<Collection><data><item><value>test</value></item></data></Collection>`
-	valid, validationErrors := validator.ValidateXMLString(schema, xmlWithWrongItemName)
+	valid, _ := validator.ValidateXMLString(schema, xmlWithWrongItemName)
+	assert.False(t, valid)
 
-	// it should still process (might fail schema validation but won't crash)
-	_ = valid
-	assert.NotNil(t, validationErrors)
+	xmlWithWrightItemName := `<Collection><data><record><value>test</value></record></data></Collection>`
+	valid, _ = validator.ValidateXMLString(schema, xmlWithWrightItemName)
+	assert.True(t, valid)
 }
 
 func TestValidateXML_DirectArrayValue(t *testing.T) {
@@ -935,7 +940,7 @@ func TestValidateXML_DirectArrayValue(t *testing.T) {
 
 	// when val is already an array (not a map), it should return as-is
 	arrayVal := []interface{}{"one", "two", "three"}
-	result := unwrapArrayElement(arrayVal, schema)
+	result := unwrapArrayElement(arrayVal, "", schema)
 	assert.Equal(t, arrayVal, result)
 }
 
@@ -953,16 +958,16 @@ func TestValidateXML_UnwrapArrayElementMissingItem(t *testing.T) {
 
 	// wrapper map contains wrong key - should return map as-is (line 177)
 	wrapperMap := map[string]interface{}{"wrongKey": []interface{}{"one", "two"}}
-	result := unwrapArrayElement(wrapperMap, schema)
+	result := unwrapArrayElement(wrapperMap, "", schema)
 	assert.Equal(t, wrapperMap, result)
 }
 
 func TestTransformXMLToSchemaJSON_EmptyString(t *testing.T) {
 	// test empty string error path (line 68)
 	schema := &base.Schema{}
-	_, err := transformXMLToSchemaJSON("", schema)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "empty xml")
+	_, err := TransformXMLToSchemaJSON("", schema)
+	assert.Len(t, err, 1)
+	assert.Contains(t, err[0].Reason, "empty xml content")
 }
 
 func TestApplyXMLTransformations_NoXMLName(t *testing.T) {
@@ -970,8 +975,10 @@ func TestApplyXMLTransformations_NoXMLName(t *testing.T) {
 	schema := &base.Schema{
 		Properties: nil,
 	}
+	xmlNsMap := make(map[string]string, 2)
 	data := map[string]interface{}{"Cat": map[string]interface{}{"nice": "true"}}
-	result := applyXMLTransformations(data, schema)
+	result, err := applyXMLTransformations(data, schema, &xmlNsMap)
+	assert.Len(t, err, 0)
 	assert.Equal(t, data, result)
 }
 
@@ -996,4 +1003,252 @@ func TestIsXMLContentType(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestTransformXMLToSchemaJSON_InvalixXml(t *testing.T) {
+	schema := &base.Schema{}
+	_, err := TransformXMLToSchemaJSON("<xmlaaaaaaaaaaaaaaaaaa><", schema)
+	assert.Len(t, err, 1)
+	assert.Contains(t, err[0].Reason, "malformed xml")
+}
+
+func TestValidateXmlNs_NoData(t *testing.T) {
+	errors := validateXmlNs(nil, nil, "", nil)
+	assert.Len(t, errors, 0)
+}
+
+func getXmlTestSchema(t *testing.T) *base.Schema {
+	spec := `openapi: 3.1
+paths:
+ /collection:
+  get:
+    responses:
+      '200':
+        content:
+          application/xml:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                body:
+                  type: object
+                  required:
+                    - id
+                    - success
+                    - payload
+                  xml:
+                    prefix: t
+                    namespace: http://assert.t
+                    name: reqBody
+                  properties:
+                    id: 
+                      type: integer
+                      xml:
+                        attribute: true
+                    success:
+                      xml:
+                        name: ok
+                        prefix: j
+                        namespace: http://j.j
+                      type: boolean
+                    payload:
+                      oneOf:
+                        - type: integer
+                        - type: object
+                data:
+                  type: array
+                  xml:
+                    wrapped: true
+                    name: list
+                  items:
+                    additionalProperties: false
+                    type: object
+                    required:
+                      - value
+                    properties:
+                      value:
+                        type: string
+                        xml:
+                          namespace: http://prop.arr
+                          prefix: arr
+                    xml:
+                      name: record
+                      prefix: unt
+                      namespace: http://expect.t
+              xml:
+                name: Collection`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/collection").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	return schema
+}
+
+func TestValidateXmlNs_InvalidPrefix(t *testing.T) {
+	schema := getXmlTestSchema(t)
+	validator := NewXMLValidator()
+	xmlPayload := `<Collection><reqBody></reqBody></Collection>`
+	valid, err := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.False(t, valid)
+	assert.Equal(t, helpers.XmlValidationPrefix, err[0].ValidationSubType)
+}
+
+func TestValidateXmlNs_InvalidNamespace(t *testing.T) {
+	schema := getXmlTestSchema(t)
+	validator := NewXMLValidator()
+	xmlPayload := `<Collection><t:reqBody xmlns:t="incorrectUrl"></t:reqBody></Collection>`
+	valid, err := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.False(t, valid)
+	assert.Equal(t, helpers.XmlValidationNamespace, err[0].ValidationSubType)
+}
+
+func TestValidateXmlNs_InvalidNamespaceInRoot(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /pet:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: object
+                xml:
+                  name: Cat
+                  prefix: c
+                  namespace: http://cat.ca`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pet").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewXMLValidator()
+	xmlPayload := `<c:Cat xmlns:c="invalid"></c:Cat>`
+
+	valid, validationErrors := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.False(t, valid)
+	assert.Equal(t, "The namespace from prefix 'c' differs from the xml", validationErrors[0].Message)
+	assert.Equal(t, helpers.XmlValidationNamespace, validationErrors[0].ValidationSubType)
+}
+
+func TestValidateXmlNs_CorrectNamespaceInRoot(t *testing.T) {
+	spec := `openapi: 3.0.0
+paths:
+  /pet:
+    get:
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                type: string
+                xml:
+                  name: Cat
+                  prefix: c
+                  namespace: http://cat.ca`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	assert.NoError(t, err)
+
+	v3Doc, err := doc.BuildV3Model()
+	assert.NoError(t, err)
+
+	schema := v3Doc.Model.Paths.PathItems.GetOrZero("/pet").Get.Responses.Codes.GetOrZero("200").
+		Content.GetOrZero("application/xml").Schema.Schema()
+
+	validator := NewXMLValidator()
+	xmlPayload := `<c:Cat xmlns:c="http://cat.ca">meow</c:Cat>`
+
+	valid, validationErrors := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.True(t, valid)
+	assert.Len(t, validationErrors, 0)
+}
+
+func TestConvertBasedOnSchema_XmlSuccessfullyConverted(t *testing.T) {
+	schema := getXmlTestSchema(t)
+	validator := NewXMLValidator()
+
+	xmlPayload := `<Collection><t:reqBody xmlns:t="http://assert.t" id="2"><j:ok xmlns:j="http://j.j">true</j:ok><payload><any>2</any></payload></t:reqBody>
+<list xmlns:unt="http://expect.t"><unt:record><arr:value xmlns:arr="http://prop.arr">Text</arr:value></unt:record></list></Collection>`
+
+	valid, err := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.True(t, valid)
+	assert.Len(t, err, 0)
+}
+
+func TestConvertBasedOnSchema_MissingPrefixInObjectProperties(t *testing.T) {
+	schema := getXmlTestSchema(t)
+	validator := NewXMLValidator()
+
+	xmlPayload := `<Collection><t:reqBody xmlns:t="http://assert.t" id="2"><ok>true</ok><payload><any>2</any></payload></t:reqBody>
+<list xmlns:unt="http://expect.t"><unt:record><arr:value xmlns:arr="http://prop.arr">Text</arr:value></unt:record></list></Collection>`
+
+	valid, err := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.False(t, valid)
+	assert.Equal(t, helpers.XmlValidationPrefix, err[0].ValidationSubType)
+	assert.Equal(t, "The prefix 'j' is defined in the schema, however it's missing from the xml", err[0].Message)
+}
+
+func TestConvertBasedOnSchema_MissingPrefixInArrayItemProperties(t *testing.T) {
+	schema := getXmlTestSchema(t)
+	validator := NewXMLValidator()
+
+	xmlPayload := `<Collection><t:reqBody xmlns:t="http://assert.t" id="2"><j:ok xmlns:j="http://j.j">true</j:ok><payload><any>2</any></payload></t:reqBody>
+<list xmlns:unt="http://expect.t"><unt:record><value>Text</value></unt:record></list></Collection>`
+
+	valid, err := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.False(t, valid)
+	assert.Equal(t, helpers.XmlValidationPrefix, err[0].ValidationSubType)
+	assert.Equal(t, "The prefix 'arr' is defined in the schema, however it's missing from the xml", err[0].Message)
+}
+
+func TestApplyXMLTransformations_IncorrectSchema(t *testing.T) {
+	schema := getXmlTestSchema(t)
+	validator := NewXMLValidator()
+
+	xmlPayload := `<Collection><t:reqBody xmlns:t="http://assert.t" id="2"><j:ok xmlns:j="http://j.j">NotBoolean</j:ok><payload><any>NotInteger</any></payload></t:reqBody>
+<list xmlns:unt="http://expect.t"><unt:record><arr:value xmlns:arr="http://prop.arr">Text</arr:value></unt:record></list></Collection>`
+
+	valid, err := validator.ValidateXMLString(schema, xmlPayload)
+
+	assert.False(t, valid)
+	assert.Equal(t, "got string, want boolean", err[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "schema does not pass validation", err[0].Message)
+}
+
+func TestApplyXMLTransformations_NilPropSchema(t *testing.T) {
+	schema := &base.Schema{
+		Properties: orderedmap.New[string, *base.SchemaProxy](),
+	}
+
+	emptyProxy := &base.SchemaProxy{}
+	schema.Properties.Set("broken_ref_prop", emptyProxy)
+
+	data := map[string]any{
+		"broken_ref_prop": "some_value",
+	}
+	xmlNsMap := make(map[string]string)
+
+	result, errs := applyXMLTransformations(data, schema, &xmlNsMap)
+
+	assert.Len(t, errs, 0)
+	assert.NotNil(t, result)
 }

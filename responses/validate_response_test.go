@@ -291,3 +291,56 @@ components:
 	assert.Contains(t, errors[0].Message, "failed schema rendering")
 	assert.Contains(t, errors[0].Reason, "circular reference")
 }
+
+func TestValidateResponseSchema_ResponseMissing(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+properties:
+  name:
+    type: string`, 3.1)
+
+	// Response body missing (NoBody) for a non-HEAD request should error
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: &http.Response{StatusCode: http.StatusOK, Body: http.NoBody},
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "response object is missing")
+}
+
+func TestValidateResponseSchema_HeadEmptySkipsValidation(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+
+	req, _ := http.NewRequest(http.MethodHead, "/test", nil)
+	resp := &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  req,
+		Response: resp,
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+}
+
+func TestValidateResponseSchema_HeadWithBodyFails(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+
+	req, _ := http.NewRequest(http.MethodHead, "/test", nil)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  req,
+		Response: responseWithBody(`{"name":"bob"}`),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Reason, "must not contain a body")
+}

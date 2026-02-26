@@ -151,6 +151,11 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	schema := input.Schema
 
 	if response == nil || response.Body == http.NoBody {
+
+		// skip response body validation for head request after processing schema
+		if response != nil && request != nil && request.Method == http.MethodHead {
+			return len(validationErrors) == 0, validationErrors
+		}
 		// cannot decode the response body, so it's not valid
 		validationErrors = append(validationErrors, &errors.ValidationError{
 			ValidationType:    "response",
@@ -190,6 +195,27 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	var decodedObj interface{}
 
 	if len(responseBody) > 0 {
+		// Per RFC7231, a response to a HEAD request MUST NOT include a message body.
+		if request != nil && request.Method == http.MethodHead {
+			violation := &errors.SchemaValidationFailure{
+				Reason:          "HEAD responses must not include a message body",
+				ReferenceObject: string(responseBody),
+				ReferenceSchema: referenceSchema,
+			}
+			validationErrors = append(validationErrors, &errors.ValidationError{
+				ValidationType:    helpers.ResponseBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%s response for '%s' must not include a body",
+					request.Method, request.URL.Path),
+				Reason:                 "The response to a HEAD request must not contain a body",
+				SpecLine:               1,
+				SpecCol:                0,
+				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				HowToFix:               "ensure no response body is present for HEAD requests",
+				Context:                referenceSchema,
+			})
+			return false, validationErrors
+		}
 		err := json.Unmarshal(responseBody, &decodedObj)
 		if err != nil {
 			// cannot decode the response body, so it's not valid
