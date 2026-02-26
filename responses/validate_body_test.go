@@ -1186,7 +1186,8 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "POST response body for '/burgers/createBurger' failed to validate schema", errors[0].Message)
-	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Nil(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].Reason, "cannot be decoded")
 }
 
 func TestValidateBody_NoContentType_Valid(t *testing.T) {
@@ -1517,16 +1518,13 @@ paths:
 		found := false
 		for _, err := range validationErrors {
 			if err.ValidationSubType == helpers.Schema &&
-				err.SchemaValidationErrors != nil &&
-				len(err.SchemaValidationErrors) > 0 {
-				for _, schemaErr := range err.SchemaValidationErrors {
-					if schemaErr.Location == "schema compilation" &&
-						schemaErr.Reason != "" {
-						found = true
-						assert.Contains(t, schemaErr.Reason, "failed to compile JSON schema")
-						assert.Contains(t, err.HowToFix, "complex regex patterns")
-						break
-					}
+				len(err.SchemaValidationErrors) == 0 {
+				// Schema compilation errors don't have SchemaValidationFailure objects
+				if strings.Contains(err.Reason, "failed to compile JSON schema") {
+					found = true
+					assert.Contains(t, err.Reason, "failed to compile JSON schema")
+					assert.Contains(t, err.HowToFix, "complex regex patterns")
+					break
 				}
 			}
 		}

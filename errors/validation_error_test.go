@@ -14,11 +14,11 @@ import (
 func TestSchemaValidationFailure_Error(t *testing.T) {
 	// Test the Error method of SchemaValidationFailure
 	s := &SchemaValidationFailure{
-		Reason:   "Invalid type",
-		Location: "/path/to/property",
+		Reason:    "Invalid type",
+		FieldPath: "$.path.to.property",
 	}
 
-	expectedError := "Reason: Invalid type, Location: /path/to/property"
+	expectedError := "Reason: Invalid type, FieldPath: $.path.to.property"
 	require.Equal(t, expectedError, s.Error())
 }
 
@@ -49,8 +49,8 @@ func TestValidationError_Error_WithSpecLineAndColumn(t *testing.T) {
 func TestValidationError_Error_WithSchemaValidationErrors(t *testing.T) {
 	// Test the Error method of ValidationError with SchemaValidationErrors
 	schemaError := &SchemaValidationFailure{
-		Reason:   "Invalid enum value",
-		Location: "/path/to/enum",
+		Reason:    "Invalid enum value",
+		FieldPath: "$.path.to.enum",
 	}
 	v := &ValidationError{
 		Message:                "Enum validation failed",
@@ -65,8 +65,8 @@ func TestValidationError_Error_WithSchemaValidationErrors(t *testing.T) {
 func TestValidationError_Error_WithSchemaValidationErrors_AndSpecLineColumn(t *testing.T) {
 	// Test the Error method of ValidationError with SchemaValidationErrors and SpecLine and SpecCol
 	schemaError := &SchemaValidationFailure{
-		Reason:   "Invalid enum value",
-		Location: "/path/to/enum",
+		Reason:    "Invalid enum value",
+		FieldPath: "$.path.to.enum",
 	}
 	v := &ValidationError{
 		Message:                "Enum validation failed",

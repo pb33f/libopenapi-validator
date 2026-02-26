@@ -96,7 +96,6 @@ func InvalidXMLParsing(reason, referenceObject string) *ValidationError {
 		Reason:            fmt.Sprintf("failed to parse xml: %s", reason),
 		SchemaValidationErrors: []*SchemaValidationFailure{{
 			Reason:          reason,
-			Location:        "xml parsing",
 			ReferenceSchema: "",
 			ReferenceObject: referenceObject,
 		}},

@@ -72,6 +72,7 @@ func TestInvalidParsing(t *testing.T) {
 	err := InvalidXMLParsing("no data sent", "invalid-xml")
 
 	assert.NotNil(t, (*err))
-	assert.Equal(t, (*err).SchemaValidationErrors[0].Location, "xml parsing")
+	assert.Equal(t, (*err).SchemaValidationErrors[0].Reason, "no data sent")
+	assert.Equal(t, (*err).SchemaValidationErrors[0].ReferenceObject, "invalid-xml")
 	assert.Equal(t, helpers.Schema, (*err).ValidationSubType)
 }

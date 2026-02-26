@@ -38,7 +38,8 @@ func TestInvalidURLEncodedParsing(t *testing.T) {
 	err := InvalidURLEncodedParsing("no data sent", "invalid-formdata")
 
 	assert.NotNil(t, (*err))
-	assert.Equal(t, (*err).SchemaValidationErrors[0].Location, "url encoded parsing")
+	assert.Equal(t, (*err).SchemaValidationErrors[0].Reason, "no data sent")
+	assert.Equal(t, (*err).SchemaValidationErrors[0].ReferenceObject, "invalid-formdata")
 	assert.Equal(t, helpers.Schema, (*err).ValidationSubType)
 }
 

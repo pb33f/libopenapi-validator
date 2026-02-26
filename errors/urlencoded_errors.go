@@ -15,7 +15,6 @@ func InvalidURLEncodedParsing(reason, referenceObject string) *ValidationError {
 		Reason:            fmt.Sprintf("failed to parse form-urlencoded: %s", reason),
 		SchemaValidationErrors: []*SchemaValidationFailure{{
 			Reason:          reason,
-			Location:        "url encoded parsing",
 			ReferenceSchema: "",
 			ReferenceObject: referenceObject,
 		}},

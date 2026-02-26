@@ -1310,8 +1310,8 @@ components:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 1)
-	assert.Equal(t, "invalid character '}' looking for beginning of object key string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Nil(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].Reason, "cannot be decoded")
 }
 
 func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {

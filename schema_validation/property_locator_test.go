@@ -114,13 +114,13 @@ components:
 
 	if len(errors) > 0 && len(errors[0].SchemaValidationErrors) > 0 {
 		sve := errors[0].SchemaValidationErrors[0]
-		if sve.OriginalError != nil {
+		if sve.OriginalJsonSchemaError != nil {
 			// Test extractPatternFromCauses directly with the real error
-			pattern := extractPatternFromCauses(sve.OriginalError)
+			pattern := extractPatternFromCauses(sve.OriginalJsonSchemaError)
 			assert.NotEmpty(t, pattern, "Should extract pattern from ValidationError")
 
 			// Also test the info extraction
-			info := checkErrorForPropertyInfo(sve.OriginalError)
+			info := checkErrorForPropertyInfo(sve.OriginalJsonSchemaError)
 			assert.NotNil(t, info)
 			assert.Equal(t, "$with-pattern", info.PropertyName)
 			assert.NotEmpty(t, info.Pattern, "Pattern should be extracted from causes")
@@ -146,9 +146,9 @@ info:
 
 	if len(errors) > 0 && len(errors[0].SchemaValidationErrors) > 0 {
 		for _, sve := range errors[0].SchemaValidationErrors {
-			if sve.OriginalError != nil {
+			if sve.OriginalJsonSchemaError != nil {
 				// Call extractPatternFromCauses - may return empty string for errors without pattern
-				pattern := extractPatternFromCauses(sve.OriginalError)
+				pattern := extractPatternFromCauses(sve.OriginalJsonSchemaError)
 				// Pattern might be empty for non-property-name errors (covering line 108)
 				_ = pattern
 			}
@@ -241,9 +241,9 @@ components:
 
 	if len(errors) > 0 && len(errors[0].SchemaValidationErrors) > 0 {
 		sve := errors[0].SchemaValidationErrors[0]
-		if sve.OriginalError != nil {
+		if sve.OriginalJsonSchemaError != nil {
 			// Test pattern extraction
-			pattern := extractPatternFromCauses(sve.OriginalError)
+			pattern := extractPatternFromCauses(sve.OriginalJsonSchemaError)
 			assert.NotEmpty(t, pattern, "Should extract pattern from error")
 			assert.Equal(t, "^[a-zA-Z0-9._-]+$", pattern)
 		}
@@ -293,15 +293,15 @@ components:
 	_, errors := ValidateOpenAPIDocument(doc)
 	if len(errors) > 0 && len(errors[0].SchemaValidationErrors) > 0 {
 		sve := errors[0].SchemaValidationErrors[0]
-		if sve.OriginalError != nil {
+		if sve.OriginalJsonSchemaError != nil {
 			// Test extraction from root error
-			info := extractPropertyNameFromError(sve.OriginalError)
+			info := extractPropertyNameFromError(sve.OriginalJsonSchemaError)
 			assert.NotNil(t, info, "Should extract property name from root error")
 			assert.Equal(t, "$direct-test", info.PropertyName)
 			assert.NotEmpty(t, info.EnhancedReason)
 
 			// Test extractPatternFromCauses on the root error
-			pattern := extractPatternFromCauses(sve.OriginalError)
+			pattern := extractPatternFromCauses(sve.OriginalJsonSchemaError)
 			assert.NotEmpty(t, pattern, "Should extract pattern from error message")
 			assert.Equal(t, "^[a-zA-Z0-9._-]+$", pattern)
 		}
@@ -343,8 +343,8 @@ paths:
 	} else if len(errors) > 0 && len(errors[0].SchemaValidationErrors) > 0 {
 		// If there are errors, test extraction (might not find property name info)
 		sve := errors[0].SchemaValidationErrors[0]
-		if sve.OriginalError != nil {
-			info := extractPropertyNameFromError(sve.OriginalError)
+		if sve.OriginalJsonSchemaError != nil {
+			info := extractPropertyNameFromError(sve.OriginalJsonSchemaError)
 			// Info might be nil for non-property-name errors
 			_ = info
 		}
@@ -637,7 +637,7 @@ components:
 	}
 
 	var line, column int
-	var reason, fieldName, fieldPath, location string
+	var reason, fieldName, fieldPath string
 	var instancePath []string
 
 	enriched := enrichSchemaValidationFailure(
@@ -648,7 +648,6 @@ components:
 		&reason,
 		&fieldName,
 		&fieldPath,
-		&location,
 		&instancePath,
 	)
 
@@ -658,7 +657,6 @@ components:
 	assert.Equal(t, "invalid propertyName '$defs-atmVolatility_type': does not match pattern '^[a-zA-Z0-9._-]+$'", reason)
 	assert.Equal(t, "$defs-atmVolatility_type", fieldName)
 	assert.Contains(t, fieldPath, "$defs-atmVolatility_type")
-	assert.Equal(t, "/components/schemas", location)
 	assert.Equal(t, []string{"components", "schemas"}, instancePath)
 }
 
@@ -672,7 +670,7 @@ test: value
 	assert.NoError(t, err)
 
 	var line, column int
-	var reason, fieldName, fieldPath, location string
+	var reason, fieldName, fieldPath string
 	var instancePath []string
 
 	enriched := enrichSchemaValidationFailure(
@@ -683,7 +681,6 @@ test: value
 		&reason,
 		&fieldName,
 		&fieldPath,
-		&location,
 		&instancePath,
 	)
 
@@ -711,7 +708,7 @@ components:
 	}
 
 	var line, column int
-	var reason, fieldName, fieldPath, location string
+	var reason, fieldName, fieldPath string
 	var instancePath []string
 
 	enriched := enrichSchemaValidationFailure(
@@ -722,7 +719,6 @@ components:
 		&reason,
 		&fieldName,
 		&fieldPath,
-		&location,
 		&instancePath,
 	)
 
@@ -748,7 +744,7 @@ $defs-test:
 	}
 
 	var line, column int
-	var reason, fieldName, fieldPath, location string
+	var reason, fieldName, fieldPath string
 	var instancePath []string
 
 	enriched := enrichSchemaValidationFailure(
@@ -759,7 +755,6 @@ $defs-test:
 		&reason,
 		&fieldName,
 		&fieldPath,
-		&location,
 		&instancePath,
 	)
 
@@ -767,7 +762,6 @@ $defs-test:
 	assert.Greater(t, line, 0)
 	assert.Equal(t, "test reason", reason)
 	assert.Equal(t, "$defs-test", fieldName)
-	assert.Equal(t, "/", location)
 	assert.Equal(t, []string{}, instancePath)
 }
 
@@ -821,9 +815,9 @@ components:
 	assert.Contains(t, sve.FieldPath, "$defs-atmVolatility_type", "FieldPath should include property name")
 
 	// Original validation check that extractPropertyNameFromError works
-	assert.NotNil(t, sve.OriginalError, "OriginalError should be populated")
+	assert.NotNil(t, sve.OriginalJsonSchemaError, "OriginalError should be populated")
 
-	info := extractPropertyNameFromError(sve.OriginalError)
+	info := extractPropertyNameFromError(sve.OriginalJsonSchemaError)
 	// This should successfully extract the property name
 	assert.NotNil(t, info, "Should extract property name info from error")
 	assert.Equal(t, "$defs-atmVolatility_type", info.PropertyName)
@@ -833,15 +827,15 @@ components:
 
 	// Explicitly test checkErrorForPropertyInfo with the root error and causes
 	// to ensure coverage of different code paths
-	rootInfo := checkErrorForPropertyInfo(sve.OriginalError)
-	if rootInfo == nil && len(sve.OriginalError.Causes) > 0 {
+	rootInfo := checkErrorForPropertyInfo(sve.OriginalJsonSchemaError)
+	if rootInfo == nil && len(sve.OriginalJsonSchemaError.Causes) > 0 {
 		// Check first cause
-		causeInfo := checkErrorForPropertyInfo(sve.OriginalError.Causes[0])
+		causeInfo := checkErrorForPropertyInfo(sve.OriginalJsonSchemaError.Causes[0])
 		_ = causeInfo
 	}
 
 	// Explicitly test extractPatternFromCauses to exercise recursive pattern extraction
-	pattern := extractPatternFromCauses(sve.OriginalError)
+	pattern := extractPatternFromCauses(sve.OriginalJsonSchemaError)
 	if pattern != "" {
 		assert.Equal(t, "^[a-zA-Z0-9._-]+$", pattern)
 	}
@@ -903,8 +897,8 @@ components:
 		noPatternCount := 0
 
 		for _, sve := range errors[0].SchemaValidationErrors {
-			if sve.OriginalError != nil {
-				info := extractPropertyNameFromError(sve.OriginalError)
+			if sve.OriginalJsonSchemaError != nil {
+				info := extractPropertyNameFromError(sve.OriginalJsonSchemaError)
 				if info != nil {
 					foundCount++
 					assert.NotEmpty(t, info.PropertyName)
@@ -921,7 +915,7 @@ components:
 					}
 
 					// Test extractPatternFromCauses coverage
-					pattern := extractPatternFromCauses(sve.OriginalError)
+					pattern := extractPatternFromCauses(sve.OriginalJsonSchemaError)
 					// Pattern may or may not be found depending on error structure
 					_ = pattern
 				}
@@ -999,7 +993,7 @@ components:
 		"FieldPath should include the property name")
 
 	// Verify OriginalError is preserved for debugging
-	assert.NotNil(t, sve.OriginalError, "OriginalError should be populated for debugging")
+	assert.NotNil(t, sve.OriginalJsonSchemaError, "OriginalError should be populated for debugging")
 }
 
 // TestValidateOpenAPIDocument_Issue726_MultipleInvalidPropertyNames tests that the fix

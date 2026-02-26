@@ -113,7 +113,7 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 	if foundResponse != nil {
 		// check for headers in the response
 		if foundResponse.Headers != nil {
-			if ok, hErrs := ValidateResponseHeaders(request, response, foundResponse.Headers, config.WithExistingOpts(v.options)); !ok {
+			if ok, hErrs := ValidateResponseHeaders(request, response, foundResponse.Headers, pathFound, codeStr, config.WithExistingOpts(v.options)); !ok {
 				validationErrors = append(validationErrors, hErrs...)
 			}
 		}
