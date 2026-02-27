@@ -283,6 +283,23 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	assert.NotEmpty(t, errs)
 }
 
+func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+
+	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
+	// but leave SpecJSON intact so the fallback to normalizeJSON executes.
+	corrupt := []byte(`{not valid json!!!}`)
+	info.SpecJSONBytes = &corrupt
+
+	// Should still validate successfully via the SpecJSON fallback
+	valid, errs := ValidateOpenAPIDocument(doc)
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+}
+
 func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 	petstore, _ := os.ReadFile("../test_specs/invalid_31.yaml")
 	doc, _ := libopenapi.NewDocument(petstore)
