@@ -177,9 +177,10 @@ info:
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
-	// Simulate the nil SpecJSON scenario by setting it to nil
+	// Simulate the nil SpecJSON scenario by setting both to nil
 	info := doc.GetSpecInfo()
 	info.SpecJSON = nil
+	info.SpecJSONBytes = nil
 
 	// validate!
 	valid, errors := ValidateOpenAPIDocument(doc)
@@ -200,4 +201,81 @@ info:
 
 	// Pre-validation errors should not have SchemaValidationErrors
 	assert.Empty(t, validationError.SchemaValidationErrors)
+}
+
+func TestValidateDocument_WithPrecompiledSchema(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+
+	// Pre-compile the schema
+	options := config.NewValidationOptions()
+	compiledSchema, err := helpers.NewCompiledSchema("schema", []byte(info.APISchema), options)
+	assert.NoError(t, err)
+
+	// Validate with precompiled schema
+	valid, errs := ValidateOpenAPIDocumentWithPrecompiled(doc, compiledSchema)
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+
+	// Validate without precompiled schema (should produce identical results)
+	valid2, errs2 := ValidateOpenAPIDocument(doc)
+	assert.True(t, valid2)
+	assert.Len(t, errs2, 0)
+}
+
+func TestValidateDocument_WithPrecompiledSchema_Invalid(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/invalid_31.yaml")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+
+	// Pre-compile the schema
+	options := config.NewValidationOptions()
+	compiledSchema, err := helpers.NewCompiledSchema("schema", []byte(info.APISchema), options)
+	assert.NoError(t, err)
+
+	// Validate with precompiled schema
+	valid, errs := ValidateOpenAPIDocumentWithPrecompiled(doc, compiledSchema)
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Len(t, errs[0].SchemaValidationErrors, 6)
+
+	// Validate without precompiled schema (should produce identical error count)
+	valid2, errs2 := ValidateOpenAPIDocument(doc)
+	assert.False(t, valid2)
+	assert.Len(t, errs2, 1)
+	assert.Len(t, errs2[0].SchemaValidationErrors, 6)
+}
+
+func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+
+	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
+	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
+	info.SpecJSON = nil
+
+	valid, errs := ValidateOpenAPIDocument(doc)
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+}
+
+func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/invalid_31.yaml")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+
+	// Nil out SpecJSON but leave SpecJSONBytes intact
+	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
+	info.SpecJSON = nil
+
+	valid, errs := ValidateOpenAPIDocument(doc)
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.NotEmpty(t, errs[0].SchemaValidationErrors)
 }
