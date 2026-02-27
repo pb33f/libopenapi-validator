@@ -264,6 +264,25 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 	assert.Len(t, errs, 0)
 }
 
+func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+
+	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
+	// and nil out SpecJSON so the fallback normalizeJSON path is skipped.
+	// This exercises the nil guard on SpecJSON inside the error branch.
+	corrupt := []byte(`{not valid json!!!}`)
+	info.SpecJSONBytes = &corrupt
+	info.SpecJSON = nil
+
+	// Validation should still run (against nil normalized value) and report errors
+	valid, errs := ValidateOpenAPIDocument(doc)
+	assert.False(t, valid)
+	assert.NotEmpty(t, errs)
+}
+
 func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 	petstore, _ := os.ReadFile("../test_specs/invalid_31.yaml")
 	doc, _ := libopenapi.NewDocument(petstore)
