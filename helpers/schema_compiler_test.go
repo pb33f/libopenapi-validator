@@ -330,7 +330,7 @@ func TestTransformNullableInSchema_MapWithNullableTrue(t *testing.T) {
 		"nullable": true,
 	}
 
-	result := transformNullableInSchema(schema)
+	result := transformOAS30Keywords(schema)
 
 	resultMap, ok := result.(map[string]interface{})
 	require.True(t, ok)
@@ -353,7 +353,7 @@ func TestTransformNullableInSchema_MapWithNullableFalse(t *testing.T) {
 		"nullable": false,
 	}
 
-	result := transformNullableInSchema(schema)
+	result := transformOAS30Keywords(schema)
 
 	resultMap, ok := result.(map[string]interface{})
 	require.True(t, ok)
@@ -376,7 +376,7 @@ func TestTransformNullableInSchema_Array(t *testing.T) {
 		"other-item",
 	}
 
-	result := transformNullableInSchema(schema)
+	result := transformOAS30Keywords(schema)
 
 	resultArray, ok := result.([]interface{})
 	require.True(t, ok)
@@ -395,16 +395,113 @@ func TestTransformNullableInSchema_Array(t *testing.T) {
 
 func TestTransformNullableInSchema_OtherTypes(t *testing.T) {
 	stringSchema := "string-value"
-	result := transformNullableInSchema(stringSchema)
+	result := transformOAS30Keywords(stringSchema)
 	assert.Equal(t, stringSchema, result)
 
 	numberSchema := 123
-	result = transformNullableInSchema(numberSchema)
+	result = transformOAS30Keywords(numberSchema)
 	assert.Equal(t, numberSchema, result)
 
 	var nilSchema interface{} = nil
-	result = transformNullableInSchema(nilSchema)
+	result = transformOAS30Keywords(nilSchema)
 	assert.Equal(t, nilSchema, result)
+}
+
+func TestTransformExclusiveBound_TrueWithBound(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":             "number",
+		"minimum":          float64(10),
+		"exclusiveMinimum": true,
+	}
+	transformExclusiveBound(schema, "exclusiveMinimum", "minimum")
+
+	assert.Equal(t, float64(10), schema["exclusiveMinimum"])
+	_, hasMin := schema["minimum"]
+	assert.False(t, hasMin)
+}
+
+func TestTransformExclusiveBound_TrueWithoutBound(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":             "number",
+		"exclusiveMinimum": true,
+	}
+	transformExclusiveBound(schema, "exclusiveMinimum", "minimum")
+
+	_, hasExMin := schema["exclusiveMinimum"]
+	assert.False(t, hasExMin)
+}
+
+func TestTransformExclusiveBound_False(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":             "number",
+		"minimum":          float64(10),
+		"exclusiveMinimum": false,
+	}
+	transformExclusiveBound(schema, "exclusiveMinimum", "minimum")
+
+	_, hasExMin := schema["exclusiveMinimum"]
+	assert.False(t, hasExMin)
+	assert.Equal(t, float64(10), schema["minimum"])
+}
+
+func TestTransformExclusiveBound_NotPresent(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":    "number",
+		"minimum": float64(10),
+	}
+	transformExclusiveBound(schema, "exclusiveMinimum", "minimum")
+
+	assert.Equal(t, float64(10), schema["minimum"])
+}
+
+func TestTransformExclusiveBound_AlreadyNumeric(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":             "number",
+		"exclusiveMinimum": float64(10),
+	}
+	transformExclusiveBound(schema, "exclusiveMinimum", "minimum")
+
+	assert.Equal(t, float64(10), schema["exclusiveMinimum"])
+}
+
+func TestTransformExclusiveBound_Maximum(t *testing.T) {
+	schema := map[string]interface{}{
+		"type":             "number",
+		"maximum":          float64(100),
+		"exclusiveMaximum": true,
+	}
+	transformExclusiveBound(schema, "exclusiveMaximum", "maximum")
+
+	assert.Equal(t, float64(100), schema["exclusiveMaximum"])
+	_, hasMax := schema["maximum"]
+	assert.False(t, hasMax)
+}
+
+func TestTransformOAS30Keywords_ExclusiveMinMaxRecursive(t *testing.T) {
+	schema := map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"price": map[string]interface{}{
+				"type":             "number",
+				"minimum":          float64(0),
+				"exclusiveMinimum": true,
+				"maximum":          float64(1000),
+				"exclusiveMaximum": true,
+			},
+		},
+	}
+
+	result := transformOAS30Keywords(schema)
+	resultMap := result.(map[string]interface{})
+	props := resultMap["properties"].(map[string]interface{})
+	price := props["price"].(map[string]interface{})
+
+	assert.Equal(t, float64(0), price["exclusiveMinimum"])
+	assert.Equal(t, float64(1000), price["exclusiveMaximum"])
+	_, hasMin := price["minimum"]
+	assert.False(t, hasMin)
+	_, hasMax := price["maximum"]
+	assert.False(t, hasMax)
 }
 
 func TestTransformNullableSchema_ArrayType(t *testing.T) {

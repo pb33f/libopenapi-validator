@@ -27,7 +27,7 @@ func TestValidateResponseSchema(t *testing.T) {
 	}{
 		"FailOnBooleanExclusiveMinimum": {
 			request:  postRequest(),
-			response: responseWithBody(`{"exclusiveNumber": 13}`),
+			response: responseWithBody(`{"exclusiveNumber": 10}`),
 			schemaYAML: `type: object
 properties:
   exclusiveNumber:
@@ -117,7 +117,7 @@ properties:
 	}
 }
 
-func TestInvalidMin(t *testing.T) {
+func TestBooleanExclusiveMin_ValidValue(t *testing.T) {
 	openAPIVersion := float32(3.0)
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
@@ -134,8 +134,8 @@ properties:
 		Version:  openAPIVersion,
 	})
 
-	assert.False(t, valid)
-	assert.Len(t, errors, 1)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
 }
 
 func TestValidateResponseSchema_CachePopulation(t *testing.T) {
