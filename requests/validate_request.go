@@ -32,10 +32,11 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // ValidateRequestSchemaInput contains parameters for request schema validation.
 type ValidateRequestSchemaInput struct {
-	Request *http.Request   // Required: The HTTP request to validate
-	Schema  *base.Schema    // Required: The OpenAPI schema to validate against
-	Version float32         // Required: OpenAPI version (3.0 or 3.1)
-	Options []config.Option // Optional: Functional options (defaults applied if empty/nil)
+	Request      *http.Request   // Required: The HTTP request to validate
+	Schema       *base.Schema    // Required: The OpenAPI schema to validate against
+	Version      float32         // Required: OpenAPI version (3.0 or 3.1)
+	Options      []config.Option // Optional: Functional options (defaults applied if empty/nil)
+	BodyRequired bool            // Optional: Whether the request body is required (default false)
 }
 
 // ValidateRequestSchema will validate a http.Request pointer against a schema.
@@ -178,6 +179,9 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 
 	// no request body? but we do have a schema?
 	if len(requestBody) == 0 && len(jsonSchema) > 0 {
+		if !input.BodyRequired {
+			return true, nil
+		}
 
 		line := schema.ParentProxy.GetSchemaKeyNode().Line
 		col := schema.ParentProxy.GetSchemaKeyNode().Line
@@ -186,7 +190,6 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			col = schema.GoLow().Type.KeyNode.Column
 		}
 
-		// cannot decode the request body, so it's not valid
 		validationErrors = append(validationErrors, &errors.ValidationError{
 			ValidationType:    helpers.RequestBodyValidation,
 			ValidationSubType: helpers.Schema,
