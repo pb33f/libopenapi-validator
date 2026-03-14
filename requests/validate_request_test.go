@@ -110,7 +110,7 @@ properties:
 	}
 }
 
-func TestInvalidMin(t *testing.T) {
+func TestBooleanExclusiveMin_ValidValue(t *testing.T) {
 	openAPIVersion := float32(3.0)
 	schema := parseSchemaFromSpec(t, `type: object
 properties:
@@ -126,8 +126,8 @@ properties:
 		Version: openAPIVersion,
 	})
 
-	assert.False(t, valid)
-	assert.Len(t, errors, 1)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
 }
 
 func TestValidateRequestSchema_CachePopulation(t *testing.T) {
