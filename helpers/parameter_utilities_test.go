@@ -819,3 +819,226 @@ func TestConstructParamMapFromFormEncodingArray(t *testing.T) {
 	require.Equal(t, true, decoded["param1"].(map[string]interface{})["key2"])       // cast to bool
 	require.Equal(t, "hello", decoded["param1"].(map[string]interface{})["key3"])    // string remains string
 }
+
+func TestCastWithSchema(t *testing.T) {
+	t.Run("returns string unchanged when schema property type is string", func(t *testing.T) {
+		sch := &base.Schema{
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"item_count": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			}),
+		}
+		result := castWithSchema("10", sch, "item_count")
+		require.Equal(t, "10", result)
+	})
+
+	t.Run("casts to int64 when schema property type is integer", func(t *testing.T) {
+		sch := &base.Schema{
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"count": base.CreateSchemaProxy(&base.Schema{Type: []string{"integer"}}),
+			}),
+		}
+		result := castWithSchema("10", sch, "count")
+		require.Equal(t, int64(10), result)
+	})
+
+	t.Run("falls back to cast when no schema provided", func(t *testing.T) {
+		result := castWithSchema("10", nil, "anything")
+		require.Equal(t, int64(10), result)
+	})
+
+	t.Run("falls back to cast when property not found in schema", func(t *testing.T) {
+		sch := &base.Schema{
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"other": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			}),
+		}
+		result := castWithSchema("10", sch, "missing")
+		require.Equal(t, int64(10), result)
+	})
+
+	t.Run("falls back to cast when schema has no properties", func(t *testing.T) {
+		sch := &base.Schema{Type: []string{"object"}}
+		result := castWithSchema("10", sch, "anything")
+		require.Equal(t, int64(10), result)
+	})
+}
+
+func TestConstructParamMapFromQueryParamInputWithSchema(t *testing.T) {
+	t.Run("preserves string '10' when schema says string", func(t *testing.T) {
+		sch := &base.Schema{
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"item_count":  base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+				"search_term": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			}),
+		}
+		values := map[string][]*QueryParam{
+			"item_count": {
+				{Key: "item_count", Values: []string{"10"}},
+			},
+			"search_term": {
+				{Key: "search_term", Values: []string{"foo"}},
+			},
+		}
+		decoded := ConstructParamMapFromQueryParamInputWithSchema(values, sch)
+		require.Equal(t, "10", decoded["item_count"])
+		require.Equal(t, "foo", decoded["search_term"])
+	})
+
+	t.Run("casts numeric values when schema says integer", func(t *testing.T) {
+		sch := &base.Schema{
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"count": base.CreateSchemaProxy(&base.Schema{Type: []string{"integer"}}),
+			}),
+		}
+		values := map[string][]*QueryParam{
+			"count": {
+				{Key: "count", Values: []string{"42"}},
+			},
+		}
+		decoded := ConstructParamMapFromQueryParamInputWithSchema(values, sch)
+		require.Equal(t, int64(42), decoded["count"])
+	})
+
+	t.Run("falls back to heuristic when no schema", func(t *testing.T) {
+		values := map[string][]*QueryParam{
+			"count": {
+				{Key: "count", Values: []string{"42"}},
+			},
+		}
+		decoded := ConstructParamMapFromQueryParamInputWithSchema(values, nil)
+		require.Equal(t, int64(42), decoded["count"])
+	})
+}
+
+func TestConstructParamMapFromDeepObjectEncoding_WithSchema(t *testing.T) {
+	t.Run("preserves string values when schema property type is string", func(t *testing.T) {
+		sch := &base.Schema{
+			Type: []string{"object"},
+			Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+				"prop1": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			}),
+		}
+		values := []*QueryParam{
+			{Key: "key1", Values: []string{"123"}, Property: "prop1"},
+		}
+		decoded := ConstructParamMapFromDeepObjectEncoding(values, sch)
+		require.Equal(t, "123", decoded["key1"].(map[string]interface{})["prop1"])
+	})
+}
+
+func TestConstructParamMapFromPipeEncodingWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"name":  base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			"count": base.CreateSchemaProxy(&base.Schema{Type: []string{"integer"}}),
+		}),
+	}
+	params := []*QueryParam{
+		{Key: "key1", Values: []string{"name|123|count|42"}},
+	}
+	result := ConstructParamMapFromPipeEncodingWithSchema(params, sch)
+	props := result["key1"].(map[string]interface{})
+	require.Equal(t, "123", props["name"])    // string because schema says string
+	require.Equal(t, int64(42), props["count"]) // int because schema says integer
+}
+
+func TestConstructParamMapFromSpaceEncodingWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"name": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+		}),
+	}
+	params := []*QueryParam{
+		{Key: "key1", Values: []string{"name 456"}},
+	}
+	result := ConstructParamMapFromSpaceEncodingWithSchema(params, sch)
+	props := result["key1"].(map[string]interface{})
+	require.Equal(t, "456", props["name"]) // string because schema says string
+}
+
+func TestConstructMapFromCSVWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"id":   base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			"rank": base.CreateSchemaProxy(&base.Schema{Type: []string{"number"}}),
+		}),
+	}
+	result := ConstructMapFromCSVWithSchema("id,99,rank,3.5", sch)
+	require.Equal(t, "99", result["id"])       // string
+	require.Equal(t, 3.5, result["rank"])      // number
+
+	// odd number of values
+	result = ConstructMapFromCSVWithSchema("id,99,rank", sch)
+	require.Equal(t, "99", result["id"])
+	require.NotContains(t, result, "rank")
+}
+
+func TestConstructKVFromCSVWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"key1": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			"key2": base.CreateSchemaProxy(&base.Schema{Type: []string{"integer"}}),
+		}),
+	}
+	result := ConstructKVFromCSVWithSchema("key1=100,key2=200", sch)
+	require.Equal(t, "100", result["key1"])      // string
+	require.Equal(t, int64(200), result["key2"]) // integer
+}
+
+func TestConstructKVFromLabelEncodingWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"key1": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			"key2": base.CreateSchemaProxy(&base.Schema{Type: []string{"boolean"}}),
+		}),
+	}
+	result := ConstructKVFromLabelEncodingWithSchema("key1=true.key2=true", sch)
+	require.Equal(t, "true", result["key1"]) // string because schema says string
+	require.Equal(t, true, result["key2"])   // bool because schema says boolean
+
+	// invalid pair (missing equals) is ignored
+	result = ConstructKVFromLabelEncodingWithSchema("key1=val.key2", sch)
+	require.Equal(t, "val", result["key1"])
+	require.NotContains(t, result, "key2")
+}
+
+func TestConstructKVFromMatrixCSVWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"key1": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+		}),
+	}
+	result := ConstructKVFromMatrixCSVWithSchema("key1=456;key2=789", sch)
+	require.Equal(t, "456", result["key1"])      // string
+	require.Equal(t, int64(789), result["key2"]) // no schema for key2, falls back to cast
+
+	// invalid pair
+	result = ConstructKVFromMatrixCSVWithSchema("key1=val;key2", sch)
+	require.Equal(t, "val", result["key1"])
+	require.NotContains(t, result, "key2")
+}
+
+func TestConstructParamMapFromFormEncodingArrayWithSchema(t *testing.T) {
+	sch := &base.Schema{
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"key1": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			"key2": base.CreateSchemaProxy(&base.Schema{Type: []string{"integer"}}),
+		}),
+	}
+	values := []*QueryParam{
+		{Key: "param1", Values: []string{"key1,123,key2,456"}},
+	}
+	decoded := ConstructParamMapFromFormEncodingArrayWithSchema(values, sch)
+	props := decoded["param1"].(map[string]interface{})
+	require.Equal(t, "123", props["key1"])      // string
+	require.Equal(t, int64(456), props["key2"]) // integer
+
+	// odd number of values — incomplete pair ignored
+	values = []*QueryParam{
+		{Key: "param1", Values: []string{"key1,val,key2"}},
+	}
+	decoded = ConstructParamMapFromFormEncodingArrayWithSchema(values, sch)
+	props = decoded["param1"].(map[string]interface{})
+	require.Equal(t, "val", props["key1"])
+	require.NotContains(t, props, "key2")
+}
