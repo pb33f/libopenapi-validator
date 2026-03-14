@@ -1154,6 +1154,7 @@ paths:
   /burgers/createBurger:
     post:
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -1446,6 +1447,41 @@ func TestValidateBody_SchemaNoType_Issue75(t *testing.T) {
 	assert.False(t, isSuccess)
 	assert.Len(t, valErrs, 1)
 	assert.Equal(t, "PUT request body is empty for '/path1'", valErrs[0].Message)
+}
+
+// https://github.com/pb33f/wiretap/issues/146
+func TestValidateBody_OptionalRequestBody_EmptyBody(t *testing.T) {
+	spec := `openapi: 3.0.1
+info:
+  title: test
+  version: "1.0"
+paths:
+  /test:
+    post:
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	v3Model, _ := doc.BuildV3Model()
+
+	req, _ := http.NewRequest("POST", "/test", nil)
+	req.Header.Set("Content-Type", "application/json")
+
+	reqBodyValidator := NewRequestBodyValidator(&v3Model.Model)
+	isSuccess, valErrs := reqBodyValidator.ValidateRequestBody(req)
+
+	assert.True(t, isSuccess)
+	assert.Empty(t, valErrs)
 }
 
 // https://github.com/pb33f/libopenapi-validator/issues/144

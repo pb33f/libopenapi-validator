@@ -192,11 +192,54 @@ func TestValidateRequestSchema_NilSchemaGoLow(t *testing.T) {
 	assert.Contains(t, errors[0].Reason, "does not have low-level information")
 }
 
+func TestValidateRequestSchema_EmptyBodyOptional(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+properties:
+  name:
+    type: string`, 3.1)
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request:      emptyPostRequest(),
+		Schema:       schema,
+		Version:      3.1,
+		BodyRequired: false,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateRequestSchema_EmptyBodyRequired(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+properties:
+  name:
+    type: string`, 3.1)
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request:      emptyPostRequest(),
+		Schema:       schema,
+		Version:      3.1,
+		BodyRequired: true,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "request body is empty")
+}
+
 func postRequestWithBody(payload string) *http.Request {
 	return &http.Request{
 		Method: http.MethodPost,
 		URL:    &url.URL{Path: "/test"},
 		Body:   io.NopCloser(strings.NewReader(payload)),
+	}
+}
+
+func emptyPostRequest() *http.Request {
+	return &http.Request{
+		Method: http.MethodPost,
+		URL:    &url.URL{Path: "/test"},
+		Body:   http.NoBody,
 	}
 }
 
