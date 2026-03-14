@@ -3768,3 +3768,131 @@ paths:
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
+
+// TestNewValidator_QueryParamExplodedObjectStringType_Issue91 reproduces GitHub issue #91:
+// exploded object query params with type: string properties that look numeric should not
+// be eagerly cast to numbers before schema validation.
+func TestNewValidator_QueryParamExplodedObjectStringType_Issue91(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          required: true
+          explode: true
+          schema:
+            type: object
+            properties:
+              item_count:
+                type: string
+              search_term:
+                type: string
+            required:
+              - item_count
+              - search_term
+      operationId: listProducts`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://example.com/products?item_count=10&search_term=foo", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid, "validation should pass: item_count=10 is valid for type: string")
+	assert.Empty(t, errors)
+}
+
+// TestNewValidator_QueryParamExplodedObjectMixedTypes_Issue91 tests that mixed types
+// in an exploded object are correctly handled: string properties stay strings,
+// integer properties get cast.
+func TestNewValidator_QueryParamExplodedObjectMixedTypes_Issue91(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          required: true
+          explode: true
+          schema:
+            type: object
+            properties:
+              item_count:
+                type: string
+              page:
+                type: integer
+                minimum: 1
+            required:
+              - item_count
+              - page
+      operationId: listProducts`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://example.com/products?item_count=10&page=2", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid, "validation should pass: item_count=10 is string, page=2 is integer >= 1")
+	assert.Empty(t, errors)
+}
+
+// TestNewValidator_QueryParamExactIssue91Reproduction uses the exact spec and URL from
+// https://github.com/pb33f/wiretap/issues/91 to verify the fix.
+func TestNewValidator_QueryParamExactIssue91Reproduction(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 0.1.0
+paths:
+  /anything/queryParams/form/camelObj:
+    get:
+      operationId: formQueryParamsCamelObject
+      parameters:
+        - name: obj_param_exploded
+          in: query
+          explode: true
+          schema:
+            type: object
+            properties:
+              search_term:
+                type: string
+                example: foo
+              item_count:
+                type: string
+                example: "10"
+          required: true
+        - name: obj_param
+          in: query
+          explode: false
+          schema:
+            type: object
+            properties:
+              encoded_term:
+                type: string
+                example: bar
+              encoded_count:
+                type: string
+                example: "11"
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://localhost:35123/anything/queryParams/form/camelObj?item_count=10&obj_param=encoded_count%2C11%2Cencoded_term%2Cbar&search_term=foo", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid, "issue #91: item_count=10 with type: string should not fail with 'expected string, but got number'")
+	assert.Empty(t, errors)
+}
