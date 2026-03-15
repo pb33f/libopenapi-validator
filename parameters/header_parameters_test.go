@@ -1417,3 +1417,72 @@ paths:
 	assert.Len(t, errors, 1)
 	assert.Contains(t, errors[0].Message, "X-Custom")
 }
+
+func TestNewValidator_HeaderParams_StrictMode_GlobalSecurityScheme(t *testing.T) {
+	// Global security with HTTP basic auth — Authorization header should not trigger undeclared error in strict mode
+	spec := `openapi: 3.1.0
+info:
+  title: Test API
+  version: "1.0"
+paths:
+  /secure/resource:
+    get:
+      responses:
+        "200":
+          description: OK
+security:
+  - BasicAuth: []
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/secure/resource", nil)
+	request.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	// Authorization should be recognized as a valid header via global security
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_HeaderParams_StrictMode_GlobalSecurityApiKey(t *testing.T) {
+	// Global security with apiKey in header — X-API-Key should not trigger undeclared error in strict mode
+	spec := `openapi: 3.1.0
+info:
+  title: Test API
+  version: "1.0"
+paths:
+  /secure/resource:
+    get:
+      responses:
+        "200":
+          description: OK
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model, config.WithStrictMode())
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/secure/resource", nil)
+	request.Header.Set("X-API-Key", "my-secret-key")
+
+	valid, errors := v.ValidateHeaderParams(request)
+
+	// X-API-Key should be recognized as a valid header via global security
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}

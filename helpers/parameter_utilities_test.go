@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package helpers
@@ -938,7 +938,7 @@ func TestConstructParamMapFromPipeEncodingWithSchema(t *testing.T) {
 	}
 	result := ConstructParamMapFromPipeEncodingWithSchema(params, sch)
 	props := result["key1"].(map[string]interface{})
-	require.Equal(t, "123", props["name"])    // string because schema says string
+	require.Equal(t, "123", props["name"])      // string because schema says string
 	require.Equal(t, int64(42), props["count"]) // int because schema says integer
 }
 
@@ -964,8 +964,8 @@ func TestConstructMapFromCSVWithSchema(t *testing.T) {
 		}),
 	}
 	result := ConstructMapFromCSVWithSchema("id,99,rank,3.5", sch)
-	require.Equal(t, "99", result["id"])       // string
-	require.Equal(t, 3.5, result["rank"])      // number
+	require.Equal(t, "99", result["id"])  // string
+	require.Equal(t, 3.5, result["rank"]) // number
 
 	// odd number of values
 	result = ConstructMapFromCSVWithSchema("id,99,rank", sch)
@@ -1041,4 +1041,66 @@ func TestConstructParamMapFromFormEncodingArrayWithSchema(t *testing.T) {
 	props = decoded["param1"].(map[string]interface{})
 	require.Equal(t, "val", props["key1"])
 	require.NotContains(t, props, "key2")
+}
+
+func TestEffectiveSecurityForOperation(t *testing.T) {
+	globalSecurity := []*base.SecurityRequirement{
+		{
+			Requirements: orderedmap.ToOrderedMap(map[string][]string{
+				"GlobalAuth": {},
+			}),
+		},
+	}
+
+	opSecurity := []*base.SecurityRequirement{
+		{
+			Requirements: orderedmap.ToOrderedMap(map[string][]string{
+				"OpAuth": {},
+			}),
+		},
+	}
+
+	t.Run("operation-level security wins over global", func(t *testing.T) {
+		pathItem := &v3.PathItem{
+			Get: &v3.Operation{Security: opSecurity},
+		}
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
+		require.Equal(t, opSecurity, result)
+	})
+
+	t.Run("nil operation security falls back to global", func(t *testing.T) {
+		pathItem := &v3.PathItem{
+			Get: &v3.Operation{}, // Security is nil
+		}
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
+		require.Equal(t, globalSecurity, result)
+	})
+
+	t.Run("empty operation security means no security (opt-out)", func(t *testing.T) {
+		pathItem := &v3.PathItem{
+			Get: &v3.Operation{Security: []*base.SecurityRequirement{}},
+		}
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
+		require.NotNil(t, result)
+		require.Len(t, result, 0)
+	})
+
+	t.Run("both nil returns nil", func(t *testing.T) {
+		pathItem := &v3.PathItem{
+			Get: &v3.Operation{},
+		}
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, nil)
+		require.Nil(t, result)
+	})
+
+	t.Run("nil operation falls back to global", func(t *testing.T) {
+		pathItem := &v3.PathItem{} // no Get operation
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
+		require.Equal(t, globalSecurity, result)
+	})
 }
