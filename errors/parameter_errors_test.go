@@ -1,4 +1,4 @@
-// Copyright 2023-2024 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // https://pb33f.io
 
 package errors
@@ -1241,4 +1241,317 @@ items:
 	require.Contains(t, err.Message, "Query array parameter 'testQueryParam' contains non-unique items")
 	require.Contains(t, err.Reason, "The query parameter (which is an array) 'testQueryParam' contains the following duplicates: 'fish, cake'")
 	require.Contains(t, err.HowToFix, "Ensure the array values are all unique")
+}
+
+// createMinimalParameter creates a parameter with nil GoLow nodes to test nil safety.
+func createMinimalParameter() *v3.Parameter {
+	param := &lowv3.Parameter{
+		Name: low.NodeReference[string]{Value: "minParam"},
+		// All node references intentionally left with nil KeyNode/ValueNode
+	}
+	return v3.NewParameter(param)
+}
+
+func TestParameterErrors_NilGoLowNodes(t *testing.T) {
+	// Tests that all parameter error constructors handle nil GoLow nodes
+	// without panicking. This covers the crash scenario from wiretap #134.
+	param := createMinimalParameter()
+	qp := &helpers.QueryParam{
+		Key:    "minParam",
+		Values: []string{"value"},
+	}
+	sch := &base.Schema{}
+
+	t.Run("IncorrectFormEncoding", func(t *testing.T) {
+		err := IncorrectFormEncoding(param, qp, 0)
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectSpaceDelimiting", func(t *testing.T) {
+		err := IncorrectSpaceDelimiting(param, qp)
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPipeDelimiting", func(t *testing.T) {
+		err := IncorrectPipeDelimiting(param, qp)
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidDeepObject", func(t *testing.T) {
+		err := InvalidDeepObject(param, qp)
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("QueryParameterMissing", func(t *testing.T) {
+		err := QueryParameterMissing(param, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("HeaderParameterMissing", func(t *testing.T) {
+		err := HeaderParameterMissing(param, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("CookieParameterMissing", func(t *testing.T) {
+		err := CookieParameterMissing(param, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("HeaderParameterCannotBeDecoded", func(t *testing.T) {
+		err := HeaderParameterCannotBeDecoded(param, "bad", "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectHeaderParamEnum", func(t *testing.T) {
+		err := IncorrectHeaderParamEnum(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectQueryParamEnum", func(t *testing.T) {
+		err := IncorrectQueryParamEnum(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectCookieParamEnum", func(t *testing.T) {
+		err := IncorrectCookieParamEnum(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamEnum", func(t *testing.T) {
+		err := IncorrectPathParamEnum(param, "bad", sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectQueryParamBool", func(t *testing.T) {
+		err := IncorrectQueryParamBool(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidQueryParamInteger", func(t *testing.T) {
+		err := InvalidQueryParamInteger(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidQueryParamNumber", func(t *testing.T) {
+		err := InvalidQueryParamNumber(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectReservedValues", func(t *testing.T) {
+		err := IncorrectReservedValues(param, "a:b", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidHeaderParamInteger", func(t *testing.T) {
+		err := InvalidHeaderParamInteger(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidHeaderParamNumber", func(t *testing.T) {
+		err := InvalidHeaderParamNumber(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidCookieParamInteger", func(t *testing.T) {
+		err := InvalidCookieParamInteger(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidCookieParamNumber", func(t *testing.T) {
+		err := InvalidCookieParamNumber(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectHeaderParamBool", func(t *testing.T) {
+		err := IncorrectHeaderParamBool(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectCookieParamBool", func(t *testing.T) {
+		err := IncorrectCookieParamBool(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamBool", func(t *testing.T) {
+		err := IncorrectPathParamBool(param, "bad", sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamInteger", func(t *testing.T) {
+		err := IncorrectPathParamInteger(param, "bad", sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamNumber", func(t *testing.T) {
+		err := IncorrectPathParamNumber(param, "bad", sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectParamEncodingJSON", func(t *testing.T) {
+		err := IncorrectParamEncodingJSON(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectQueryParamEnumArray", func(t *testing.T) {
+		err := IncorrectQueryParamEnumArray(param, "bad", sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("PathParameterMissing", func(t *testing.T) {
+		err := PathParameterMissing(param, "/test/{id}", "/test/123")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+}
+
+func TestParameterErrors_NilSchemaItems(t *testing.T) {
+	// Tests array parameter error constructors with nil Items in schema.
+	param := createMinimalParameter()
+	sch := &base.Schema{} // no Items set
+
+	t.Run("IncorrectQueryParamArrayBoolean", func(t *testing.T) {
+		err := IncorrectQueryParamArrayBoolean(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectParamArrayMaxNumItems", func(t *testing.T) {
+		err := IncorrectParamArrayMaxNumItems(param, sch, 5, 10, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectParamArrayMinNumItems", func(t *testing.T) {
+		err := IncorrectParamArrayMinNumItems(param, sch, 5, 2, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectParamArrayUniqueItems", func(t *testing.T) {
+		err := IncorrectParamArrayUniqueItems(param, sch, "dup", "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectCookieParamArrayBoolean", func(t *testing.T) {
+		err := IncorrectCookieParamArrayBoolean(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectQueryParamArrayInteger", func(t *testing.T) {
+		err := IncorrectQueryParamArrayInteger(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectQueryParamArrayNumber", func(t *testing.T) {
+		err := IncorrectQueryParamArrayNumber(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectCookieParamArrayNumber", func(t *testing.T) {
+		err := IncorrectCookieParamArrayNumber(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectHeaderParamArrayBoolean", func(t *testing.T) {
+		err := IncorrectHeaderParamArrayBoolean(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectHeaderParamArrayNumber", func(t *testing.T) {
+		err := IncorrectHeaderParamArrayNumber(param, "bad", sch, sch, "/test", "get", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamArrayNumber", func(t *testing.T) {
+		err := IncorrectPathParamArrayNumber(param, "bad", sch, sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamArrayInteger", func(t *testing.T) {
+		err := IncorrectPathParamArrayInteger(param, "bad", sch, sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("IncorrectPathParamArrayBoolean", func(t *testing.T) {
+		err := IncorrectPathParamArrayBoolean(param, "bad", sch, sch, "/test", "{}")
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
 }

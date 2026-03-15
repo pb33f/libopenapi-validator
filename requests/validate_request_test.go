@@ -318,3 +318,21 @@ components:
 	assert.Contains(t, errors[0].Message, "failed schema rendering")
 	assert.Contains(t, errors[0].Reason, "circular reference")
 }
+
+func TestValidateRequestSchema_NilParentProxy(t *testing.T) {
+	// Schema with nil ParentProxy and empty body — should not panic (fix for wiretap #134)
+	schema := &base.Schema{
+		Type: []string{"object"},
+	}
+
+	valid, errs := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request:      postRequestWithBody(""),
+		Schema:       schema,
+		Version:      3.1,
+		BodyRequired: true,
+	})
+
+	// Should return error about nil schema low-level info, not panic
+	assert.False(t, valid)
+	assert.NotEmpty(t, errs)
+}
