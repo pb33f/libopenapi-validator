@@ -1103,4 +1103,30 @@ func TestEffectiveSecurityForOperation(t *testing.T) {
 		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
 		require.Equal(t, globalSecurity, result)
 	})
+
+	t.Run("HEAD falls back to GET operation security", func(t *testing.T) {
+		pathItem := &v3.PathItem{
+			Get: &v3.Operation{Security: opSecurity},
+		}
+		request, _ := http.NewRequest(http.MethodHead, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
+		require.Equal(t, opSecurity, result)
+	})
+
+	t.Run("HEAD with explicit Head security uses Head", func(t *testing.T) {
+		headSecurity := []*base.SecurityRequirement{
+			{
+				Requirements: orderedmap.ToOrderedMap(map[string][]string{
+					"HeadAuth": {},
+				}),
+			},
+		}
+		pathItem := &v3.PathItem{
+			Get:  &v3.Operation{Security: opSecurity},
+			Head: &v3.Operation{Security: headSecurity},
+		}
+		request, _ := http.NewRequest(http.MethodHead, "/", nil)
+		result := EffectiveSecurityForOperation(request, pathItem, globalSecurity)
+		require.Equal(t, headSecurity, result)
+	})
 }

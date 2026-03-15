@@ -66,6 +66,9 @@ func ExtractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.P
 }
 
 // ExtractSecurityForOperation will extract the security requirements for the operation based on the request method.
+//
+// Deprecated: use EffectiveSecurityForOperation instead, which also handles
+// document-level global security inheritance per the OpenAPI specification.
 func ExtractSecurityForOperation(request *http.Request, item *v3.PathItem) []*base.SecurityRequirement {
 	var schemes []*base.SecurityRequirement
 	switch request.Method {
