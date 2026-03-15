@@ -2678,6 +2678,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Field'
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Field'
+      responses:
+        '201':
+          description: Created
 components:
   schemas:
     BooleanField:
@@ -2710,41 +2720,66 @@ components:
       discriminator:
         propertyName: field_type`
 
-	doc, err := libopenapi.NewDocument([]byte(spec))
-	require.NoError(t, err)
+	// Subtest with cache enabled (exercises cache-warming paths in validator.go)
+	t.Run("cached", func(t *testing.T) {
+		doc, err := libopenapi.NewDocument([]byte(spec))
+		require.NoError(t, err)
 
-	v, errs := NewValidator(doc)
-	require.Empty(t, errs)
+		v, errs := NewValidator(doc)
+		require.Empty(t, errs)
 
-	// Valid BooleanField response
-	body, _ := json.Marshal(map[string]interface{}{
-		"field_type":    "boolean",
-		"default_value": true,
+		body, _ := json.Marshal(map[string]interface{}{
+			"field_type":    "boolean",
+			"default_value": true,
+		})
+		request, _ := http.NewRequest(http.MethodGet, "https://example.com/fields", nil)
+		response := &http.Response{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewBuffer(body)),
+		}
+
+		valid, validationErrors := v.ValidateHttpResponse(request, response)
+		assert.True(t, valid, "response validation should pass for valid discriminator oneOf payload")
+		assert.Empty(t, validationErrors, "no validation errors expected")
 	})
-	request, _ := http.NewRequest(http.MethodGet, "https://example.com/fields", nil)
-	response := &http.Response{
-		StatusCode: 200,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(bytes.NewBuffer(body)),
-	}
 
-	valid, validationErrors := v.ValidateHttpResponse(request, response)
-	assert.True(t, valid, "response validation should pass for valid discriminator oneOf payload")
-	assert.Empty(t, validationErrors, "no validation errors expected")
+	// Subtest with cache disabled (exercises uncached compile paths in
+	// validate_response.go, validate_request.go)
+	t.Run("uncached", func(t *testing.T) {
+		doc, err := libopenapi.NewDocument([]byte(spec))
+		require.NoError(t, err)
 
-	// Valid StringField response
-	body2, _ := json.Marshal(map[string]interface{}{
-		"field_type": "string",
-		"max_length": 255,
+		v, errs := NewValidator(doc, config.WithSchemaCache(nil))
+		require.Empty(t, errs)
+
+		// Response validation (validate_response.go cache-miss path)
+		body, _ := json.Marshal(map[string]interface{}{
+			"field_type": "string",
+			"max_length": 255,
+		})
+		request, _ := http.NewRequest(http.MethodGet, "https://example.com/fields", nil)
+		response := &http.Response{
+			StatusCode: 200,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(bytes.NewBuffer(body)),
+		}
+
+		valid, validationErrors := v.ValidateHttpResponse(request, response)
+		assert.True(t, valid, "uncached response validation should pass")
+		assert.Empty(t, validationErrors, "no validation errors expected (uncached response)")
+
+		// Request validation (validate_request.go cache-miss path)
+		reqBody, _ := json.Marshal(map[string]interface{}{
+			"field_type":    "boolean",
+			"default_value": false,
+		})
+		postReq, _ := http.NewRequest(http.MethodPost, "https://example.com/fields",
+			bytes.NewBuffer(reqBody))
+		postReq.Header.Set("Content-Type", "application/json")
+
+		validReq, reqErrors := v.ValidateHttpRequest(postReq)
+		assert.True(t, validReq, "uncached request validation should pass")
+		assert.Empty(t, reqErrors, "no validation errors expected (uncached request)")
 	})
-	request2, _ := http.NewRequest(http.MethodGet, "https://example.com/fields", nil)
-	response2 := &http.Response{
-		StatusCode: 200,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(bytes.NewBuffer(body2)),
-	}
-
-	valid2, validationErrors2 := v.ValidateHttpResponse(request2, response2)
-	assert.True(t, valid2, "response validation should pass for valid StringField payload")
-	assert.Empty(t, validationErrors2, "no validation errors expected for StringField")
 }
