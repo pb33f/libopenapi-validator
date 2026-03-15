@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package helpers
@@ -156,6 +156,19 @@ func ExtractSecurityHeaderNames(
 	}
 
 	return headers
+}
+
+// EffectiveSecurityForOperation returns the security requirements that apply to the
+// operation matched by request method. It implements OpenAPI's inheritance rule:
+//   - If the operation defines security (even an empty array), use that.
+//   - Otherwise, fall back to the document-level global security.
+//   - Returns nil only when neither level defines security.
+func EffectiveSecurityForOperation(request *http.Request, item *v3.PathItem, docSecurity []*base.SecurityRequirement) []*base.SecurityRequirement {
+	op := ExtractOperation(request, item)
+	if op != nil && op.Security != nil {
+		return op.Security // operation-level (may be empty [] = "no security")
+	}
+	return docSecurity // nil when no global security either
 }
 
 func cast(v string) any {

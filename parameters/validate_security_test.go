@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -1082,4 +1082,180 @@ components:
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
 	assert.Contains(t, errors[0].Message, "Authorization header scheme 'custom' mismatch")
+}
+
+func TestValidateSecurity_GlobalSecurity_NoOperationSecurity_Fails(t *testing.T) {
+	// Global security defined, no operation-level override — request without credentials should fail
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      responses:
+        "200":
+          description: OK
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Equal(t, "API Key X-API-Key not found in header", errors[0].Message)
+}
+
+func TestValidateSecurity_GlobalSecurity_RequestSatisfies(t *testing.T) {
+	// Global security defined, request provides correct credentials — should pass
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      responses:
+        "200":
+          description: OK
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request.Header.Set("X-API-Key", "my-secret")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateSecurity_GlobalSecurity_OperationOverridesWithEmpty(t *testing.T) {
+	// Global security defined, but operation overrides with empty array (opt-out) — should pass without creds
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security: []
+      responses:
+        "200":
+          description: OK
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	// No credentials
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateSecurity_GlobalSecurity_OperationOverridesWithDifferent(t *testing.T) {
+	// Global security defines ApiKey, operation overrides with BasicAuth — operation takes precedence
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - BasicAuth: []
+      responses:
+        "200":
+          description: OK
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// Request with Basic auth (satisfying operation-level security, not global)
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+
+	valid, errors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+
+	// Request with API key (satisfying global, not operation-level) should fail
+	request2, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request2.Header.Set("X-API-Key", "my-secret")
+
+	valid2, errors2 := v.ValidateSecurity(request2)
+	assert.False(t, valid2)
+	assert.Len(t, errors2, 1)
+	assert.Contains(t, errors2[0].Message, "Authorization header")
+}
+
+func TestValidateSecurity_GlobalSecurity_HTTPBasic(t *testing.T) {
+	// Global security with HTTP basic auth
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      responses:
+        "200":
+          description: OK
+security:
+  - BasicAuth: []
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// No auth header — should fail
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	valid, errors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+
+	// With correct auth header — should pass
+	request2, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request2.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+	valid2, errors2 := v.ValidateSecurity(request2)
+	assert.True(t, valid2)
+	assert.Empty(t, errors2)
 }

@@ -231,7 +231,7 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 		// Extract security headers applicable to this operation
 		var securityHeaders []string
 		if v.document.Components != nil && v.document.Components.SecuritySchemes != nil {
-			security := helpers.ExtractSecurityForOperation(request, pathItem)
+			security := helpers.EffectiveSecurityForOperation(request, pathItem, v.document.Security)
 			// Convert orderedmap to regular map for the helper
 			schemesMap := make(map[string]*v3.SecurityScheme)
 			for pair := v.document.Components.SecuritySchemes.First(); pair != nil; pair = pair.Next() {
