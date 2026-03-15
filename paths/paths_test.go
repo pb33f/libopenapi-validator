@@ -1480,6 +1480,11 @@ func TestCheckPathAgainstBase_MergedPath(t *testing.T) {
 	// No match
 	result = checkPathAgainstBase("/other/path", "/users", basePaths)
 	assert.False(t, result)
+
+	// Issue #27: basePath is just "/" — should not produce empty string
+	basePaths = []string{"/"}
+	result = checkPathAgainstBase("/users", "/users", basePaths)
+	assert.True(t, result)
 }
 
 func TestFindPath_RegexFallback_MethodMismatch(t *testing.T) {
