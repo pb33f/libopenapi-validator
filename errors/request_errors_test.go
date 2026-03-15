@@ -1,4 +1,4 @@
-// Copyright 2023-2024 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // https://pb33f.io
 
 package errors
@@ -97,4 +97,31 @@ func TestOperationNotFound(t *testing.T) {
 	require.Equal(t, 15, err.SpecLine)
 	require.Equal(t, 25, err.SpecCol)
 	require.Equal(t, HowToFixPathMethod, err.HowToFix)
+}
+
+func TestRequestContentTypeNotFound_NilContentKeyNode(t *testing.T) {
+	// RequestBody exists but has no content KeyNode — should not panic
+	reqBody := &lowv3.RequestBody{
+		Content: low.NodeReference[*orderedmap.Map[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]]]{
+			Value: orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]](),
+			// KeyNode intentionally nil
+		},
+	}
+	op := &lowv3.Operation{
+		RequestBody: low.NodeReference[*lowv3.RequestBody]{
+			Value:     reqBody,
+			KeyNode:   &yaml.Node{},
+			ValueNode: &yaml.Node{},
+		},
+	}
+	highOp := v3.NewOperation(op)
+
+	request, _ := http.NewRequest(http.MethodPost, "/test", nil)
+	request.Header.Set(helpers.ContentTypeHeader, "application/xml")
+
+	// Should not panic
+	err := RequestContentTypeNotFound(highOp, request, "/test")
+	require.NotNil(t, err)
+	require.Equal(t, 1, err.SpecLine)
+	require.Equal(t, 0, err.SpecCol)
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package requests
@@ -183,11 +183,19 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			return true, nil
 		}
 
-		line := schema.ParentProxy.GetSchemaKeyNode().Line
-		col := schema.ParentProxy.GetSchemaKeyNode().Line
+		line := 1
+		col := 0
+		if schema.ParentProxy != nil {
+			if keyNode := schema.ParentProxy.GetSchemaKeyNode(); keyNode != nil {
+				line = keyNode.Line
+				col = keyNode.Column
+			}
+		}
 		if schema.Type != nil {
-			line = schema.GoLow().Type.KeyNode.Line
-			col = schema.GoLow().Type.KeyNode.Column
+			if low := schema.GoLow(); low != nil && low.Type.KeyNode != nil {
+				line = low.Type.KeyNode.Line
+				col = low.Type.KeyNode.Column
+			}
 		}
 
 		validationErrors = append(validationErrors, &errors.ValidationError{
@@ -231,7 +239,10 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 			if er.Error != nil {
 
 				// locate the violated property in the schema
-				located := schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+				var located *yaml.Node
+				if len(renderedNode.Content) > 0 {
+					located = schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+				}
 
 				// extract the element specified by the instance
 				val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
@@ -283,9 +294,9 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*errors.V
 
 		line := 1
 		col := 0
-		if schema.GoLow().Type.KeyNode != nil {
-			line = schema.GoLow().Type.KeyNode.Line
-			col = schema.GoLow().Type.KeyNode.Column
+		if low := schema.GoLow(); low != nil && low.Type.KeyNode != nil {
+			line = low.Type.KeyNode.Line
+			col = low.Type.KeyNode.Column
 		}
 
 		// add the error to the list

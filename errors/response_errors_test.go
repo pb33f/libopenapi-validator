@@ -1,4 +1,4 @@
-// Copyright 2023-2024 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // https://pb33f.io
 
 package errors
@@ -158,4 +158,106 @@ func TestResponseCodeNotFound(t *testing.T) {
 	require.Equal(t, 22, err.SpecLine)
 	require.Equal(t, 56, err.SpecCol)
 	require.Equal(t, HowToFixInvalidResponseCode, err.HowToFix)
+}
+
+func TestResponseContentTypeNotFound_NilContentKeyNode(t *testing.T) {
+	// Response code exists but has no content KeyNode — should not panic
+	r := &lowv3.Response{
+		Content: low.NodeReference[*orderedmap.Map[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]]]{
+			Value: orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]](),
+			// KeyNode intentionally nil
+		},
+	}
+	resp := v3.NewResponse(r)
+
+	responses := &lowv3.Responses{
+		Codes:   orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.Response]](),
+		KeyNode: &yaml.Node{},
+	}
+	op := &lowv3.Operation{
+		Responses: low.NodeReference[*lowv3.Responses]{
+			Value:     responses,
+			KeyNode:   &yaml.Node{},
+			ValueNode: &yaml.Node{},
+		},
+	}
+	highOp := v3.NewOperation(op)
+	highOp.Responses.Codes.Set("200", resp)
+
+	request, _ := http.NewRequest(http.MethodGet, "/test", nil)
+	response := &http.Response{
+		Header: http.Header{
+			helpers.ContentTypeHeader: {"application/xml"},
+		},
+	}
+
+	// Should not panic
+	err := ResponseContentTypeNotFound(highOp, request, response, "200", false)
+	require.NotNil(t, err)
+	require.Equal(t, 1, err.SpecLine)
+	require.Equal(t, 0, err.SpecCol)
+}
+
+func TestResponseContentTypeNotFound_NilDefaultContentKeyNode(t *testing.T) {
+	// Default response exists but has no content KeyNode — should not panic
+	r := &lowv3.Response{
+		Content: low.NodeReference[*orderedmap.Map[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]]]{
+			Value: orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.MediaType]](),
+			// KeyNode intentionally nil
+		},
+	}
+
+	responses := &lowv3.Responses{
+		Default: low.NodeReference[*lowv3.Response]{
+			Value:     r,
+			KeyNode:   &yaml.Node{},
+			ValueNode: &yaml.Node{},
+		},
+		Codes:   orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.Response]](),
+		KeyNode: &yaml.Node{},
+	}
+	op := &lowv3.Operation{
+		Responses: low.NodeReference[*lowv3.Responses]{
+			Value:     responses,
+			KeyNode:   &yaml.Node{},
+			ValueNode: &yaml.Node{},
+		},
+	}
+	highOp := v3.NewOperation(op)
+
+	request, _ := http.NewRequest(http.MethodGet, "/test", nil)
+	response := &http.Response{
+		Header: http.Header{
+			helpers.ContentTypeHeader: {"application/xml"},
+		},
+	}
+
+	// Should not panic
+	err := ResponseContentTypeNotFound(highOp, request, response, "200", true)
+	require.NotNil(t, err)
+	require.Equal(t, 1, err.SpecLine)
+	require.Equal(t, 0, err.SpecCol)
+}
+
+func TestResponseCodeNotFound_NilResponsesKeyNode(t *testing.T) {
+	// Operation with nil Responses KeyNode — should not panic
+	responses := &lowv3.Responses{
+		Codes: orderedmap.New[low.KeyReference[string], low.ValueReference[*lowv3.Response]](),
+		// KeyNode intentionally nil
+	}
+	op := &lowv3.Operation{
+		Responses: low.NodeReference[*lowv3.Responses]{
+			Value:     responses,
+			ValueNode: &yaml.Node{},
+		},
+	}
+	highOp := v3.NewOperation(op)
+
+	request, _ := http.NewRequest(http.MethodGet, "/test", nil)
+
+	// Should not panic
+	err := ResponseCodeNotFound(highOp, request, 404)
+	require.NotNil(t, err)
+	require.Equal(t, 1, err.SpecLine)
+	require.Equal(t, 0, err.SpecCol)
 }

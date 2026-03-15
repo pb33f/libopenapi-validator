@@ -1905,6 +1905,37 @@ paths:
 	assert.Equal(t, "xml example is malformed", errors[0].Message)
 }
 
+func TestValidateResponseBodyWithPathItem_NilResponses(t *testing.T) {
+	// Operation with nil Responses — should not panic (fix for wiretap #134)
+	spec := []byte(`openapi: 3.1.0
+paths:
+  /test:
+    get:
+      responses:
+        '200':
+          description: ok
+`)
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	v := NewResponseBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "/test", nil)
+	response := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{},
+		Body:       io.NopCloser(bytes.NewBufferString("")),
+	}
+
+	// Should not panic even with no content in the response definition
+	valid, validationErrors := v.ValidateResponseBodyWithPathItem(request, response,
+		m.Model.Paths.PathItems.GetOrZero("/test"), "/test")
+	assert.True(t, valid)
+	assert.Empty(t, validationErrors)
+}
+
 type errorReader struct{}
 
 func (er *errorReader) Read(p []byte) (n int, err error) {
