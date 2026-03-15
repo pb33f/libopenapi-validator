@@ -81,7 +81,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		renderCtx := base.NewInlineRenderContext()
+		renderCtx := base.NewInlineRenderContextForValidation()
 		var renderErr error
 		renderedSchema, renderErr = input.Schema.RenderInlineWithContext(renderCtx)
 		referenceSchema = string(renderedSchema)

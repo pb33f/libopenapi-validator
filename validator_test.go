@@ -2657,3 +2657,94 @@ paths:
 	assert.True(t, validB)
 	assert.Len(t, errsB, 0)
 }
+
+// TestValidateHttpResponse_DiscriminatorOneOf tests that response validation works correctly
+// when the response schema uses oneOf with a discriminator and $ref to component schemas.
+// This is a regression test for https://github.com/pb33f/libopenapi-validator/issues/247
+// where the validator would fail with "json-pointer not found" because discriminator refs
+// were preserved (Bundle mode) instead of fully inlined (Validation mode).
+func TestValidateHttpResponse_DiscriminatorOneOf(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Discriminator OneOf Response Test
+  version: 1.0.0
+paths:
+  /fields:
+    get:
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Field'
+components:
+  schemas:
+    BooleanField:
+      type: object
+      required:
+        - field_type
+        - default_value
+      properties:
+        field_type:
+          type: string
+          const: boolean
+        default_value:
+          type: boolean
+    StringField:
+      type: object
+      required:
+        - field_type
+        - max_length
+      properties:
+        field_type:
+          type: string
+          const: string
+        max_length:
+          type: integer
+          minimum: 1
+    Field:
+      oneOf:
+        - $ref: '#/components/schemas/BooleanField'
+        - $ref: '#/components/schemas/StringField'
+      discriminator:
+        propertyName: field_type`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Empty(t, errs)
+
+	// Valid BooleanField response
+	body, _ := json.Marshal(map[string]interface{}{
+		"field_type":    "boolean",
+		"default_value": true,
+	})
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/fields", nil)
+	response := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBuffer(body)),
+	}
+
+	valid, validationErrors := v.ValidateHttpResponse(request, response)
+	assert.True(t, valid, "response validation should pass for valid discriminator oneOf payload")
+	assert.Empty(t, validationErrors, "no validation errors expected")
+
+	// Valid StringField response
+	body2, _ := json.Marshal(map[string]interface{}{
+		"field_type": "string",
+		"max_length": 255,
+	})
+	request2, _ := http.NewRequest(http.MethodGet, "https://example.com/fields", nil)
+	response2 := &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(bytes.NewBuffer(body2)),
+	}
+
+	valid2, validationErrors2 := v.ValidateHttpResponse(request2, response2)
+	assert.True(t, valid2, "response validation should pass for valid StringField payload")
+	assert.Empty(t, validationErrors2, "no validation errors expected for StringField")
+}
