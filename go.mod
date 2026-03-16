@@ -7,7 +7,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/go-openapi/jsonpointer v0.22.5
 	github.com/goccy/go-yaml v1.19.2
-	github.com/pb33f/jsonpath v0.8.1
+	github.com/pb33f/jsonpath v0.8.2
 	github.com/pb33f/libopenapi v0.34.3
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
