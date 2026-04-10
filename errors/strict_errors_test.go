@@ -167,6 +167,58 @@ func TestUndeclaredCookieError(t *testing.T) {
 	assert.Equal(t, "tracking", err.ParameterName)
 }
 
+func TestReadOnlyPropertyError(t *testing.T) {
+	err := ReadOnlyPropertyError(
+		"$.body.id",
+		"id",
+		"user-123",
+		"/users",
+		"POST",
+		10,
+		5,
+	)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, StrictValidationType, err.ValidationType)
+	assert.Equal(t, StrictSubTypeReadOnlyProperty, err.ValidationSubType)
+	assert.Contains(t, err.Message, "readOnly")
+	assert.Contains(t, err.Message, "'id'")
+	assert.Contains(t, err.Message, "'$.body.id'")
+	assert.Contains(t, err.Reason, "readOnly")
+	assert.Contains(t, err.HowToFix, "id")
+	assert.Equal(t, "/users", err.RequestPath)
+	assert.Equal(t, "POST", err.RequestMethod)
+	assert.Equal(t, "id", err.ParameterName)
+	assert.Equal(t, 10, err.SpecLine)
+	assert.Equal(t, 5, err.SpecCol)
+}
+
+func TestWriteOnlyPropertyError(t *testing.T) {
+	err := WriteOnlyPropertyError(
+		"$.body.password",
+		"password",
+		"secret",
+		"/users/123",
+		"GET",
+		20,
+		3,
+	)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, StrictValidationType, err.ValidationType)
+	assert.Equal(t, StrictSubTypeWriteOnlyProperty, err.ValidationSubType)
+	assert.Contains(t, err.Message, "writeOnly")
+	assert.Contains(t, err.Message, "'password'")
+	assert.Contains(t, err.Message, "'$.body.password'")
+	assert.Contains(t, err.Reason, "writeOnly")
+	assert.Contains(t, err.HowToFix, "password")
+	assert.Equal(t, "/users/123", err.RequestPath)
+	assert.Equal(t, "GET", err.RequestMethod)
+	assert.Equal(t, "password", err.ParameterName)
+	assert.Equal(t, 20, err.SpecLine)
+	assert.Equal(t, 3, err.SpecCol)
+}
+
 func TestTruncateForContext_String(t *testing.T) {
 	// Short string should not be truncated
 	short := truncateForContext("short")
