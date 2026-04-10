@@ -62,6 +62,13 @@ func (d Direction) String() string {
 	return "request"
 }
 
+// Type constants for UndeclaredValue.Type, defined here for use in the
+// request/response dispatch switch (existing types use inline strings).
+const (
+	TypeReadOnlyProperty  = "readonly"
+	TypeWriteOnlyProperty = "writeonly"
+)
+
 // UndeclaredValue represents a value found in data that is not declared
 // in the schema. This is the core output of strict validation.
 type UndeclaredValue struct {
@@ -77,7 +84,7 @@ type UndeclaredValue struct {
 	Value any
 
 	// Type indicates what kind of value this is.
-	// one of: "property", "header", "query", "cookie", "item"
+	// one of: "property", "header", "query", "cookie", "item", "readonly", "writeonly"
 	Type string
 
 	// DeclaredProperties lists property names that ARE declared at this
@@ -124,6 +131,24 @@ func newUndeclaredProperty(path, name string, value any, declaredNames []string,
 		Direction:          direction,
 		SpecLine:           line,
 		SpecCol:            col,
+	}
+}
+
+// newReadWriteOnlyViolation creates an UndeclaredValue for a readOnly/writeOnly violation.
+func newReadWriteOnlyViolation(path, name string, value any, direction Direction, schema *base.Schema) UndeclaredValue {
+	line, col := extractSchemaLocation(schema)
+	violationType := TypeReadOnlyProperty
+	if direction == DirectionResponse {
+		violationType = TypeWriteOnlyProperty
+	}
+	return UndeclaredValue{
+		Path:      path,
+		Name:      name,
+		Value:     TruncateValue(value),
+		Type:      violationType,
+		Direction: direction,
+		SpecLine:  line,
+		SpecCol:   col,
 	}
 }
 

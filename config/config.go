@@ -42,6 +42,8 @@ type ValidationOptions struct {
 	StrictIgnorePaths         []string // Instance JSONPath patterns to exclude from strict checks
 	StrictIgnoredHeaders      []string // Headers to always ignore in strict mode (nil = use defaults)
 	strictIgnoredHeadersMerge bool     // Internal: true if merging with defaults
+	StrictRejectReadOnly      bool     // Reject readOnly properties in requests
+	StrictRejectWriteOnly     bool     // Reject writeOnly properties in responses
 }
 
 // Option Enables an 'Options pattern' approach
@@ -88,6 +90,8 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.StrictIgnorePaths = options.StrictIgnorePaths
 			o.StrictIgnoredHeaders = options.StrictIgnoredHeaders
 			o.strictIgnoredHeadersMerge = options.strictIgnoredHeadersMerge
+			o.StrictRejectReadOnly = options.StrictRejectReadOnly
+			o.StrictRejectWriteOnly = options.StrictRejectWriteOnly
 		}
 	}
 }
@@ -238,6 +242,24 @@ func WithStrictMode() Option {
 func WithStrictIgnorePaths(paths ...string) Option {
 	return func(o *ValidationOptions) {
 		o.StrictIgnorePaths = paths
+	}
+}
+
+// WithStrictRejectReadOnly enables rejection of readOnly properties in requests.
+// When enabled, readOnly properties present in request bodies are reported as
+// validation errors instead of being silently skipped.
+func WithStrictRejectReadOnly() Option {
+	return func(o *ValidationOptions) {
+		o.StrictRejectReadOnly = true
+	}
+}
+
+// WithStrictRejectWriteOnly enables rejection of writeOnly properties in responses.
+// When enabled, writeOnly properties present in response bodies are reported as
+// validation errors instead of being silently skipped.
+func WithStrictRejectWriteOnly() Option {
+	return func(o *ValidationOptions) {
+		o.StrictRejectWriteOnly = true
 	}
 }
 

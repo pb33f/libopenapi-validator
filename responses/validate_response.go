@@ -354,18 +354,28 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 		if !strictResult.Valid {
 			for _, undeclared := range strictResult.UndeclaredValues {
-				validationErrors = append(validationErrors,
-					errors.UndeclaredPropertyError(
-						undeclared.Path,
-						undeclared.Name,
-						undeclared.Value,
-						undeclared.DeclaredProperties,
-						undeclared.Direction.String(),
-						request.URL.Path,
-						request.Method,
-						undeclared.SpecLine,
-						undeclared.SpecCol,
-					))
+				switch undeclared.Type {
+				case strict.TypeWriteOnlyProperty:
+					validationErrors = append(validationErrors,
+						errors.WriteOnlyPropertyError(
+							undeclared.Path, undeclared.Name, undeclared.Value,
+							request.URL.Path, request.Method,
+							undeclared.SpecLine, undeclared.SpecCol,
+						))
+				default:
+					validationErrors = append(validationErrors,
+						errors.UndeclaredPropertyError(
+							undeclared.Path,
+							undeclared.Name,
+							undeclared.Value,
+							undeclared.DeclaredProperties,
+							undeclared.Direction.String(),
+							request.URL.Path,
+							request.Method,
+							undeclared.SpecLine,
+							undeclared.SpecCol,
+						))
+				}
 			}
 		}
 	}

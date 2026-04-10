@@ -90,7 +90,10 @@ func (v *Validator) validateObject(ctx *traversalContext, schema *base.Schema, d
 		if propProxy != nil {
 			propSchema := propProxy.Schema()
 			if propSchema != nil {
-				// check readOnly/writeOnly
+				if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+					undeclared = append(undeclared, violation)
+					continue
+				}
 				if v.shouldSkipProperty(propSchema, ctx.direction) {
 					continue
 				}
@@ -191,6 +194,10 @@ func (v *Validator) recurseIntoDeclaredProperties(ctx *traversalContext, schema 
 
 			propSchema := propProxy.Schema()
 			if propSchema != nil {
+				if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+					undeclared = append(undeclared, violation)
+					continue
+				}
 				if v.shouldSkipProperty(propSchema, ctx.direction) {
 					continue
 				}
@@ -222,6 +229,10 @@ func (v *Validator) recurseIntoDeclaredProperties(ctx *traversalContext, schema 
 
 			propSchema := propProxy.Schema()
 			if propSchema != nil {
+				if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+					undeclared = append(undeclared, violation)
+					continue
+				}
 				if v.shouldSkipProperty(propSchema, ctx.direction) {
 					continue
 				}
