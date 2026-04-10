@@ -11,12 +11,14 @@ import (
 // StrictValidationType is the validation type for strict mode errors.
 const StrictValidationType = "strict"
 
-// StrictValidationSubTypes for different kinds of undeclared values.
+// StrictValidationSubTypes for different kinds of strict validation errors.
 const (
-	StrictSubTypeProperty = "undeclared-property"
-	StrictSubTypeHeader   = "undeclared-header"
-	StrictSubTypeQuery    = "undeclared-query-param"
-	StrictSubTypeCookie   = "undeclared-cookie"
+	StrictSubTypeProperty          = "undeclared-property"
+	StrictSubTypeHeader            = "undeclared-header"
+	StrictSubTypeQuery             = "undeclared-query-param"
+	StrictSubTypeCookie            = "undeclared-cookie"
+	StrictSubTypeReadOnlyProperty  = "readonly-property"
+	StrictSubTypeWriteOnlyProperty = "writeonly-property"
 )
 
 // UndeclaredPropertyError creates a ValidationError for an undeclared property.
@@ -129,6 +131,62 @@ func UndeclaredCookieError(
 		RequestMethod: requestMethod,
 		ParameterName: name,
 		Context:       truncateForContext(value),
+	}
+}
+
+// ReadOnlyPropertyError creates a ValidationError for a readOnly property in a request.
+func ReadOnlyPropertyError(
+	path string,
+	name string,
+	value any,
+	requestPath string,
+	requestMethod string,
+	specLine int,
+	specCol int,
+) *ValidationError {
+	return &ValidationError{
+		ValidationType:    StrictValidationType,
+		ValidationSubType: StrictSubTypeReadOnlyProperty,
+		Message: fmt.Sprintf("request property '%s' at '%s' is readOnly and should not be sent in the request",
+			name, path),
+		Reason: fmt.Sprintf("Strict mode: property '%s' is marked readOnly in the schema",
+			name),
+		HowToFix: fmt.Sprintf("Remove the readOnly annotation from '%s' in the schema, "+
+			"remove it from the request, or add '%s' to StrictIgnorePaths", name, path),
+		RequestPath:   requestPath,
+		RequestMethod: requestMethod,
+		ParameterName: name,
+		Context:       truncateForContext(value),
+		SpecLine:      specLine,
+		SpecCol:       specCol,
+	}
+}
+
+// WriteOnlyPropertyError creates a ValidationError for a writeOnly property in a response.
+func WriteOnlyPropertyError(
+	path string,
+	name string,
+	value any,
+	requestPath string,
+	requestMethod string,
+	specLine int,
+	specCol int,
+) *ValidationError {
+	return &ValidationError{
+		ValidationType:    StrictValidationType,
+		ValidationSubType: StrictSubTypeWriteOnlyProperty,
+		Message: fmt.Sprintf("response property '%s' at '%s' is writeOnly and should not be returned in the response",
+			name, path),
+		Reason: fmt.Sprintf("Strict mode: property '%s' is marked writeOnly in the schema",
+			name),
+		HowToFix: fmt.Sprintf("Remove the writeOnly annotation from '%s' in the schema, "+
+			"remove it from the response, or add '%s' to StrictIgnorePaths", name, path),
+		RequestPath:   requestPath,
+		RequestMethod: requestMethod,
+		ParameterName: name,
+		Context:       truncateForContext(value),
+		SpecLine:      specLine,
+		SpecCol:       specCol,
 	}
 }
 

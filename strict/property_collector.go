@@ -147,6 +147,26 @@ func getPropertySchema(name string, declared map[string]*declaredProperty) *base
 	return nil
 }
 
+// checkReadWriteOnlyViolation checks if a property violates readOnly/writeOnly rules
+// when the corresponding rejection flag is enabled. Returns a violation and true if so.
+func (v *Validator) checkReadWriteOnlyViolation(
+	path string, name string, value any,
+	schema *base.Schema, direction Direction,
+) (UndeclaredValue, bool) {
+	if schema == nil || v.options == nil {
+		return UndeclaredValue{}, false
+	}
+	if direction == DirectionRequest && v.options.StrictRejectReadOnly &&
+		schema.ReadOnly != nil && *schema.ReadOnly {
+		return newReadWriteOnlyViolation(path, name, value, direction, schema), true
+	}
+	if direction == DirectionResponse && v.options.StrictRejectWriteOnly &&
+		schema.WriteOnly != nil && *schema.WriteOnly {
+		return newReadWriteOnlyViolation(path, name, value, direction, schema), true
+	}
+	return UndeclaredValue{}, false
+}
+
 // shouldSkipProperty checks if a property should be skipped based on
 // readOnly/writeOnly and the current validation direction.
 func (v *Validator) shouldSkipProperty(schema *base.Schema, direction Direction) bool {

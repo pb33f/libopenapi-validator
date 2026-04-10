@@ -113,6 +113,10 @@ func (v *Validator) validateAllOf(ctx *traversalContext, schema *base.Schema, da
 			// Recurse into the property
 			propSchema := v.findPropertySchemaInAllOf(schema.AllOf, propName, allDeclared)
 			if propSchema != nil {
+				if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+					undeclared = append(undeclared, violation)
+					continue
+				}
 				if v.shouldSkipProperty(propSchema, ctx.direction) {
 					continue
 				}
@@ -219,6 +223,10 @@ func (v *Validator) validateVariantWithParent(ctx *traversalContext, parent *bas
 			// Find the property schema (prefer variant, fallback to parent)
 			propSchema := v.findPropertySchemaInMerged(variant, parent, propName, allDeclared)
 			if propSchema != nil {
+				if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+					undeclared = append(undeclared, violation)
+					continue
+				}
 				if v.shouldSkipProperty(propSchema, ctx.direction) {
 					continue
 				}
@@ -293,6 +301,10 @@ func (v *Validator) recurseIntoDeclaredPropertiesWithMerged(ctx *traversalContex
 
 		propSchema := v.findPropertySchemaInMerged(variant, parent, propName, declared)
 		if propSchema != nil {
+			if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+				undeclared = append(undeclared, violation)
+				continue
+			}
 			if v.shouldSkipProperty(propSchema, ctx.direction) {
 				continue
 			}
@@ -463,6 +475,10 @@ func (v *Validator) recurseIntoAllOfDeclaredProperties(ctx *traversalContext, al
 
 		propSchema := v.findPropertySchemaInAllOf(allOf, propName, declared)
 		if propSchema != nil {
+			if violation, ok := v.checkReadWriteOnlyViolation(propPath, propName, propValue, propSchema, ctx.direction); ok {
+				undeclared = append(undeclared, violation)
+				continue
+			}
 			if v.shouldSkipProperty(propSchema, ctx.direction) {
 				continue
 			}
