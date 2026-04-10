@@ -6183,3 +6183,486 @@ components:
 	// Location should come from parent (not crash due to nil variant.GoLow())
 	assert.Greater(t, result[0].SpecLine, 0)
 }
+
+// ============== readOnly/writeOnly rejection tests ==============
+
+func TestStrictValidator_RejectReadOnly_InRequest(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	// readOnly property "id" sent in a request should be rejected
+	data := map[string]any{
+		"id":   "user-123",
+		"name": "John",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "id", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body.id", result.UndeclaredValues[0].Path)
+	assert.Equal(t, TypeReadOnlyProperty, result.UndeclaredValues[0].Type)
+	assert.Equal(t, DirectionRequest, result.UndeclaredValues[0].Direction)
+}
+
+func TestStrictValidator_RejectReadOnly_Disabled(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	// Flag off — backward compat: no violation
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"id":   "user-123",
+		"name": "John",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RejectReadOnly_InResponse_NoEffect(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	// readOnly in response is fine — readOnly only applies to requests
+	data := map[string]any{
+		"id":   "user-123",
+		"name": "John",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionResponse,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RejectReadOnly_NestedObject(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              readOnly: true
+            updatedBy:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name": "John",
+		"metadata": map[string]any{
+			"createdAt": "2024-01-01",
+			"updatedBy": "admin",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "createdAt", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body.metadata.createdAt", result.UndeclaredValues[0].Path)
+	assert.Equal(t, TypeReadOnlyProperty, result.UndeclaredValues[0].Type)
+}
+
+func TestStrictValidator_RejectReadOnly_AllOf(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Combined:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              readOnly: true
+        - type: object
+          properties:
+            name:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Combined")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"id":   "combined-1",
+		"name": "Test",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "id", result.UndeclaredValues[0].Name)
+	assert.Equal(t, TypeReadOnlyProperty, result.UndeclaredValues[0].Type)
+}
+
+func TestStrictValidator_RejectWriteOnly_InResponse(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectWriteOnly())
+	v := NewValidator(opts, 3.1)
+
+	// writeOnly property "password" in response should be rejected
+	data := map[string]any{
+		"name":     "John",
+		"password": "secret",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionResponse,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "password", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body.password", result.UndeclaredValues[0].Path)
+	assert.Equal(t, TypeWriteOnlyProperty, result.UndeclaredValues[0].Type)
+	assert.Equal(t, DirectionResponse, result.UndeclaredValues[0].Direction)
+}
+
+func TestStrictValidator_RejectWriteOnly_Disabled(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	// Flag off — backward compat: no violation
+	opts := config.NewValidationOptions(config.WithStrictMode())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name":     "John",
+		"password": "secret",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionResponse,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RejectWriteOnly_InRequest_NoEffect(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectWriteOnly())
+	v := NewValidator(opts, 3.1)
+
+	// writeOnly in request is fine — writeOnly only applies to responses
+	data := map[string]any{
+		"name":     "John",
+		"password": "secret",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.True(t, result.Valid)
+	assert.Empty(t, result.UndeclaredValues)
+}
+
+func TestStrictValidator_RejectWriteOnly_NestedObject(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        name:
+          type: string
+        auth:
+          type: object
+          properties:
+            token:
+              type: string
+              writeOnly: true
+            provider:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectWriteOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name": "John",
+		"auth": map[string]any{
+			"token":    "secret-token",
+			"provider": "google",
+		},
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionResponse,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "token", result.UndeclaredValues[0].Name)
+	assert.Equal(t, "$.body.auth.token", result.UndeclaredValues[0].Path)
+	assert.Equal(t, TypeWriteOnlyProperty, result.UndeclaredValues[0].Type)
+}
+
+func TestStrictValidator_RejectBoth_Enabled(t *testing.T) {
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "User")
+
+	// Both flags on
+	opts := config.NewValidationOptions(
+		config.WithStrictMode(),
+		config.WithStrictRejectReadOnly(),
+		config.WithStrictRejectWriteOnly(),
+	)
+
+	// Test request: readOnly "id" should be rejected
+	v := NewValidator(opts, 3.1)
+	dataRequest := map[string]any{
+		"id":       "user-123",
+		"name":     "John",
+		"password": "secret",
+	}
+	resultRequest := v.Validate(Input{
+		Schema:    schema,
+		Data:      dataRequest,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+	assert.False(t, resultRequest.Valid)
+	require.Len(t, resultRequest.UndeclaredValues, 1)
+	assert.Equal(t, "id", resultRequest.UndeclaredValues[0].Name)
+	assert.Equal(t, TypeReadOnlyProperty, resultRequest.UndeclaredValues[0].Type)
+
+	// Test response: writeOnly "password" should be rejected
+	v2 := NewValidator(opts, 3.1)
+	dataResponse := map[string]any{
+		"id":       "user-123",
+		"name":     "John",
+		"password": "secret",
+	}
+	resultResponse := v2.Validate(Input{
+		Schema:    schema,
+		Data:      dataResponse,
+		Direction: DirectionResponse,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+	assert.False(t, resultResponse.Valid)
+	require.Len(t, resultResponse.UndeclaredValues, 1)
+	assert.Equal(t, "password", resultResponse.UndeclaredValues[0].Name)
+	assert.Equal(t, TypeWriteOnlyProperty, resultResponse.UndeclaredValues[0].Type)
+}

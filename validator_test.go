@@ -2783,3 +2783,114 @@ components:
 		assert.Empty(t, reqErrors, "no validation errors expected (uncached request)")
 	})
 }
+
+func TestStrictRejectReadOnly_RequestIntegration(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /users:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  readOnly: true
+                name:
+                  type: string
+      responses:
+        "201":
+          description: created`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc, config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	require.Empty(t, errs)
+
+	body := map[string]any{
+		"id":   "user-123",
+		"name": "John",
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://example.com/users", bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, valErrs := v.ValidateHttpRequest(request)
+	assert.False(t, valid)
+
+	foundReadOnly := false
+	for _, vErr := range valErrs {
+		if vErr.ValidationType == errors.StrictValidationType &&
+			vErr.ValidationSubType == errors.StrictSubTypeReadOnlyProperty {
+			foundReadOnly = true
+			break
+		}
+	}
+	assert.True(t, foundReadOnly, "should report readOnly violation")
+}
+
+func TestStrictRejectWriteOnly_ResponseIntegration(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /users/{id}:
+    get:
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  password:
+                    type: string
+                    writeOnly: true`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc, config.WithStrictMode(), config.WithStrictRejectWriteOnly())
+	require.Empty(t, errs)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/users/123", http.NoBody)
+
+	body := map[string]any{
+		"name":     "John",
+		"password": "secret",
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	response := &http.Response{
+		StatusCode: 200,
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
+		Body: io.NopCloser(bytes.NewBuffer(bodyBytes)),
+	}
+
+	valid, valErrs := v.ValidateHttpResponse(request, response)
+	assert.False(t, valid)
+
+	foundWriteOnly := false
+	for _, vErr := range valErrs {
+		if vErr.ValidationType == errors.StrictValidationType &&
+			vErr.ValidationSubType == errors.StrictSubTypeWriteOnlyProperty {
+			foundWriteOnly = true
+			break
+		}
+	}
+	assert.True(t, foundWriteOnly, "should report writeOnly violation")
+}
