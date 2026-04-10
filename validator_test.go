@@ -2784,7 +2784,7 @@ components:
 	})
 }
 
-func TestStrictRejectReadOnly_RequestIntegration(t *testing.T) {
+func TestStrictMode_RejectReadOnly_RequestIntegration(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /users:
@@ -2834,7 +2834,7 @@ paths:
 	assert.True(t, foundReadOnly, "should report readOnly violation")
 }
 
-func TestStrictRejectWriteOnly_ResponseIntegration(t *testing.T) {
+func TestStrictMode_RejectWriteOnly_ResponseIntegration(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /users/{id}:

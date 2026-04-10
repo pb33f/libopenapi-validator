@@ -1614,6 +1614,50 @@ paths:
 	assert.Len(t, errors, 0)
 }
 
+func TestValidateBody_StrictMode_ReadOnlyProperty(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /users:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  readOnly: true
+                name:
+                  type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model,
+		config.WithStrictMode(),
+		config.WithStrictRejectReadOnly(),
+	)
+
+	body := map[string]interface{}{
+		"id":   "user-123",
+		"name": "John",
+	}
+
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/users",
+		bytes.NewBuffer(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+
+	valid, errors := v.ValidateRequestBody(request)
+
+	assert.False(t, valid)
+	assert.Len(t, errors, 1)
+	assert.Contains(t, errors[0].Message, "readOnly")
+	assert.Contains(t, errors[0].Message, "id")
+}
+
 func TestValidateRequestBody_XMLMarshalError(t *testing.T) {
 	spec := []byte(`
 openapi: 3.1.0
