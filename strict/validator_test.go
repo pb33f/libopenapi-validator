@@ -6666,3 +6666,214 @@ components:
 	assert.Equal(t, "password", resultResponse.UndeclaredValues[0].Name)
 	assert.Equal(t, TypeWriteOnlyProperty, resultResponse.UndeclaredValues[0].Type)
 }
+
+func TestStrictValidator_RejectReadOnly_AdditionalPropertiesFalse(t *testing.T) {
+	// Covers schema_walker.go recurseIntoDeclaredProperties:
+	// explicit property path and patternProperties path
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    Strict:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+      patternProperties:
+        "^x-":
+          type: string
+          readOnly: true
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "Strict")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"id":       "user-1",
+		"name":     "John",
+		"x-custom": "value",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	assert.Len(t, result.UndeclaredValues, 2)
+
+	names := []string{result.UndeclaredValues[0].Name, result.UndeclaredValues[1].Name}
+	assert.Contains(t, names, "id")
+	assert.Contains(t, names, "x-custom")
+	for _, uv := range result.UndeclaredValues {
+		assert.Equal(t, TypeReadOnlyProperty, uv.Type)
+	}
+}
+
+func TestStrictValidator_RejectReadOnly_OneOf(t *testing.T) {
+	// Covers polymorphic.go validateVariantWithParent path
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    OneOfSchema:
+      type: object
+      oneOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              readOnly: true
+            email:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "OneOfSchema")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"id":    "user-1",
+		"email": "test@example.com",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "id", result.UndeclaredValues[0].Name)
+	assert.Equal(t, TypeReadOnlyProperty, result.UndeclaredValues[0].Type)
+}
+
+func TestStrictValidator_RejectReadOnly_OneOfAdditionalPropertiesFalse(t *testing.T) {
+	// Covers polymorphic.go recurseIntoDeclaredPropertiesWithMerged path
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    OneOfStrict:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+      oneOf:
+        - type: object
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+            id:
+              type: string
+              readOnly: true
+            data:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "OneOfStrict")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"name": "test",
+		"id":   "should-be-rejected",
+		"data": "valid",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "id", result.UndeclaredValues[0].Name)
+	assert.Equal(t, TypeReadOnlyProperty, result.UndeclaredValues[0].Type)
+}
+
+func TestStrictValidator_RejectReadOnly_AllOfAdditionalPropertiesFalse(t *testing.T) {
+	// Covers polymorphic.go recurseIntoAllOfDeclaredProperties path
+	yml := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1.0"
+paths: {}
+components:
+  schemas:
+    AllOfStrict:
+      type: object
+      additionalProperties: false
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              readOnly: true
+            name:
+              type: string
+`
+	model := buildSchemaFromYAML(t, yml)
+	schema := getSchema(t, model, "AllOfStrict")
+
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	data := map[string]any{
+		"id":   "should-be-rejected",
+		"name": "John",
+	}
+
+	result := v.Validate(Input{
+		Schema:    schema,
+		Data:      data,
+		Direction: DirectionRequest,
+		Options:   opts,
+		BasePath:  "$.body",
+		Version:   3.1,
+	})
+
+	assert.False(t, result.Valid)
+	require.Len(t, result.UndeclaredValues, 1)
+	assert.Equal(t, "id", result.UndeclaredValues[0].Name)
+	assert.Equal(t, TypeReadOnlyProperty, result.UndeclaredValues[0].Type)
+}
+
+func TestStrictValidator_CheckReadWriteOnlyViolation_NilSchema(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictMode(), config.WithStrictRejectReadOnly())
+	v := NewValidator(opts, 3.1)
+
+	_, ok := v.checkReadWriteOnlyViolation("$.body.x", "x", "val", nil, DirectionRequest)
+	assert.False(t, ok)
+}

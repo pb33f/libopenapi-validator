@@ -1619,6 +1619,50 @@ paths:
 	assert.Len(t, errs, 0)
 }
 
+func TestValidateBody_StrictMode_WriteOnlyProperty(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /users/123:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  password:
+                    type: string
+                    writeOnly: true`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewResponseBodyValidator(&m.Model,
+		config.WithStrictMode(),
+		config.WithStrictRejectWriteOnly(),
+	)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/users/123", nil)
+
+	responseBody := `{"name": "John", "password": "secret"}`
+	response := &http.Response{
+		Header:     http.Header{},
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}
+	response.Header.Set("Content-Type", "application/json")
+
+	valid, errs := v.ValidateResponseBody(request, response)
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "writeOnly")
+	assert.Contains(t, errs[0].Message, "password")
+}
+
 func TestValidateBody_ValidURLEncodedBody(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:

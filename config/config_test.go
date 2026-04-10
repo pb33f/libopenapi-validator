@@ -466,6 +466,8 @@ func TestWithLogger(t *testing.T) {
 func TestWithExistingOpts_StrictFields(t *testing.T) {
 	original := &ValidationOptions{
 		StrictMode:                true,
+		StrictRejectReadOnly:      true,
+		StrictRejectWriteOnly:     true,
 		StrictIgnorePaths:         []string{"$.body.*"},
 		StrictIgnoredHeaders:      []string{"x-custom"},
 		strictIgnoredHeadersMerge: true,
@@ -475,10 +477,22 @@ func TestWithExistingOpts_StrictFields(t *testing.T) {
 	opts := NewValidationOptions(WithExistingOpts(original))
 
 	assert.True(t, opts.StrictMode)
+	assert.True(t, opts.StrictRejectReadOnly)
+	assert.True(t, opts.StrictRejectWriteOnly)
 	assert.Equal(t, original.StrictIgnorePaths, opts.StrictIgnorePaths)
 	assert.Equal(t, original.StrictIgnoredHeaders, opts.StrictIgnoredHeaders)
 	assert.True(t, opts.strictIgnoredHeadersMerge)
 	assert.Equal(t, original.Logger, opts.Logger)
+}
+
+func TestWithStrictRejectReadOnly(t *testing.T) {
+	opts := NewValidationOptions(WithStrictRejectReadOnly())
+	assert.True(t, opts.StrictRejectReadOnly)
+}
+
+func TestWithStrictRejectWriteOnly(t *testing.T) {
+	opts := NewValidationOptions(WithStrictRejectWriteOnly())
+	assert.True(t, opts.StrictRejectWriteOnly)
 }
 
 func TestStrictModeWithIgnorePaths(t *testing.T) {
