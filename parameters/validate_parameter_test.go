@@ -12,6 +12,7 @@ import (
 
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -676,5 +677,163 @@ func BenchmarkValidationWithRegexCache(b *testing.B) {
 		validator.ValidateQueryParams(req)
 		validator.ValidateSecurity(req)
 		validator.ValidatePathParams(req)
+	}
+}
+
+// cacheTestSpec is an OpenAPI spec for testing cache behavior
+var cacheTestSpec = []byte(`{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Cache Test API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/items/{id}": {
+      "get": {
+        "operationId": "getItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  }
+}`)
+
+// Test_ParameterValidation_CacheUsage verifies that parameter validation uses the schema cache.
+// This test validates that:
+// 1. Cache is populated after the first validation
+// 2. Subsequent validations reuse the cached compiled schemas
+// 3. Validation still produces correct results when using cached schemas
+func Test_ParameterValidation_CacheUsage(t *testing.T) {
+	doc, err := libopenapi.NewDocument(cacheTestSpec)
+	require.NoError(t, err, "Failed to create document")
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs, "Failed to build v3 model")
+
+	// Create options with cache (default behavior)
+	opts := config.NewValidationOptions()
+	require.NotNil(t, opts.SchemaCache, "Schema cache should be initialized by default")
+
+	validator := NewParameterValidator(&v3Model.Model, config.WithExistingOpts(opts))
+
+	// First request - should populate cache
+	req1, _ := http.NewRequest("GET", "/items/abc123?limit=50", nil)
+	isSuccess1, errors1 := validator.ValidateQueryParams(req1)
+	assert.True(t, isSuccess1, "First validation should succeed")
+	assert.Empty(t, errors1, "First validation should have no errors")
+
+	// Count cached entries (should have at least the limit parameter schema)
+	cacheCount := 0
+	opts.SchemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
+		cacheCount++
+		return true
+	})
+	assert.Greater(t, cacheCount, 0, "Cache should have entries after first validation")
+
+	// Second request with different valid value - should use cached schema
+	req2, _ := http.NewRequest("GET", "/items/xyz789?limit=75", nil)
+	isSuccess2, errors2 := validator.ValidateQueryParams(req2)
+	assert.True(t, isSuccess2, "Second validation should succeed")
+	assert.Empty(t, errors2, "Second validation should have no errors")
+
+	// Third request with invalid value - should still use cached schema but fail validation
+	req3, _ := http.NewRequest("GET", "/items/test?limit=999", nil)
+	isSuccess3, errors3 := validator.ValidateQueryParams(req3)
+	assert.False(t, isSuccess3, "Third validation should fail (limit > maximum)")
+	assert.NotEmpty(t, errors3, "Third validation should have errors")
+}
+
+// Test_ParameterValidation_WithoutCache verifies that validation works when cache is disabled.
+func Test_ParameterValidation_WithoutCache(t *testing.T) {
+	doc, err := libopenapi.NewDocument(cacheTestSpec)
+	require.NoError(t, err, "Failed to create document")
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs, "Failed to build v3 model")
+
+	// Create options without cache
+	opts := config.NewValidationOptions(config.WithSchemaCache(nil))
+	require.Nil(t, opts.SchemaCache, "Schema cache should be nil")
+
+	validator := NewParameterValidator(&v3Model.Model, config.WithExistingOpts(opts))
+
+	// Validation should still work without cache
+	req, _ := http.NewRequest("GET", "/items/abc123?limit=50", nil)
+	isSuccess, errors := validator.ValidateQueryParams(req)
+	assert.True(t, isSuccess, "Validation should succeed without cache")
+	assert.Empty(t, errors, "Validation should have no errors")
+
+	// Validation with invalid value should fail
+	req2, _ := http.NewRequest("GET", "/items/abc123?limit=999", nil)
+	isSuccess2, errors2 := validator.ValidateQueryParams(req2)
+	assert.False(t, isSuccess2, "Validation should fail for invalid value")
+	assert.NotEmpty(t, errors2, "Validation should report errors")
+}
+
+// Test_ParameterValidation_CacheConsistency verifies that cached schemas produce
+// the same validation results as freshly compiled schemas.
+func Test_ParameterValidation_CacheConsistency(t *testing.T) {
+	doc, err := libopenapi.NewDocument(cacheTestSpec)
+	require.NoError(t, err, "Failed to create document")
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs, "Failed to build v3 model")
+
+	// Run the same validations with and without cache
+	testCases := []struct {
+		name     string
+		url      string
+		expected bool
+	}{
+		{"valid_limit", "/items/abc?limit=50", true},
+		{"limit_at_max", "/items/abc?limit=100", true},
+		{"limit_at_min", "/items/abc?limit=1", true},
+		{"limit_too_high", "/items/abc?limit=101", false},
+		{"limit_too_low", "/items/abc?limit=0", false},
+	}
+
+	// First run with cache
+	optsWithCache := config.NewValidationOptions()
+	validatorWithCache := NewParameterValidator(&v3Model.Model, config.WithExistingOpts(optsWithCache))
+
+	// Second run without cache
+	optsNoCache := config.NewValidationOptions(config.WithSchemaCache(nil))
+	validatorNoCache := NewParameterValidator(&v3Model.Model, config.WithExistingOpts(optsNoCache))
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest("GET", tc.url, nil)
+
+			successWithCache, errorsWithCache := validatorWithCache.ValidateQueryParams(req)
+			successNoCache, errorsNoCache := validatorNoCache.ValidateQueryParams(req)
+
+			assert.Equal(t, tc.expected, successWithCache, "Cached validation result mismatch for %s", tc.name)
+			assert.Equal(t, successWithCache, successNoCache, "Cache vs no-cache results should match for %s", tc.name)
+			assert.Equal(t, len(errorsWithCache), len(errorsNoCache), "Error count should match for %s", tc.name)
+		})
 	}
 }
