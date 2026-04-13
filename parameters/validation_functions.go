@@ -119,12 +119,8 @@ func ValidateQueryArray(
 	var validationErrors []*errors.ValidationError
 	itemsSchema := sch.Items.A.Schema()
 
-	var renderedItemsSchema string
-	if itemsSchema != nil {
-		rendered, _ := itemsSchema.RenderInline()
-		schemaBytes, _ := json.Marshal(rendered)
-		renderedItemsSchema = string(schemaBytes)
-	}
+	// Get rendered items schema for ReferenceSchema field in errors (uses cache if available)
+	renderedItemsSchema := GetRenderedSchema(itemsSchema, validationOptions)
 
 	// check for an exploded bit on the schema.
 	// if it's exploded, then we need to check each item in the array

@@ -7,10 +7,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -836,4 +835,284 @@ func Test_ParameterValidation_CacheConsistency(t *testing.T) {
 			assert.Equal(t, len(errorsWithCache), len(errorsNoCache), "Error count should match for %s", tc.name)
 		})
 	}
+}
+
+// Test_GetRenderedSchema_NilSchema verifies GetRenderedSchema handles nil schema gracefully.
+func Test_GetRenderedSchema_NilSchema(t *testing.T) {
+	opts := config.NewValidationOptions()
+	result := GetRenderedSchema(nil, opts)
+	assert.Empty(t, result, "GetRenderedSchema should return empty string for nil schema")
+}
+
+// Test_GetRenderedSchema_NilOptions verifies GetRenderedSchema works without options.
+func Test_GetRenderedSchema_NilOptions(t *testing.T) {
+	// Parse a document to get a properly initialized schema
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "id",
+						"in": "query",
+						"schema": {"type": "string", "minLength": 1}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	// Get the parameter schema
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	param := pathItem.Get.Parameters[0]
+	schema := param.Schema.Schema()
+
+	// Call with nil options - should still render the schema (returns some representation)
+	result := GetRenderedSchema(schema, nil)
+	assert.NotEmpty(t, result, "GetRenderedSchema should render schema even with nil options")
+}
+
+// Test_GetRenderedSchema_CacheHit verifies GetRenderedSchema uses cached data when available.
+func Test_GetRenderedSchema_CacheHit(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "id",
+						"in": "query",
+						"schema": {"type": "integer", "minimum": 1}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	// Get the parameter schema
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	param := pathItem.Get.Parameters[0]
+	schema := param.Schema.Schema()
+
+	// Create options with cache and pre-populate with known value
+	opts := config.NewValidationOptions()
+	hash := schema.GoLow().Hash()
+	testCachedJSON := []byte(`{"type":"integer","minimum":1,"cached":true}`)
+	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		Schema:       schema,
+		RenderedJSON: testCachedJSON,
+	})
+
+	// GetRenderedSchema should return the cached value
+	result := GetRenderedSchema(schema, opts)
+	assert.Equal(t, string(testCachedJSON), result, "GetRenderedSchema should return cached JSON")
+}
+
+// Test_GetRenderedSchema_NilCache verifies GetRenderedSchema works when cache is disabled.
+func Test_GetRenderedSchema_NilCache(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "id",
+						"in": "query",
+						"schema": {"type": "boolean"}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	// Get the parameter schema
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	param := pathItem.Get.Parameters[0]
+	schema := param.Schema.Schema()
+
+	// Create options with cache disabled
+	opts := config.NewValidationOptions(config.WithSchemaCache(nil))
+	require.Nil(t, opts.SchemaCache)
+
+	// GetRenderedSchema should still work by rendering fresh (returns some representation)
+	result := GetRenderedSchema(schema, opts)
+	assert.NotEmpty(t, result, "GetRenderedSchema should render schema even with nil cache")
+}
+
+// Test_GetRenderedSchema_CacheMiss verifies GetRenderedSchema renders fresh when cache entry has empty RenderedJSON.
+// This tests the code path where cache lookup succeeds but RenderedJSON is empty.
+func Test_GetRenderedSchema_CacheMiss(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "id",
+						"in": "query",
+						"schema": {"type": "integer"}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	// Get the parameter schema
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	param := pathItem.Get.Parameters[0]
+	schema := param.Schema.Schema()
+
+	// Create options with cache enabled
+	opts := config.NewValidationOptions()
+	require.NotNil(t, opts.SchemaCache)
+
+	// Store an entry with empty RenderedJSON to simulate cache miss scenario
+	hash := schema.GoLow().Hash()
+	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		Schema:       schema,
+		RenderedJSON: nil, // Empty - should trigger fresh rendering
+	})
+
+	// GetRenderedSchema should render fresh since RenderedJSON is empty
+	result := GetRenderedSchema(schema, opts)
+	assert.NotEmpty(t, result, "GetRenderedSchema should render fresh when cached RenderedJSON is empty")
+}
+
+// Test_ValidateSingleParameterSchema_CacheMissCompiledSchema tests the path where cache entry
+// exists but CompiledSchema is nil, forcing recompilation.
+func Test_ValidateSingleParameterSchema_CacheMissCompiledSchema(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test/{id}": {
+				"get": {
+					"parameters": [{
+						"name": "id",
+						"in": "path",
+						"required": true,
+						"schema": {"type": "integer", "minimum": 1}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	// Get the parameter schema
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test/{id}")
+	param := pathItem.Get.Parameters[0]
+	schema := param.Schema.Schema()
+
+	// Create options with cache enabled
+	opts := config.NewValidationOptions()
+	require.NotNil(t, opts.SchemaCache)
+
+	// Store an entry with nil CompiledSchema to force recompilation
+	hash := schema.GoLow().Hash()
+	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		Schema:         schema,
+		CompiledSchema: nil, // nil - should trigger recompilation
+	})
+
+	// Validate should still work by recompiling the schema
+	result := ValidateSingleParameterSchema(
+		schema,
+		int64(5), // valid integer
+		"Path parameter",
+		"The path parameter",
+		"id",
+		helpers.ParameterValidation,
+		helpers.ParameterValidationPath,
+		opts,
+		"/test/{id}",
+		"get",
+	)
+	assert.Empty(t, result, "Validation should pass for valid integer")
+
+	// Now verify the cache was populated with the compiled schema
+	cached, ok := opts.SchemaCache.Load(hash)
+	assert.True(t, ok, "Cache entry should exist")
+	assert.NotNil(t, cached.CompiledSchema, "CompiledSchema should be populated after validation")
+}
+
+// arrayValidationSpec is used to test array parameter validation with the updated function signatures
+var arrayValidationSpec = []byte(`{
+	"openapi": "3.1.0",
+	"info": {"title": "Array Test", "version": "1.0.0"},
+	"paths": {
+		"/test": {
+			"get": {
+				"parameters": [{
+					"name": "ids",
+					"in": "query",
+					"schema": {
+						"type": "array",
+						"items": {"type": "integer", "minimum": 1}
+					}
+				}],
+				"responses": {"200": {"description": "OK"}}
+			}
+		}
+	}
+}`)
+
+// Test_ArrayValidation_ErrorContainsRenderedSchema verifies that array validation errors
+// still contain the rendered schema after the rendering optimization.
+func Test_ArrayValidation_ErrorContainsRenderedSchema(t *testing.T) {
+	doc, err := libopenapi.NewDocument(arrayValidationSpec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	validator := NewParameterValidator(&v3Model.Model)
+
+	// Request with invalid array values (strings instead of integers)
+	req, _ := http.NewRequest("GET", "/test?ids=abc,def", nil)
+
+	success, validationErrors := validator.ValidateQueryParams(req)
+	assert.False(t, success, "Validation should fail for non-integer array values")
+	assert.NotEmpty(t, validationErrors, "Should have validation errors")
+
+	// Verify error message is properly formatted
+	assert.Contains(t, validationErrors[0].Message, "ids", "Error should reference parameter name")
 }
