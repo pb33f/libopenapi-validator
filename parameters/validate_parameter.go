@@ -97,6 +97,28 @@ func buildJsonRender(schema *base.Schema) ([]byte, error) {
 	return utils.ConvertYAMLtoJSON(renderedSchema)
 }
 
+// GetRenderedSchema returns a JSON string representation of the schema for error messages.
+// It first checks the schema cache for a pre-rendered version, falling back to fresh rendering.
+// This avoids expensive re-rendering on each validation when the cache is available.
+func GetRenderedSchema(schema *base.Schema, opts *config.ValidationOptions) string {
+	if schema == nil {
+		return ""
+	}
+
+	// Try cache lookup first
+	if opts != nil && opts.SchemaCache != nil && schema.GoLow() != nil {
+		hash := schema.GoLow().Hash()
+		if cached, ok := opts.SchemaCache.Load(hash); ok && cached != nil && len(cached.RenderedJSON) > 0 {
+			return string(cached.RenderedJSON)
+		}
+	}
+
+	// Cache miss - render fresh
+	rendered, _ := schema.RenderInline()
+	schemaBytes, _ := json.Marshal(rendered)
+	return string(schemaBytes)
+}
+
 // ValidateParameterSchema will validate a parameter against a raw object, or a blob of json/yaml.
 // It will return a list of validation errors, if any.
 //
@@ -128,7 +150,6 @@ func ValidateParameterSchema(
 		hash := schema.GoLow().Hash()
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
 			jsch = cached.CompiledSchema
-			jsonSchema = cached.RenderedJSON
 		}
 	}
 

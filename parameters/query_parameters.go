@@ -121,13 +121,8 @@ doneLooking:
 						}
 					}
 
-					// Render schema once for ReferenceSchema field in errors
-					var renderedSchema string
-					if sch != nil {
-						rendered, _ := sch.RenderInline()
-						schemaBytes, _ := json.Marshal(rendered)
-						renderedSchema = string(schemaBytes)
-					}
+					// Get rendered schema for ReferenceSchema field in errors (uses cache if available)
+					renderedSchema := GetRenderedSchema(sch, v.options)
 
 					pType := sch.Type
 
@@ -263,12 +258,8 @@ doneLooking:
 							break
 						}
 					}
-					var renderedSchema string
-					if sch != nil {
-						rendered, _ := sch.RenderInline()
-						schemaBytes, _ := json.Marshal(rendered)
-						renderedSchema = string(schemaBytes)
-					}
+					// Get rendered schema for ReferenceSchema field in errors (uses cache if available)
+					renderedSchema := GetRenderedSchema(sch, v.options)
 					validationErrors = append(validationErrors, errors.QueryParameterMissing(params[p], pathValue, operation, renderedSchema))
 				}
 			}

@@ -4,7 +4,6 @@
 package parameters
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -70,13 +69,8 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 				sch = p.Schema.Schema()
 			}
 
-			// Render schema once for ReferenceSchema field in errors
-			var renderedSchema string
-			if sch != nil {
-				rendered, _ := sch.RenderInline()
-				schemaBytes, _ := json.Marshal(rendered)
-				renderedSchema = string(schemaBytes)
-			}
+			// Get rendered schema for ReferenceSchema field in errors (uses cache if available)
+			renderedSchema := GetRenderedSchema(sch, v.options)
 
 			pType := sch.Type
 
