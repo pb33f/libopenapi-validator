@@ -846,7 +846,6 @@ func Test_GetRenderedSchema_NilSchema(t *testing.T) {
 
 // Test_GetRenderedSchema_NilOptions verifies GetRenderedSchema works without options.
 func Test_GetRenderedSchema_NilOptions(t *testing.T) {
-	// Parse a document to get a properly initialized schema
 	spec := []byte(`{
 		"openapi": "3.1.0",
 		"info": {"title": "Test", "version": "1.0.0"},
@@ -870,14 +869,16 @@ func Test_GetRenderedSchema_NilOptions(t *testing.T) {
 	v3Model, errs := doc.BuildV3Model()
 	require.Nil(t, errs)
 
-	// Get the parameter schema
 	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
-	param := pathItem.Get.Parameters[0]
-	schema := param.Schema.Schema()
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
 
-	// Call with nil options - should still render the schema (returns some representation)
+	// Ground truth
+	rendered, _ := schema.RenderInline()
+	expected := string(rendered)
+
+	// With nil options should match ground truth
 	result := GetRenderedSchema(schema, nil)
-	assert.NotEmpty(t, result, "GetRenderedSchema should render schema even with nil options")
+	assert.Equal(t, expected, result)
 }
 
 // Test_GetRenderedSchema_CacheHit verifies GetRenderedSchema uses cached data when available.
@@ -905,23 +906,24 @@ func Test_GetRenderedSchema_CacheHit(t *testing.T) {
 	v3Model, errs := doc.BuildV3Model()
 	require.Nil(t, errs)
 
-	// Get the parameter schema
 	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
-	param := pathItem.Get.Parameters[0]
-	schema := param.Schema.Schema()
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
 
-	// Create options with cache and pre-populate with known value
+	// Ground truth
+	rendered, _ := schema.RenderInline()
+	expected := string(rendered)
+
+	// Pre-populate cache with RenderedInline
 	opts := config.NewValidationOptions()
 	hash := schema.GoLow().Hash()
-	testCachedJSON := []byte(`{"type":"integer","minimum":1,"cached":true}`)
 	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
-		Schema:       schema,
-		RenderedJSON: testCachedJSON,
+		Schema:         schema,
+		RenderedInline: rendered,
 	})
 
-	// GetRenderedSchema should return the cached value
+	// Cache hit should match ground truth
 	result := GetRenderedSchema(schema, opts)
-	assert.Equal(t, string(testCachedJSON), result, "GetRenderedSchema should return cached JSON")
+	assert.Equal(t, expected, result)
 }
 
 // Test_GetRenderedSchema_NilCache verifies GetRenderedSchema works when cache is disabled.
@@ -949,22 +951,21 @@ func Test_GetRenderedSchema_NilCache(t *testing.T) {
 	v3Model, errs := doc.BuildV3Model()
 	require.Nil(t, errs)
 
-	// Get the parameter schema
 	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
-	param := pathItem.Get.Parameters[0]
-	schema := param.Schema.Schema()
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
 
-	// Create options with cache disabled
+	// Ground truth
+	rendered, _ := schema.RenderInline()
+	expected := string(rendered)
+
+	// With nil cache should match ground truth
 	opts := config.NewValidationOptions(config.WithSchemaCache(nil))
-	require.Nil(t, opts.SchemaCache)
-
-	// GetRenderedSchema should still work by rendering fresh (returns some representation)
 	result := GetRenderedSchema(schema, opts)
-	assert.NotEmpty(t, result, "GetRenderedSchema should render schema even with nil cache")
+	assert.Equal(t, expected, result)
 }
 
-// Test_GetRenderedSchema_CacheMiss verifies GetRenderedSchema renders fresh when cache entry has empty RenderedJSON.
-// This tests the code path where cache lookup succeeds but RenderedJSON is empty.
+// Test_GetRenderedSchema_CacheMiss verifies GetRenderedSchema renders fresh when cache entry has empty RenderedInline.
+// This tests the code path where cache lookup succeeds but RenderedInline is empty.
 func Test_GetRenderedSchema_CacheMiss(t *testing.T) {
 	spec := []byte(`{
 		"openapi": "3.1.0",
@@ -989,25 +990,72 @@ func Test_GetRenderedSchema_CacheMiss(t *testing.T) {
 	v3Model, errs := doc.BuildV3Model()
 	require.Nil(t, errs)
 
-	// Get the parameter schema
 	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
-	param := pathItem.Get.Parameters[0]
-	schema := param.Schema.Schema()
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
 
-	// Create options with cache enabled
+	// Ground truth
+	rendered, _ := schema.RenderInline()
+	expected := string(rendered)
+
+	// Store entry with empty RenderedInline to force cache miss
 	opts := config.NewValidationOptions()
-	require.NotNil(t, opts.SchemaCache)
-
-	// Store an entry with empty RenderedJSON to simulate cache miss scenario
 	hash := schema.GoLow().Hash()
 	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
-		Schema:       schema,
-		RenderedJSON: nil, // Empty - should trigger fresh rendering
+		Schema:         schema,
+		RenderedInline: nil, // Empty - should trigger fresh rendering
 	})
 
-	// GetRenderedSchema should render fresh since RenderedJSON is empty
+	// Cache miss should still match ground truth
 	result := GetRenderedSchema(schema, opts)
-	assert.NotEmpty(t, result, "GetRenderedSchema should render fresh when cached RenderedJSON is empty")
+	assert.Equal(t, expected, result)
+}
+
+// Test_GetRenderedSchema_Deterministic verifies that GetRenderedSchema returns the same
+// output regardless of cache state (cache hit vs cache miss).
+func Test_GetRenderedSchema_Deterministic(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "status",
+						"in": "query",
+						"schema": {"type": "string", "enum": ["active", "inactive"]}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
+
+	// Ground truth
+	rendered, _ := schema.RenderInline()
+	expected := string(rendered)
+
+	// Cache miss path (no cache)
+	optsNoCache := config.NewValidationOptions(config.WithSchemaCache(nil))
+	resultMiss := GetRenderedSchema(schema, optsNoCache)
+	assert.Equal(t, expected, resultMiss)
+
+	// Cache hit path (pre-populated cache)
+	optsWithCache := config.NewValidationOptions()
+	hash := schema.GoLow().Hash()
+	optsWithCache.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		RenderedInline: rendered,
+	})
+	resultHit := GetRenderedSchema(schema, optsWithCache)
+	assert.Equal(t, expected, resultHit)
 }
 
 // Test_ValidateSingleParameterSchema_CacheMissCompiledSchema tests the path where cache entry
@@ -1164,4 +1212,52 @@ func Test_ParameterValidation_CompleteCacheEntry(t *testing.T) {
 	assert.NotEmpty(t, cached.RenderedJSON, "RenderedJSON should be populated")
 	assert.NotNil(t, cached.CompiledSchema, "CompiledSchema should be populated")
 	assert.NotNil(t, cached.RenderedNode, "RenderedNode should be populated")
+}
+
+// Test_ReferenceSchema_ConsistentFormat verifies that ReferenceSchema has the same
+// format whether the error comes from GetRenderedSchema or formatJsonSchemaValidationError.
+func Test_ReferenceSchema_ConsistentFormat(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "count",
+						"in": "query",
+						"required": true,
+						"schema": {"type": "integer", "minimum": 1, "maximum": 100}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	validator := NewParameterValidator(&v3Model.Model)
+
+	// Error path 1: Missing required parameter (uses GetRenderedSchema)
+	req1, _ := http.NewRequest(http.MethodGet, "/test", nil)
+	_, errors1 := validator.ValidateQueryParams(req1)
+	require.NotEmpty(t, errors1)
+	require.NotEmpty(t, errors1[0].SchemaValidationErrors)
+	refSchema1 := errors1[0].SchemaValidationErrors[0].ReferenceSchema
+
+	// Error path 2: Value outside range (uses formatJsonSchemaValidationError)
+	req2, _ := http.NewRequest(http.MethodGet, "/test?count=999", nil)
+	_, errors2 := validator.ValidateQueryParams(req2)
+	require.NotEmpty(t, errors2)
+	require.NotEmpty(t, errors2[0].SchemaValidationErrors)
+	refSchema2 := errors2[0].SchemaValidationErrors[0].ReferenceSchema
+
+	// Both should be plain YAML with the same content
+	assert.Equal(t, refSchema1, refSchema2,
+		"ReferenceSchema should be consistent regardless of error path")
 }
