@@ -13,6 +13,7 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"go.yaml.in/yaml/v4"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -65,10 +66,21 @@ func ValidateSingleParameterSchema(
 		// Store in cache for future requests
 		if o != nil && o.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
 			hash := schema.GoLow().Hash()
+
+			renderCtx := base.NewInlineRenderContextForValidation()
+			renderedInline, _ := schema.RenderInlineWithContext(renderCtx)
+			referenceSchema := string(renderedInline)
+
+			var renderedNode yaml.Node
+			_ = yaml.Unmarshal(renderedInline, &renderedNode)
+
 			o.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
-				Schema:         schema,
-				RenderedJSON:   jsonSchema,
-				CompiledSchema: jsch,
+				Schema:          schema,
+				RenderedInline:  renderedInline,
+				ReferenceSchema: referenceSchema,
+				RenderedJSON:    jsonSchema,
+				CompiledSchema:  jsch,
+				RenderedNode:    &renderedNode,
 			})
 		}
 	}
@@ -184,12 +196,17 @@ func ValidateParameterSchema(
 		// Store in cache for future requests
 		if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
 			hash := schema.GoLow().Hash()
+
+			var renderedNode yaml.Node
+			_ = yaml.Unmarshal(renderedSchema, &renderedNode)
+
 			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
 				Schema:          schema,
 				RenderedInline:  renderedSchema,
 				ReferenceSchema: referenceSchema,
 				RenderedJSON:    jsonSchema,
 				CompiledSchema:  jsch,
+				RenderedNode:    &renderedNode,
 			})
 		}
 	}
