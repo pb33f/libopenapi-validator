@@ -1116,3 +1116,52 @@ func Test_ArrayValidation_ErrorContainsRenderedSchema(t *testing.T) {
 	// Verify error message is properly formatted
 	assert.Contains(t, validationErrors[0].Message, "ids", "Error should reference parameter name")
 }
+
+// Test_ParameterValidation_CompleteCacheEntry verifies that parameter validation
+// writes complete cache entries.
+func Test_ParameterValidation_CompleteCacheEntry(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "id",
+						"in": "query",
+						"schema": {"type": "string", "minLength": 1}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	opts := config.NewValidationOptions()
+	validator := NewParameterValidator(&v3Model.Model, config.WithExistingOpts(opts))
+
+	req, _ := http.NewRequest("GET", "/test?id=abc", nil)
+	valid, _ := validator.ValidateQueryParams(req)
+	assert.True(t, valid)
+
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
+	hash := schema.GoLow().Hash()
+
+	cached, ok := opts.SchemaCache.Load(hash)
+	require.True(t, ok, "Cache entry should exist")
+
+	// Check that all fields of the cache entry are populated
+	assert.NotNil(t, cached.Schema, "Schema should be populated")
+	assert.NotEmpty(t, cached.RenderedInline, "RenderedInline should be populated")
+	assert.NotEmpty(t, cached.ReferenceSchema, "ReferenceSchema should be populated")
+	assert.NotEmpty(t, cached.RenderedJSON, "RenderedJSON should be populated")
+	assert.NotNil(t, cached.CompiledSchema, "CompiledSchema should be populated")
+	assert.NotNil(t, cached.RenderedNode, "RenderedNode should be populated")
+}
