@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1260,4 +1261,98 @@ func Test_ReferenceSchema_ConsistentFormat(t *testing.T) {
 	// Both should be plain YAML with the same content
 	assert.Equal(t, refSchema1, refSchema2,
 		"ReferenceSchema should be consistent regardless of error path")
+}
+
+// Test_GetRenderedSchema_ValidationModeConsistency verifies that GetRenderedSchema produces
+// identical output on cache hit vs cache miss for schemas with discriminators. The cache
+// stores schemas rendered with validation mode, so cache misses must also use validation
+// mode for consistency.
+func Test_GetRenderedSchema_ValidationModeConsistency(t *testing.T) {
+	spec := []byte(`{
+		"openapi": "3.1.0",
+		"info": {"title": "Test", "version": "1.0.0"},
+		"paths": {
+			"/test": {
+				"get": {
+					"parameters": [{
+						"name": "pet",
+						"in": "query",
+						"required": true,
+						"schema": {
+							"discriminator": {
+								"propertyName": "petType",
+								"mapping": {
+									"cat": "#/components/schemas/Cat",
+									"dog": "#/components/schemas/Dog"
+								}
+							},
+							"oneOf": [
+								{"$ref": "#/components/schemas/Cat"},
+								{"$ref": "#/components/schemas/Dog"}
+							]
+						}
+					}],
+					"responses": {"200": {"description": "OK"}}
+				}
+			}
+		},
+		"components": {
+			"schemas": {
+				"Cat": {
+					"type": "object",
+					"properties": {
+						"petType": {"type": "string"},
+						"meow": {"type": "boolean"}
+					},
+					"required": ["petType"]
+				},
+				"Dog": {
+					"type": "object",
+					"properties": {
+						"petType": {"type": "string"},
+						"bark": {"type": "boolean"}
+					},
+					"required": ["petType"]
+				}
+			}
+		}
+	}`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.Nil(t, errs)
+
+	// Get the discriminator schema
+	pathItem := v3Model.Model.Paths.PathItems.GetOrZero("/test")
+	schema := pathItem.Get.Parameters[0].Schema.Schema()
+
+	// Get ground truth: what the cache would store (validation mode)
+	renderCtx := base.NewInlineRenderContextForValidation()
+	expectedRendered, err := schema.RenderInlineWithContext(renderCtx)
+	require.NoError(t, err)
+	expected := string(expectedRendered)
+
+	// Test cache miss path
+	optsNoCache := config.NewValidationOptions(config.WithSchemaCache(nil))
+	resultCacheMiss := GetRenderedSchema(schema, optsNoCache)
+
+	assert.Equal(t, expected, resultCacheMiss,
+		"Cache miss should produce same output as validation mode rendering")
+
+	// Test cache hit path
+	optsWithCache := config.NewValidationOptions()
+	hash := schema.GoLow().Hash()
+	optsWithCache.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		RenderedInline: expectedRendered,
+	})
+	resultCacheHit := GetRenderedSchema(schema, optsWithCache)
+
+	assert.Equal(t, expected, resultCacheHit,
+		"Cache hit should return the cached validation mode rendering")
+
+	// Test both paths are identical
+	assert.Equal(t, resultCacheHit, resultCacheMiss,
+		"GetRenderedSchema should produce identical output regardless of cache state")
 }
