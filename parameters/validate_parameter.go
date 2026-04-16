@@ -125,8 +125,9 @@ func GetRenderedSchema(schema *base.Schema, opts *config.ValidationOptions) stri
 		}
 	}
 
-	// Cache miss - render fresh as YAML
-	rendered, _ := schema.RenderInline()
+	// Cache miss - render fresh as YAML using validation mode
+	renderCtx := base.NewInlineRenderContextForValidation()
+	rendered, _ := schema.RenderInlineWithContext(renderCtx)
 	return string(rendered)
 }
 
