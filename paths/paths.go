@@ -163,7 +163,7 @@ func StripRequestPath(request *http.Request, document *v3.Document) string {
 	if request.URL.Fragment != "" {
 		stripped = fmt.Sprintf("%s#%s", stripped, request.URL.Fragment)
 	}
-	if len(stripped) > 0 && !strings.HasPrefix(stripped, "/") {
+	if !strings.HasPrefix(stripped, "/") {
 		stripped = "/" + stripped
 	}
 	return stripped

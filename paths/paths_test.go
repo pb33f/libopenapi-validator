@@ -644,6 +644,96 @@ paths:
 	assert.Equal(t, "GET Path '/not_here' not found", errs[0].Message)
 }
 
+func TestStripRequestPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		servers []string
+		reqURL  string
+		want    string
+	}{
+		{
+			name:    "no servers, no base path to strip",
+			servers: nil,
+			reqURL:  "https://things.com/users",
+			want:    "/users",
+		},
+		{
+			name:    "host-only server URL leaves request path untouched",
+			servers: []string{"https://things.com"},
+			reqURL:  "https://things.com/users",
+			want:    "/users",
+		},
+		{
+			name:    "base path prefix stripped from request path",
+			servers: []string{"https://things.com/api"},
+			reqURL:  "https://things.com/api/users",
+			want:    "/users",
+		},
+		{
+			name:    "base path fully consumes request path yields /",
+			servers: []string{"https://things.com/v1beta/weather"},
+			reqURL:  "https://things.com/v1beta/weather",
+			want:    "/",
+		},
+		{
+			name:    "fragment preserved after stripping",
+			servers: []string{"https://things.com/api"},
+			reqURL:  "https://things.com/api/users#frag",
+			want:    "/users#frag",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := "openapi: 3.1.0\n"
+			if len(test.servers) > 0 {
+				spec += "servers:\n"
+				for _, s := range test.servers {
+					spec += fmt.Sprintf("  - url: %q\n", s)
+				}
+			}
+			spec += "paths:\n  /users:\n    get:\n      operationId: one\n"
+
+			doc, err := libopenapi.NewDocument([]byte(spec))
+			assert.NoError(t, err)
+			m, _ := doc.BuildV3Model()
+
+			req, _ := http.NewRequest(http.MethodGet, test.reqURL, nil)
+
+			assert.Equal(t, test.want, StripRequestPath(req, &m.Model))
+		})
+	}
+}
+
+func TestNewValidator_FindPath_BasePathFullyConsumesRequestPath(t *testing.T) {
+	spec := `openapi: 3.1.0
+servers:
+  - url: https://things.com/v1beta/weather
+paths:
+  /:
+    post:
+      operationId: rootOp
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _ := doc.BuildV3Model()
+
+	request, _ := http.NewRequest(http.MethodPost,
+		"https://things.com/v1beta/weather", nil)
+
+	pathItem, errs, matched := FindPath(request, &m.Model, &config.ValidationOptions{RegexCache: &sync.Map{}})
+
+	assert.Empty(t, errs)
+	assert.NotNil(t, pathItem)
+	assert.Equal(t, "rootOp", pathItem.Post.OperationId)
+	assert.Equal(t, "/", matched)
+}
+
 func TestGetBasePaths(t *testing.T) {
 	spec := `openapi: 3.1.0
 servers:
