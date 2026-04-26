@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/basgys/goxml2json v1.1.1-0.20231018121955-e66ee54ceaad
-	github.com/dlclark/regexp2 v1.11.5
+	github.com/dlclark/regexp2 v1.12.0
 	github.com/go-openapi/jsonpointer v0.23.1
 	github.com/goccy/go-yaml v1.19.2
 	github.com/pb33f/jsonpath v0.8.2
