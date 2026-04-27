@@ -290,6 +290,34 @@ func TestInvalidDeepObject(t *testing.T) {
 	require.Contains(t, err.HowToFix, "testParam=value1|value2")
 }
 
+func TestInvalidDeepObjectPathConflict(t *testing.T) {
+	param := createMockParameterWithDeepObjectStyle()
+	prefixParam := &helpers.QueryParam{
+		Key:          "testParam",
+		Values:       []string{"bad"},
+		Property:     "nested",
+		PropertyPath: []string{"nested"},
+	}
+	nestedParam := &helpers.QueryParam{
+		Key:          "testParam",
+		Values:       []string{"ok"},
+		Property:     "nested",
+		PropertyPath: []string{"nested", "child"},
+	}
+
+	err := InvalidDeepObjectPathConflict(param, prefixParam, nestedParam)
+
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Equal(t, "testParam", err.ParameterName)
+	require.Contains(t, err.Message, "Query parameter 'testParam' is not a valid deepObject")
+	require.Contains(t, err.Reason, "property path 'nested'")
+	require.Contains(t, err.Reason, "'nested.child'")
+	require.Contains(t, err.HowToFix, "testParam[nested]")
+	require.Contains(t, err.HowToFix, "testParam[nested][child]")
+}
+
 func createMockParameterForBooleanArray() *v3.Parameter {
 	param := &lowv3.Parameter{
 		Name: low.NodeReference[string]{Value: "testCookieParam"},
@@ -1285,6 +1313,18 @@ func TestParameterErrors_NilGoLowNodes(t *testing.T) {
 
 	t.Run("InvalidDeepObject", func(t *testing.T) {
 		err := InvalidDeepObject(param, qp)
+		require.NotNil(t, err)
+		require.Equal(t, 1, err.SpecLine)
+		require.Equal(t, 0, err.SpecCol)
+	})
+
+	t.Run("InvalidDeepObjectPathConflict", func(t *testing.T) {
+		err := InvalidDeepObjectPathConflict(param, qp, &helpers.QueryParam{
+			Key:          "test",
+			Values:       []string{"ok"},
+			Property:     "foo",
+			PropertyPath: []string{"foo", "bar"},
+		})
 		require.NotNil(t, err)
 		require.Equal(t, 1, err.SpecLine)
 		require.Equal(t, 0, err.SpecCol)
