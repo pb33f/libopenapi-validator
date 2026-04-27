@@ -1,8 +1,11 @@
 package config
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
 
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/cache"
@@ -18,6 +21,18 @@ type RegexCache interface {
 	Store(key, value any)              // Set a compiled regex to the cache
 }
 
+// AuthenticationFunc validates a security scheme for an HTTP request.
+// Return nil when the scheme is satisfied; return an error to fail the current security requirement.
+type AuthenticationFunc func(context.Context, *AuthenticationInput) error
+
+// AuthenticationInput contains the request and OpenAPI security scheme details passed to an AuthenticationFunc.
+type AuthenticationInput struct {
+	Request            *http.Request
+	SecuritySchemeName string
+	SecurityScheme     *v3.SecurityScheme
+	Scopes             []string
+}
+
 // ValidationOptions A container for validation configuration.
 //
 // Generally fluent With... style functions are used to establish the desired behavior.
@@ -27,6 +42,7 @@ type ValidationOptions struct {
 	FormatAssertions              bool
 	ContentAssertions             bool
 	SecurityValidation            bool
+	AuthenticationFunc            AuthenticationFunc
 	OpenAPIMode                   bool // Enable OpenAPI-specific vocabulary validation
 	AllowScalarCoercion           bool // Enable string->boolean/number coercion
 	Formats                       map[string]func(v any) error
@@ -77,6 +93,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.FormatAssertions = options.FormatAssertions
 			o.ContentAssertions = options.ContentAssertions
 			o.SecurityValidation = options.SecurityValidation
+			o.AuthenticationFunc = options.AuthenticationFunc
 			o.OpenAPIMode = options.OpenAPIMode
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
@@ -137,6 +154,14 @@ func WithContentAssertions() Option {
 func WithoutSecurityValidation() Option {
 	return func(o *ValidationOptions) {
 		o.SecurityValidation = false
+	}
+}
+
+// WithAuthenticationFunc sets a custom function for validating security requirements.
+// When set, the function is authoritative for all security scheme types, including oauth2 and openIdConnect.
+func WithAuthenticationFunc(fn AuthenticationFunc) Option {
+	return func(o *ValidationOptions) {
+		o.AuthenticationFunc = fn
 	}
 }
 

@@ -4,6 +4,7 @@
 package config
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"testing"
@@ -77,6 +78,25 @@ func TestWithoutSecurityValidation(t *testing.T) {
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+}
+
+func TestWithAuthenticationFunc(t *testing.T) {
+	called := false
+	authFn := func(ctx context.Context, input *AuthenticationInput) error {
+		called = true
+		assert.NotNil(t, ctx)
+		assert.Equal(t, "ApiKeyAuth", input.SecuritySchemeName)
+		return nil
+	}
+
+	opts := NewValidationOptions(WithAuthenticationFunc(authFn))
+
+	assert.True(t, opts.SecurityValidation)
+	assert.NotNil(t, opts.AuthenticationFunc)
+	assert.NoError(t, opts.AuthenticationFunc(context.Background(), &AuthenticationInput{
+		SecuritySchemeName: "ApiKeyAuth",
+	}))
+	assert.True(t, called)
 }
 
 func TestWithRegexEngine(t *testing.T) {
@@ -258,6 +278,24 @@ func TestWithExistingOpts_SecurityValidationCopied(t *testing.T) {
 	opts2 := NewValidationOptions(WithExistingOpts(original2))
 
 	assert.True(t, opts2.SecurityValidation)
+}
+
+func TestWithExistingOpts_AuthenticationFuncCopied(t *testing.T) {
+	called := false
+	authFn := func(context.Context, *AuthenticationInput) error {
+		called = true
+		return nil
+	}
+
+	original := &ValidationOptions{
+		AuthenticationFunc: authFn,
+	}
+
+	opts := NewValidationOptions(WithExistingOpts(original))
+
+	assert.NotNil(t, opts.AuthenticationFunc)
+	assert.NoError(t, opts.AuthenticationFunc(context.Background(), &AuthenticationInput{}))
+	assert.True(t, called)
 }
 
 // Tests for new OpenAPI and scalar coercion configuration options
