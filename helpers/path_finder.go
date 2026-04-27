@@ -27,7 +27,7 @@ func ExtractJSONPathFromValidationError(e *jsonschema.ValidationError) string {
 		for _, seg := range e.InstanceLocation {
 			switch {
 			case isNumeric(seg):
-				b.WriteString(fmt.Sprintf("[%s]", seg))
+				fmt.Fprintf(&b, "[%s]", seg)
 
 			case isSimpleIdentifier(seg):
 				b.WriteByte('.')
@@ -129,7 +129,7 @@ func ExtractJSONPathFromInstanceLocation(instanceLocation []string) string {
 	for _, seg := range instanceLocation {
 		switch {
 		case isNumeric(seg):
-			b.WriteString(fmt.Sprintf("[%s]", seg))
+			fmt.Fprintf(&b, "[%s]", seg)
 
 		case isSimpleIdentifier(seg):
 			b.WriteByte('.')

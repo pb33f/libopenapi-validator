@@ -718,6 +718,20 @@ func TestDeepObjectPathConflict(t *testing.T) {
 				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "other"}},
 			},
 		},
+		{
+			name: "different roots",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested"}},
+				{Key: "obj", Values: []string{"ok"}, Property: "other", PropertyPath: []string{"other", "child"}},
+			},
+		},
+		{
+			name: "empty path is ignored",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"ignored"}},
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -733,7 +747,24 @@ func TestDeepObjectPathConflict(t *testing.T) {
 	}
 }
 
+func TestQueryParamDeepObjectPath(t *testing.T) {
+	require.Nil(t, queryParamDeepObjectPath(nil))
+	require.Nil(t, queryParamDeepObjectPath(&QueryParam{}))
+	require.Equal(t, []string{"root"}, queryParamDeepObjectPath(&QueryParam{Property: "root"}))
+	require.Equal(t, []string{"root", "child"}, queryParamDeepObjectPath(&QueryParam{
+		Property:     "root",
+		PropertyPath: []string{"root", "child"},
+	}))
+}
+
 func TestSetNestedDeepObjectValue_PreservesConflicts(t *testing.T) {
+	t.Run("empty path", func(t *testing.T) {
+		target := make(map[string]interface{})
+
+		require.True(t, setNestedDeepObjectValue(target, nil, "root"))
+		require.Equal(t, "root", target[""])
+	})
+
 	t.Run("scalar before nested", func(t *testing.T) {
 		target := make(map[string]interface{})
 
@@ -1170,6 +1201,17 @@ func TestConstructParamMapFromDeepObjectEncoding_WithSchema(t *testing.T) {
 		}
 		decoded := ConstructParamMapFromDeepObjectEncoding(values, sch)
 		require.Equal(t, "123", decoded["key1"].(map[string]interface{})["prop1"])
+	})
+
+	t.Run("preserves string values when root array items are strings", func(t *testing.T) {
+		sch := &base.Schema{
+			Type: []string{"array"},
+			Items: &base.DynamicValue[*base.SchemaProxy, bool]{
+				A: base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			},
+		}
+
+		require.Equal(t, "123", castWithSchema("123", sch, "unknown"))
 	})
 }
 
