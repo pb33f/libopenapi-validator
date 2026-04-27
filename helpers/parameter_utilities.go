@@ -388,19 +388,7 @@ func setNestedDeepObjectValue(target map[string]interface{}, propertyPath []stri
 		return true
 	}
 	current := target
-	for i, propertyName := range propertyPath {
-		if i == len(propertyPath)-1 {
-			if existing, exists := current[propertyName]; exists {
-				if _, existingIsMap := existing.(map[string]interface{}); existingIsMap {
-					if _, valueIsMap := value.(map[string]interface{}); !valueIsMap {
-						current[propertyName] = []interface{}{existing, value}
-						return false
-					}
-				}
-			}
-			current[propertyName] = value
-			return true
-		}
+	for _, propertyName := range propertyPath[:len(propertyPath)-1] {
 		next, ok := current[propertyName].(map[string]interface{})
 		if !ok {
 			if existing, exists := current[propertyName]; exists {
@@ -412,6 +400,17 @@ func setNestedDeepObjectValue(target map[string]interface{}, propertyPath []stri
 		}
 		current = next
 	}
+
+	propertyName := propertyPath[len(propertyPath)-1]
+	if existing, exists := current[propertyName]; exists {
+		if _, existingIsMap := existing.(map[string]interface{}); existingIsMap {
+			if _, valueIsMap := value.(map[string]interface{}); !valueIsMap {
+				current[propertyName] = []interface{}{existing, value}
+				return false
+			}
+		}
+	}
+	current[propertyName] = value
 	return true
 }
 
