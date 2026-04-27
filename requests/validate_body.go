@@ -4,10 +4,8 @@
 package requests
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -92,10 +90,8 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 			return true, nil
 		}
 
-		if request != nil && request.Body != nil {
-			requestBody, _ := io.ReadAll(request.Body)
-			_ = request.Body.Close()
-
+		if request != nil && (request.Body != nil || request.GetBody != nil) {
+			requestBody := readAndResetRequestBody(request)
 			stringedBody := string(requestBody)
 			var jsonBody any
 			var prevalidationErrors []*errors.ValidationError
@@ -121,7 +117,7 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 				}
 			}
 
-			request.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
+			setRequestBody(request, transformedBytes)
 		}
 	}
 
