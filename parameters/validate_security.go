@@ -12,6 +12,7 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/libopenapi/orderedmap"
 
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
@@ -84,7 +85,7 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 			}
 
 			secScheme := v.document.Components.SecuritySchemes.GetOrZero(secName)
-			schemeValid, schemeErrors := v.validateSecurityScheme(secScheme, sec, request, pathValue)
+			schemeValid, schemeErrors := v.validateSecurityScheme(secName, secScheme, pair.Value(), sec, request, pathValue)
 			if !schemeValid {
 				requirementSatisfied = false
 				requirementErrors = append(requirementErrors, schemeErrors...)
@@ -103,11 +104,17 @@ func (v *paramValidator) ValidateSecurityWithPathItem(request *http.Request, pat
 
 // validateSecurityScheme checks if a single security scheme is satisfied by the request.
 func (v *paramValidator) validateSecurityScheme(
+	secName string,
 	secScheme *v3.SecurityScheme,
+	scopes []string,
 	sec *base.SecurityRequirement,
 	request *http.Request,
 	pathValue string,
 ) (bool, []*errors.ValidationError) {
+	if v.options.AuthenticationFunc != nil {
+		return v.validateAuthenticationFunc(secName, secScheme, scopes, sec, request, pathValue)
+	}
+
 	switch strings.ToLower(secScheme.Type) {
 	case "http":
 		return v.validateHTTPSecurityScheme(secScheme, sec, request, pathValue)
@@ -116,6 +123,39 @@ func (v *paramValidator) validateSecurityScheme(
 	}
 	// unknown scheme type - consider it valid to avoid false negatives
 	return true, nil
+}
+
+func (v *paramValidator) validateAuthenticationFunc(
+	secName string,
+	secScheme *v3.SecurityScheme,
+	scopes []string,
+	sec *base.SecurityRequirement,
+	request *http.Request,
+	pathValue string,
+) (bool, []*errors.ValidationError) {
+	authErr := v.options.AuthenticationFunc(request.Context(), &config.AuthenticationInput{
+		Request:            request,
+		SecuritySchemeName: secName,
+		SecurityScheme:     secScheme,
+		Scopes:             scopes,
+	})
+	if authErr == nil {
+		return true, nil
+	}
+
+	validationErrors := []*errors.ValidationError{
+		{
+			Message:           fmt.Sprintf("Authentication failed for security scheme '%s'", secName),
+			Reason:            authErr.Error(),
+			ValidationType:    helpers.SecurityValidation,
+			ValidationSubType: secScheme.Type,
+			SpecLine:          sec.GoLow().Requirements.ValueNode.Line,
+			SpecCol:           sec.GoLow().Requirements.ValueNode.Column,
+			HowToFix:          fmt.Sprintf("Provide valid credentials for security scheme '%s'", secName),
+		},
+	}
+	errors.PopulateValidationErrors(validationErrors, request, pathValue)
+	return false, validationErrors
 }
 
 func (v *paramValidator) validateHTTPSecurityScheme(

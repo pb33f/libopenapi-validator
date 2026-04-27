@@ -4,6 +4,8 @@
 package parameters
 
 import (
+	"context"
+	stderrors "errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -1258,4 +1260,261 @@ components:
 	valid2, errors2 := v.ValidateSecurity(request2)
 	assert.True(t, valid2)
 	assert.Empty(t, errors2)
+}
+
+func TestParamValidator_ValidateSecurity_AuthenticationFunc_OAuth2Scopes(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OAuth2:
+          - read:products
+          - write:products
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read:products: Read products
+            write:products: Write products
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	type authContextKey struct{}
+	var request *http.Request
+	var gotScopes []string
+	called := 0
+	authFn := func(ctx context.Context, input *config.AuthenticationInput) error {
+		called++
+		assert.Equal(t, "ctx-value", ctx.Value(authContextKey{}))
+		assert.Equal(t, request, input.Request)
+		assert.Equal(t, "OAuth2", input.SecuritySchemeName)
+		assert.Equal(t, "oauth2", input.SecurityScheme.Type)
+		gotScopes = append([]string(nil), input.Scopes...)
+		return nil
+	}
+
+	v := NewParameterValidator(&m.Model, config.WithAuthenticationFunc(authFn))
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+	request = request.WithContext(context.WithValue(request.Context(), authContextKey{}, "ctx-value"))
+
+	valid, validationErrors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, validationErrors)
+	assert.Equal(t, 1, called)
+	assert.ElementsMatch(t, []string{"read:products", "write:products"}, gotScopes)
+}
+
+func TestParamValidator_ValidateSecurity_AuthenticationFunc_OpenIDConnect(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OpenID: []
+components:
+  securitySchemes:
+    OpenID:
+      type: openIdConnect
+      openIdConnectUrl: https://example.com/.well-known/openid-configuration
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	called := false
+	authFn := func(ctx context.Context, input *config.AuthenticationInput) error {
+		called = true
+		assert.NotNil(t, ctx)
+		assert.Equal(t, "OpenID", input.SecuritySchemeName)
+		assert.Equal(t, "openIdConnect", input.SecurityScheme.Type)
+		assert.Empty(t, input.Scopes)
+		return nil
+	}
+
+	v := NewParameterValidator(&m.Model, config.WithAuthenticationFunc(authFn))
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, validationErrors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, validationErrors)
+	assert.True(t, called)
+}
+
+func TestParamValidator_ValidateSecurity_AuthenticationFunc_ORSuccessAfterFirstFailure(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OAuth2:
+          - read:products
+        - ApiKeyAuth: []
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read:products: Read products
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	calls := make(map[string]int)
+	authFn := func(_ context.Context, input *config.AuthenticationInput) error {
+		calls[input.SecuritySchemeName]++
+		if input.SecuritySchemeName == "OAuth2" {
+			return stderrors.New("token missing")
+		}
+		return nil
+	}
+
+	v := NewParameterValidator(&m.Model, config.WithAuthenticationFunc(authFn))
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, validationErrors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, validationErrors)
+	assert.Equal(t, 1, calls["OAuth2"])
+	assert.Equal(t, 1, calls["ApiKeyAuth"])
+}
+
+func TestParamValidator_ValidateSecurity_AuthenticationFunc_ANDPartialFailure(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OAuth2:
+          - read:products
+          ApiKeyAuth: []
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read:products: Read products
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	calls := make(map[string]int)
+	authFn := func(_ context.Context, input *config.AuthenticationInput) error {
+		calls[input.SecuritySchemeName]++
+		if input.SecuritySchemeName == "ApiKeyAuth" {
+			return stderrors.New("api key denied")
+		}
+		return nil
+	}
+
+	v := NewParameterValidator(&m.Model, config.WithAuthenticationFunc(authFn))
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, validationErrors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, validationErrors, 1)
+	assert.Equal(t, "Authentication failed for security scheme 'ApiKeyAuth'", validationErrors[0].Message)
+	assert.Equal(t, "api key denied", validationErrors[0].Reason)
+	assert.Equal(t, 1, calls["OAuth2"])
+	assert.Equal(t, 1, calls["ApiKeyAuth"])
+}
+
+func TestParamValidator_ValidateSecurity_AuthenticationFunc_ErrorReturned(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OAuth2:
+          - read:products
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read:products: Read products
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	authFn := func(context.Context, *config.AuthenticationInput) error {
+		return stderrors.New("expired token")
+	}
+
+	v := NewParameterValidator(&m.Model, config.WithAuthenticationFunc(authFn))
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, validationErrors := v.ValidateSecurity(request)
+	assert.False(t, valid)
+	assert.Len(t, validationErrors, 1)
+	assert.Equal(t, "Authentication failed for security scheme 'OAuth2'", validationErrors[0].Message)
+	assert.Equal(t, "expired token", validationErrors[0].Reason)
+	assert.Equal(t, "security", validationErrors[0].ValidationType)
+	assert.Equal(t, "oauth2", validationErrors[0].ValidationSubType)
+	assert.Equal(t, request.Method, validationErrors[0].RequestMethod)
+	assert.Equal(t, request.URL.Path, validationErrors[0].RequestPath)
+	assert.Equal(t, "/products", validationErrors[0].SpecPath)
+}
+
+func TestParamValidator_ValidateSecurity_AuthenticationFunc_SkippedWhenSecurityValidationDisabled(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /products:
+    get:
+      security:
+        - OAuth2:
+          - read:products
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            read:products: Read products
+`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	called := false
+	authFn := func(context.Context, *config.AuthenticationInput) error {
+		called = true
+		return stderrors.New("should not be called")
+	}
+
+	v := NewParameterValidator(&m.Model, config.WithAuthenticationFunc(authFn), config.WithoutSecurityValidation())
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/products", nil)
+
+	valid, validationErrors := v.ValidateSecurity(request)
+	assert.True(t, valid)
+	assert.Empty(t, validationErrors)
+	assert.False(t, called)
 }
