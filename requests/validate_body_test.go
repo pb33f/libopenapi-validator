@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"testing"
@@ -640,6 +641,278 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_UsesGetBodyWhenBodyAlreadyConsumed(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, patties, vegetarian]
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	body := map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewReader(bodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+	_, _ = io.ReadAll(request.Body)
+
+	valid, validationErrors := v.ValidateRequestBody(request)
+	require.True(t, valid)
+	require.Empty(t, validationErrors)
+
+	restoredBody, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+	require.JSONEq(t, string(bodyBytes), string(restoredBody))
+
+	replayedBody, err := request.GetBody()
+	require.NoError(t, err)
+	replayedBytes, err := io.ReadAll(replayedBody)
+	require.NoError(t, err)
+	require.NoError(t, replayedBody.Close())
+	require.JSONEq(t, string(bodyBytes), string(replayedBytes))
+}
+
+func TestValidateBody_PrefersAssignedBodyOverStaleGetBody(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, patties, vegetarian]
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	staleBodyBytes, _ := json.Marshal(map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    false,
+		"vegetarian": true,
+	})
+	currentBodyBytes, _ := json.Marshal(map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	})
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewReader(staleBodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+	request.Body = io.NopCloser(bytes.NewReader(currentBodyBytes))
+
+	valid, validationErrors := v.ValidateRequestBody(request)
+	require.True(t, valid)
+	require.Empty(t, validationErrors)
+}
+
+func TestValidateBody_DoesNotUseStaleGetBodyForConsumedDifferentBodySameLength(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patties]
+              properties:
+                patties:
+                  type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	staleBodyBytes := []byte(`{"patties":12345}`)
+	currentBodyBytes := []byte(`{"patties":false}`)
+	require.Len(t, currentBodyBytes, len(staleBodyBytes))
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewReader(staleBodyBytes))
+	request.Header.Set("Content-Type", "application/json")
+	request.Body = io.NopCloser(bytes.NewReader(currentBodyBytes))
+	_, _ = io.ReadAll(request.Body)
+
+	valid, validationErrors := v.ValidateRequestBody(request)
+	require.False(t, valid)
+	require.Len(t, validationErrors, 1)
+	require.Equal(t, "POST request body is empty for '/burgers/createBurger'", validationErrors[0].Message)
+
+	replayedBody, err := request.GetBody()
+	require.NoError(t, err)
+	replayedBytes, err := io.ReadAll(replayedBody)
+	require.NoError(t, err)
+	require.NoError(t, replayedBody.Close())
+	require.Empty(t, replayedBytes)
+}
+
+func TestValidateBody_DoesNotUseStaleGetBodyForExplicitEmptyBody(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, patties, vegetarian]
+              properties:
+                name:
+                  type: string
+                patties:
+                  type: integer
+                vegetarian:
+                  type: boolean`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	staleBodyBytes, _ := json.Marshal(map[string]interface{}{
+		"name":       "Big Mac",
+		"patties":    2,
+		"vegetarian": true,
+	})
+
+	tests := []struct {
+		name string
+		body io.ReadCloser
+	}{
+		{
+			name: "http no body",
+			body: http.NoBody,
+		},
+		{
+			name: "empty reader",
+			body: io.NopCloser(bytes.NewReader(nil)),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+				bytes.NewReader(staleBodyBytes))
+			request.Header.Set("Content-Type", "application/json")
+			request.Body = tc.body
+
+			valid, validationErrors := v.ValidateRequestBody(request)
+			require.False(t, valid)
+			require.Len(t, validationErrors, 1)
+			require.Equal(t, "POST request body is empty for '/burgers/createBurger'", validationErrors[0].Message)
+
+			replayedBody, err := request.GetBody()
+			require.NoError(t, err)
+			replayedBytes, err := io.ReadAll(replayedBody)
+			require.NoError(t, err)
+			require.NoError(t, replayedBody.Close())
+			require.Empty(t, replayedBytes)
+		})
+	}
+}
+
+func TestRequestBodyHelpers_NilRequest(t *testing.T) {
+	setRequestBody(nil, []byte(`{"ok":true}`))
+	require.Nil(t, readAndResetRequestBody(nil))
+}
+
+type requestBodyReaderTestBody struct{}
+
+func (r *requestBodyReaderTestBody) Read(_ []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (r *requestBodyReaderTestBody) Close() error {
+	return nil
+}
+
+type failingReplayableBody struct{}
+
+func (r *failingReplayableBody) Read(_ []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (r *failingReplayableBody) Close() error {
+	return nil
+}
+
+func (r *failingReplayableBody) ReadAt(_ []byte, _ int64) (int, error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+func (r *failingReplayableBody) Size() int64 {
+	return 1
+}
+
+func TestRequestBodyReader_DefensiveBranches(t *testing.T) {
+	require.Nil(t, requestBodyReader(nil))
+	require.Nil(t, requestBodyReader(http.NoBody))
+
+	var nilBody *requestBodyReaderTestBody
+	require.Nil(t, requestBodyReader(nilBody))
+
+	body := &requestBodyReaderTestBody{}
+	require.Same(t, body, requestBodyReader(body))
+}
+
+func TestRequestBodySnapshot_DefensiveBranches(t *testing.T) {
+	snapshot, ok := requestBodySnapshot(nil)
+	require.False(t, ok)
+	require.Nil(t, snapshot)
+
+	snapshot, ok = requestBodySnapshot(&http.Request{Body: &requestBodyReaderTestBody{}})
+	require.False(t, ok)
+	require.Nil(t, snapshot)
+
+	snapshot, ok = requestBodySnapshot(&http.Request{Body: io.NopCloser(bytes.NewReader(nil))})
+	require.False(t, ok)
+	require.Nil(t, snapshot)
+
+	snapshot, ok = requestBodySnapshot(&http.Request{Body: &failingReplayableBody{}})
+	require.False(t, ok)
+	require.Nil(t, snapshot)
 }
 
 func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {
