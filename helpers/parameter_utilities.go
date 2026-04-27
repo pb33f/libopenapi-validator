@@ -19,9 +19,10 @@ import (
 // it's used for complex query types that need to be parsed and tracked differently depending
 // on the encoding styles used.
 type QueryParam struct {
-	Key      string
-	Values   []string
-	Property string
+	Key          string
+	Values       []string
+	Property     string
+	PropertyPath []string
 }
 
 // ExtractParamsForOperation will extract the parameters for the operation based on the request method.
@@ -203,21 +204,215 @@ func getPropertySchema(objectSchema *base.Schema, propertyName string) *base.Sch
 	return proxy.Schema()
 }
 
+func getAdditionalPropertiesSchema(objectSchema *base.Schema) *base.Schema {
+	if objectSchema == nil || objectSchema.AdditionalProperties == nil || !objectSchema.AdditionalProperties.IsA() ||
+		objectSchema.AdditionalProperties.A == nil {
+		return nil
+	}
+	return objectSchema.AdditionalProperties.A.Schema()
+}
+
+func getSchemaForObjectProperty(objectSchema *base.Schema, propertyName string) *base.Schema {
+	if propSchema := getPropertySchema(objectSchema, propertyName); propSchema != nil {
+		return propSchema
+	}
+	return getAdditionalPropertiesSchema(objectSchema)
+}
+
+// ParseDeepObjectKey splits a query-string key using qs-style deepObject bracket notation.
+// It returns ok=false for non-deepObject keys or malformed bracket paths.
+func ParseDeepObjectKey(key string) (baseName string, propertyPath []string, ok bool) {
+	open := strings.IndexRune(key, '[')
+	if open <= 0 {
+		return "", nil, false
+	}
+	baseName = key[:open]
+	rest := key[open:]
+	for len(rest) > 0 {
+		if rest[0] != '[' {
+			return "", nil, false
+		}
+		close := strings.IndexRune(rest, ']')
+		if close <= 1 {
+			return "", nil, false
+		}
+		propertyPath = append(propertyPath, rest[1:close])
+		rest = rest[close+1:]
+	}
+	return baseName, propertyPath, len(propertyPath) > 0
+}
+
 // castWithSchema casts a string value consulting the schema for the property's declared type.
-// If the schema says the property is a string, the value is returned as-is (no numeric/bool guessing).
+// If the schema says the property, or array property item, is a string, the value is returned
+// as-is (no numeric/bool guessing).
 // For other declared types, it falls back to cast() which produces correct results for integer,
 // number, and boolean values. The explicit string check prevents the most common miscast: numeric-
 // looking strings like "10" being converted to int64 when the schema declares type: string.
 func castWithSchema(v string, objectSchema *base.Schema, propertyName string) any {
-	propSchema := getPropertySchema(objectSchema, propertyName)
+	propSchema := schemaForPropertyPath(objectSchema, []string{propertyName})
+	if schemaPreservesStringValue(propSchema) {
+		return v
+	}
+	if propSchema == nil && schemaPreservesStringValue(objectSchema) {
+		return v
+	}
+	return cast(v)
+}
+
+func queryParamPropertyPath(v *QueryParam) []string {
+	if len(v.PropertyPath) > 0 {
+		return v.PropertyPath
+	}
+	return []string{v.Property}
+}
+
+func queryParamDeepObjectPath(v *QueryParam) []string {
+	if v == nil {
+		return nil
+	}
+	if len(v.PropertyPath) > 0 {
+		return v.PropertyPath
+	}
+	if v.Property != "" {
+		return []string{v.Property}
+	}
+	return nil
+}
+
+func schemaForPropertyPath(objectSchema *base.Schema, propertyPath []string) *base.Schema {
+	current := objectSchema
+	for _, propertyName := range propertyPath {
+		current = getSchemaForObjectProperty(current, propertyName)
+		if current == nil {
+			return nil
+		}
+	}
+	return current
+}
+
+func schemaTypeIncludes(sch *base.Schema, schemaType string) bool {
+	return sch != nil && slices.Contains(sch.Type, schemaType)
+}
+
+func schemaArrayItems(sch *base.Schema) *base.Schema {
+	if sch == nil || sch.Items == nil || !sch.Items.IsA() || sch.Items.A == nil {
+		return nil
+	}
+	return sch.Items.A.Schema()
+}
+
+func schemaPreservesStringValue(sch *base.Schema) bool {
+	if schemaTypeIncludes(sch, String) {
+		return true
+	}
+	return schemaTypeIncludes(sch, Array) && schemaTypeIncludes(schemaArrayItems(sch), String)
+}
+
+// DeepObjectAllowsMultipleValues reports whether repeated values are allowed for a deepObject
+// property. It preserves existing top-level array/additionalProperties behavior and adds support
+// for nested properties declared as arrays.
+func DeepObjectAllowsMultipleValues(objectSchema *base.Schema, qp *QueryParam) bool {
+	if objectSchema == nil {
+		return false
+	}
+	if schemaTypeIncludes(objectSchema, Array) {
+		return true
+	}
+	propertyPath := queryParamPropertyPath(qp)
+	if schemaTypeIncludes(schemaForPropertyPath(objectSchema, propertyPath), Array) {
+		return true
+	}
+	return schemaTypeIncludes(getAdditionalPropertiesSchema(objectSchema), Array)
+}
+
+func schemaForCastingPath(objectSchema *base.Schema, propertyPath []string) *base.Schema {
+	propSchema := schemaForPropertyPath(objectSchema, propertyPath)
 	if propSchema != nil {
-		for _, t := range propSchema.Type {
-			if t == String {
-				return v
+		return propSchema
+	}
+	if schemaTypeIncludes(objectSchema, Array) {
+		return objectSchema
+	}
+	return nil
+}
+
+func castWithSchemaPath(v string, objectSchema *base.Schema, propertyPath []string) any {
+	if schemaPreservesStringValue(schemaForCastingPath(objectSchema, propertyPath)) {
+		return v
+	}
+	if len(propertyPath) == 1 {
+		return castWithSchema(v, objectSchema, propertyPath[0])
+	}
+	return cast(v)
+}
+
+func deepObjectPathHasPrefix(prefix, path []string) bool {
+	if len(prefix) >= len(path) {
+		return false
+	}
+	for i := range prefix {
+		if prefix[i] != path[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// DeepObjectPathConflict reports whether any deepObject property path is also used
+// as a prefix for a nested path, such as obj[nested] and obj[nested][child].
+func DeepObjectPathConflict(values []*QueryParam) (prefixParam, nestedParam *QueryParam, ok bool) {
+	for i := range values {
+		leftPath := queryParamDeepObjectPath(values[i])
+		if len(leftPath) == 0 {
+			continue
+		}
+		for j := i + 1; j < len(values); j++ {
+			rightPath := queryParamDeepObjectPath(values[j])
+			if len(rightPath) == 0 || slices.Equal(leftPath, rightPath) {
+				continue
+			}
+			if deepObjectPathHasPrefix(leftPath, rightPath) {
+				return values[i], values[j], true
+			}
+			if deepObjectPathHasPrefix(rightPath, leftPath) {
+				return values[j], values[i], true
 			}
 		}
 	}
-	return cast(v)
+	return nil, nil, false
+}
+
+func setNestedDeepObjectValue(target map[string]interface{}, propertyPath []string, value any) bool {
+	if len(propertyPath) == 0 {
+		target[""] = value
+		return true
+	}
+	current := target
+	for i, propertyName := range propertyPath {
+		if i == len(propertyPath)-1 {
+			if existing, exists := current[propertyName]; exists {
+				if _, existingIsMap := existing.(map[string]interface{}); existingIsMap {
+					if _, valueIsMap := value.(map[string]interface{}); !valueIsMap {
+						current[propertyName] = []interface{}{existing, value}
+						return false
+					}
+				}
+			}
+			current[propertyName] = value
+			return true
+		}
+		next, ok := current[propertyName].(map[string]interface{})
+		if !ok {
+			if existing, exists := current[propertyName]; exists {
+				current[propertyName] = []interface{}{existing, value}
+				return false
+			}
+			next = make(map[string]interface{})
+			current[propertyName] = next
+		}
+		current = next
+	}
+	return true
 }
 
 // constructKVFromDelimited is the shared implementation for constructing key=value maps
@@ -258,56 +453,26 @@ func constructParamMapFromDelimitedEncoding(values []*QueryParam, delimiter stri
 func ConstructParamMapFromDeepObjectEncoding(values []*QueryParam, sch *base.Schema) map[string]interface{} {
 	decoded := make(map[string]interface{})
 	for _, v := range values {
+		propertyPath := queryParamPropertyPath(v)
 		castForProp := func(val string) any {
-			return castWithSchema(val, sch, v.Property)
+			return castWithSchemaPath(val, sch, propertyPath)
 		}
 
-		if decoded[v.Key] == nil {
-			props := make(map[string]interface{})
-			rawValues := make([]interface{}, len(v.Values))
-			for i := range v.Values {
-				rawValues[i] = castForProp(v.Values[i])
-			}
-			// check if the schema for the param is an array
-			if sch != nil && slices.Contains(sch.Type, Array) {
-				props[v.Property] = rawValues
-			}
-			// check if schema has additional properties defined as an array
-			if sch != nil && sch.AdditionalProperties != nil &&
-				sch.AdditionalProperties.IsA() {
-				s := sch.AdditionalProperties.A.Schema()
-				if s != nil &&
-					slices.Contains(s.Type, Array) {
-					props[v.Property] = rawValues
-				}
-			}
-
-			if len(props) == 0 {
-				props[v.Property] = castForProp(v.Values[0])
-			}
+		props, ok := decoded[v.Key].(map[string]interface{})
+		if !ok {
+			props = make(map[string]interface{})
 			decoded[v.Key] = props
-		} else {
-			added := false
-			rawValues := make([]interface{}, len(v.Values))
-			for i := range v.Values {
-				rawValues[i] = castForProp(v.Values[i])
-			}
-			// check if the schema for the param is an array
-			if sch != nil && slices.Contains(sch.Type, Array) {
-				decoded[v.Key].(map[string]interface{})[v.Property] = rawValues
-				added = true
-			}
-			// check if schema has additional properties defined as an array
-			if sch != nil && sch.AdditionalProperties != nil &&
-				sch.AdditionalProperties.IsA() &&
-				slices.Contains(sch.AdditionalProperties.A.Schema().Type, Array) {
-				decoded[v.Key].(map[string]interface{})[v.Property] = rawValues
-				added = true
-			}
-			if !added {
-				decoded[v.Key].(map[string]interface{})[v.Property] = castForProp(v.Values[0])
-			}
 		}
+
+		rawValues := make([]interface{}, len(v.Values))
+		for i := range v.Values {
+			rawValues[i] = castForProp(v.Values[i])
+		}
+		if DeepObjectAllowsMultipleValues(sch, v) {
+			setNestedDeepObjectValue(props, propertyPath, rawValues)
+			continue
+		}
+		setNestedDeepObjectValue(props, propertyPath, castForProp(v.Values[0]))
 	}
 	return decoded
 }

@@ -3261,7 +3261,7 @@ paths:
 }
 
 // https://github.com/pb33f/wiretap/issues/82
-func TestNewValidator_QueryParamValidateStyle_DeepObjectAdditionalPropertiesArray_Fail(t *testing.T) {
+func TestNewValidator_QueryParamValidateStyle_DeepObjectAdditionalPropertiesArrayNumericStrings(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /anything/queryParams/deepObject/map:
@@ -3292,9 +3292,8 @@ paths:
 		"https://things.com/anything/queryParams/deepObject/map?mapArrParam[test2]=23&mapArrParam[test2]=test4&mapArrParam[test]=test&mapArrParam[test]=test2", nil)
 
 	valid, errors := v.ValidateQueryParams(request)
-	assert.False(t, valid)
-	assert.Len(t, errors, 1)
-	assert.Equal(t, "got number, want string", errors[0].SchemaValidationErrors[0].Reason)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
 }
 
 // https://github.com/pb33f/wiretap/issues/83
@@ -3390,6 +3389,251 @@ components:
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "The query parameter 'objParam' is defined as an object,"+
 		" however it failed to pass a schema validation", errors[0].Reason)
+}
+
+// https://github.com/pb33f/libopenapi-validator/issues/83
+func TestNewValidator_QueryParamValidateStyle_NestedDeepObject(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /path:
+    get:
+      parameters:
+        - name: obj
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              root:
+                type: string
+              nested:
+                type: object
+                properties:
+                  child:
+                    type: string
+          required: true
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, err := doc.BuildV3Model()
+	require.NoError(t, err)
+
+	v := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/path?obj[root]=test1&obj[nested][child]=test2", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamValidateStyle_NestedDeepObjectInvalidLeafType(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /path:
+    get:
+      parameters:
+        - name: obj
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              nested:
+                type: object
+                properties:
+                  child:
+                    type: boolean
+          required: true
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, err := doc.BuildV3Model()
+	require.NoError(t, err)
+
+	v := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/path?obj[nested][child]=not-a-bool", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	require.NotEmpty(t, errors[0].SchemaValidationErrors)
+	assert.Equal(t, "got string, want boolean", errors[0].SchemaValidationErrors[0].Reason)
+	assert.Equal(t, "$.nested.child", errors[0].SchemaValidationErrors[0].FieldPath)
+}
+
+func TestNewValidator_QueryParamValidateStyle_NestedDeepObjectRequiredLeaf(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /path:
+    get:
+      parameters:
+        - name: obj
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            required: [nested]
+            properties:
+              nested:
+                type: object
+                required: [child]
+                properties:
+                  child:
+                    type: string
+                  other:
+                    type: string
+          required: true
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, err := doc.BuildV3Model()
+	require.NoError(t, err)
+
+	v := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/path?obj[nested][other]=value", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	require.NotEmpty(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "missing")
+}
+
+func TestNewValidator_QueryParamValidateStyle_NestedDeepObjectArray(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /path:
+    get:
+      parameters:
+        - name: obj
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              nested:
+                type: object
+                properties:
+                  tags:
+                    type: array
+                    items:
+                      type: string
+          required: true
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, err := doc.BuildV3Model()
+	require.NoError(t, err)
+
+	v := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/path?obj[nested][tags]=123&obj[nested][tags]=456", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamValidateStyle_NestedDeepObjectAdditionalPropertiesArray(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /path:
+    get:
+      parameters:
+        - name: obj
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              filters:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+          required: true
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, err := doc.BuildV3Model()
+	require.NoError(t, err)
+
+	v := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/path?obj[filters][tag]=123&obj[filters][tag]=456", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamValidateStyle_NestedDeepObjectPathConflict(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /path:
+    get:
+      parameters:
+        - name: obj
+          in: query
+          style: deepObject
+          schema:
+            type: object
+            properties:
+              nested:
+                type: object
+                properties:
+                  child:
+                    type: string
+          required: true
+      responses:
+        "200":
+          description: OK`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, err := doc.BuildV3Model()
+	require.NoError(t, err)
+
+	v := NewParameterValidator(&m.Model)
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/path?obj[nested]=bad&obj[nested][child]=ok", nil)
+
+	valid, validationErrors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	require.NotEmpty(t, validationErrors)
+	assert.Contains(t, validationErrors[0].Reason, "property path 'nested'")
+	assert.Contains(t, validationErrors[0].Reason, "'nested.child'")
 }
 
 func TestNewValidator_ValidateRawMap(t *testing.T) {

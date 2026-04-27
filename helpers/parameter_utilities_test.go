@@ -535,6 +535,253 @@ func TestConstructParamMapFromDeepObjectEncoding_ElseCase(t *testing.T) {
 	require.Equal(t, int64(999), decoded["key1"].(map[string]interface{})["prop3"])
 }
 
+func TestParseDeepObjectKey(t *testing.T) {
+	tests := []struct {
+		name         string
+		key          string
+		expectedBase string
+		expectedPath []string
+		expectedOK   bool
+	}{
+		{
+			name:         "flat",
+			key:          "obj[root]",
+			expectedBase: "obj",
+			expectedPath: []string{"root"},
+			expectedOK:   true,
+		},
+		{
+			name:         "nested",
+			key:          "obj[nested][child]",
+			expectedBase: "obj",
+			expectedPath: []string{"nested", "child"},
+			expectedOK:   true,
+		},
+		{
+			name:       "plain key",
+			key:        "obj",
+			expectedOK: false,
+		},
+		{
+			name:       "empty segment",
+			key:        "obj[]",
+			expectedOK: false,
+		},
+		{
+			name:       "trailing text",
+			key:        "obj[root]extra",
+			expectedOK: false,
+		},
+		{
+			name:       "missing closing bracket",
+			key:        "obj[root",
+			expectedOK: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			baseName, propertyPath, ok := ParseDeepObjectKey(tc.key)
+			require.Equal(t, tc.expectedOK, ok)
+			require.Equal(t, tc.expectedBase, baseName)
+			require.Equal(t, tc.expectedPath, propertyPath)
+		})
+	}
+}
+
+func TestConstructParamMapFromDeepObjectEncoding_NestedObject(t *testing.T) {
+	sch := &base.Schema{
+		Type: []string{"object"},
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"root": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+			"nested": base.CreateSchemaProxy(&base.Schema{
+				Type: []string{"object"},
+				Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+					"child": base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+					"count": base.CreateSchemaProxy(&base.Schema{Type: []string{"integer"}}),
+				}),
+			}),
+		}),
+	}
+	values := []*QueryParam{
+		{Key: "obj", Values: []string{"test1"}, Property: "root", PropertyPath: []string{"root"}},
+		{Key: "obj", Values: []string{"10"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+		{Key: "obj", Values: []string{"42"}, Property: "nested", PropertyPath: []string{"nested", "count"}},
+	}
+
+	decoded := ConstructParamMapFromDeepObjectEncoding(values, sch)
+	obj := decoded["obj"].(map[string]interface{})
+	nested := obj["nested"].(map[string]interface{})
+
+	require.Equal(t, "test1", obj["root"])
+	require.Equal(t, "10", nested["child"])
+	require.Equal(t, int64(42), nested["count"])
+}
+
+func TestConstructParamMapFromDeepObjectEncoding_NestedArray(t *testing.T) {
+	sch := &base.Schema{
+		Type: []string{"object"},
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"nested": base.CreateSchemaProxy(&base.Schema{
+				Type: []string{"object"},
+				Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+					"tags": base.CreateSchemaProxy(&base.Schema{
+						Type: []string{"array"},
+						Items: &base.DynamicValue[*base.SchemaProxy, bool]{
+							A: base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+						},
+					}),
+				}),
+			}),
+		}),
+	}
+	values := []*QueryParam{
+		{Key: "obj", Values: []string{"123", "456"}, Property: "nested", PropertyPath: []string{"nested", "tags"}},
+	}
+
+	decoded := ConstructParamMapFromDeepObjectEncoding(values, sch)
+	obj := decoded["obj"].(map[string]interface{})
+	nested := obj["nested"].(map[string]interface{})
+
+	require.Equal(t, []interface{}{"123", "456"}, nested["tags"])
+	require.True(t, DeepObjectAllowsMultipleValues(sch, values[0]))
+}
+
+func TestConstructParamMapFromDeepObjectEncoding_NestedAdditionalPropertiesArray(t *testing.T) {
+	sch := &base.Schema{
+		Type: []string{"object"},
+		Properties: orderedmap.ToOrderedMap(map[string]*base.SchemaProxy{
+			"filters": base.CreateSchemaProxy(&base.Schema{
+				Type: []string{"object"},
+				AdditionalProperties: &base.DynamicValue[*base.SchemaProxy, bool]{
+					A: base.CreateSchemaProxy(&base.Schema{
+						Type: []string{"array"},
+						Items: &base.DynamicValue[*base.SchemaProxy, bool]{
+							A: base.CreateSchemaProxy(&base.Schema{Type: []string{"string"}}),
+						},
+					}),
+				},
+			}),
+		}),
+	}
+	values := []*QueryParam{
+		{Key: "obj", Values: []string{"123", "456"}, Property: "filters", PropertyPath: []string{"filters", "tag"}},
+	}
+
+	decoded := ConstructParamMapFromDeepObjectEncoding(values, sch)
+	obj := decoded["obj"].(map[string]interface{})
+	filters := obj["filters"].(map[string]interface{})
+
+	require.Equal(t, []interface{}{"123", "456"}, filters["tag"])
+	require.True(t, DeepObjectAllowsMultipleValues(sch, values[0]))
+}
+
+func TestDeepObjectPathConflict(t *testing.T) {
+	tests := []struct {
+		name       string
+		values     []*QueryParam
+		expect     bool
+		prefixPath []string
+		nestedPath []string
+	}{
+		{
+			name: "scalar before nested",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"bad"}, Property: "nested", PropertyPath: []string{"nested"}},
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+			},
+			expect:     true,
+			prefixPath: []string{"nested"},
+			nestedPath: []string{"nested", "child"},
+		},
+		{
+			name: "nested before scalar",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+				{Key: "obj", Values: []string{"bad"}, Property: "nested", PropertyPath: []string{"nested"}},
+			},
+			expect:     true,
+			prefixPath: []string{"nested"},
+			nestedPath: []string{"nested", "child"},
+		},
+		{
+			name: "same array path",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"alpha"}, Property: "nested", PropertyPath: []string{"nested", "tags"}},
+				{Key: "obj", Values: []string{"beta"}, Property: "nested", PropertyPath: []string{"nested", "tags"}},
+			},
+		},
+		{
+			name: "sibling nested paths",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "other"}},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prefixParam, nestedParam, ok := DeepObjectPathConflict(tc.values)
+			require.Equal(t, tc.expect, ok)
+			if !tc.expect {
+				return
+			}
+			require.Equal(t, tc.prefixPath, prefixParam.PropertyPath)
+			require.Equal(t, tc.nestedPath, nestedParam.PropertyPath)
+		})
+	}
+}
+
+func TestSetNestedDeepObjectValue_PreservesConflicts(t *testing.T) {
+	t.Run("scalar before nested", func(t *testing.T) {
+		target := make(map[string]interface{})
+
+		require.True(t, setNestedDeepObjectValue(target, []string{"nested"}, "bad"))
+		require.False(t, setNestedDeepObjectValue(target, []string{"nested", "child"}, "ok"))
+		require.IsType(t, []interface{}{}, target["nested"])
+	})
+
+	t.Run("nested before scalar", func(t *testing.T) {
+		target := make(map[string]interface{})
+
+		require.True(t, setNestedDeepObjectValue(target, []string{"nested", "child"}, "ok"))
+		require.False(t, setNestedDeepObjectValue(target, []string{"nested"}, "bad"))
+		require.IsType(t, []interface{}{}, target["nested"])
+	})
+}
+
+func TestConstructParamMapFromDeepObjectEncoding_NestedPathConflict(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []*QueryParam
+	}{
+		{
+			name: "scalar before nested",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"bad"}, Property: "nested", PropertyPath: []string{"nested"}},
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+			},
+		},
+		{
+			name: "nested before scalar",
+			values: []*QueryParam{
+				{Key: "obj", Values: []string{"ok"}, Property: "nested", PropertyPath: []string{"nested", "child"}},
+				{Key: "obj", Values: []string{"bad"}, Property: "nested", PropertyPath: []string{"nested"}},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			decoded := ConstructParamMapFromDeepObjectEncoding(tc.values, nil)
+			obj := decoded["obj"].(map[string]interface{})
+
+			require.IsType(t, []interface{}{}, obj["nested"])
+		})
+	}
+}
+
 func TestConstructKVFromLabelEncoding(t *testing.T) {
 	// Test case 1: Empty input string
 	values := ""

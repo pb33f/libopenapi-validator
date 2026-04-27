@@ -87,6 +87,47 @@ func InvalidDeepObject(param *v3.Parameter, qp *helpers.QueryParam) *ValidationE
 	}
 }
 
+func deepObjectPathForError(qp *helpers.QueryParam) string {
+	if qp == nil {
+		return ""
+	}
+	if len(qp.PropertyPath) > 0 {
+		return strings.Join(qp.PropertyPath, ".")
+	}
+	return qp.Property
+}
+
+func deepObjectBracketPathForError(qp *helpers.QueryParam) string {
+	if qp == nil {
+		return ""
+	}
+	if len(qp.PropertyPath) > 0 {
+		return strings.Join(qp.PropertyPath, "][")
+	}
+	return qp.Property
+}
+
+func InvalidDeepObjectPathConflict(param *v3.Parameter, prefixParam, nestedParam *helpers.QueryParam) *ValidationError {
+	specLine, specCol := paramStyleLineCol(param)
+	prefixPath := deepObjectPathForError(prefixParam)
+	nestedPath := deepObjectPathForError(nestedParam)
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query parameter '%s' is not a valid deepObject", param.Name),
+		Reason: fmt.Sprintf("The query parameter '%s' has the 'deepObject' style defined, "+
+			"but the property path '%s' is also used as a nested object prefix for '%s'",
+			param.Name, prefixPath, nestedPath),
+		SpecLine:      specLine,
+		SpecCol:       specCol,
+		ParameterName: param.Name,
+		Context:       param,
+		HowToFix: fmt.Sprintf(HowToFixParamInvalidDeepObjectPathConflict,
+			param.Name, deepObjectBracketPathForError(prefixParam),
+			param.Name, deepObjectBracketPathForError(nestedParam)),
+	}
+}
+
 func QueryParameterMissing(param *v3.Parameter, pathTemplate string, operation string, renderedSchema string) *ValidationError {
 	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "required")
 	specLine, specCol := paramRequiredLineCol(param)

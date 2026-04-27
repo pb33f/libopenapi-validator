@@ -6,7 +6,6 @@ package parameters
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -249,26 +248,19 @@ func ValidateQueryArray(
 // ValidateQueryParamStyle will validate a query parameter by style
 func ValidateQueryParamStyle(param *v3.Parameter, as []*helpers.QueryParam) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
+	if param.Style == helpers.DeepObject {
+		if prefixParam, nestedParam, ok := helpers.DeepObjectPathConflict(as); ok {
+			return []*errors.ValidationError{errors.InvalidDeepObjectPathConflict(param, prefixParam, nestedParam)}
+		}
+	}
 stopValidation:
 	for _, qp := range as {
 		for i := range qp.Values {
 			switch param.Style {
 			case helpers.DeepObject:
 				// check if the object has additional properties defined that treat this as an array
-				if param.Schema != nil {
-					pSchema := param.Schema.Schema()
-					if slices.Contains(pSchema.Type, helpers.Array) {
-						continue
-					}
-					if pSchema.AdditionalProperties != nil && pSchema.AdditionalProperties.IsA() {
-						addPropSchema := pSchema.AdditionalProperties.A.Schema()
-						if len(addPropSchema.Type) > 0 {
-							if slices.Contains(addPropSchema.Type, helpers.Array) {
-								// an array can have more than one value.
-								continue
-							}
-						}
-					}
+				if param.Schema != nil && helpers.DeepObjectAllowsMultipleValues(param.Schema.Schema(), qp) {
+					continue
 				}
 				if len(qp.Values) > 1 {
 					validationErrors = append(validationErrors, errors.InvalidDeepObject(param, qp))
