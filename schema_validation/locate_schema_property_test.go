@@ -12,3 +12,7 @@ import (
 func TestLocateSchemaPropertyNodeByJSONPath_BadNode(t *testing.T) {
 	assert.Nil(t, LocateSchemaPropertyNodeByJSONPath(nil, ""))
 }
+
+func TestLocateSchemaPropertyNode_EmptyPath(t *testing.T) {
+	assert.Nil(t, locateSchemaPropertyNode(nil, ""))
+}
