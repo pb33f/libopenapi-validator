@@ -6,6 +6,7 @@ package responses
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,7 +23,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
-	"github.com/pb33f/libopenapi-validator/errors"
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 	"github.com/pb33f/libopenapi-validator/strict"
@@ -45,23 +46,23 @@ type ValidateResponseSchemaInput struct {
 //
 // This function is used by the ValidateResponseBody function, but can be used independently.
 // The schema will be compiled from cache if available, otherwise it will be compiled and cached.
-func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors.ValidationError) {
+func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberrors.ValidationError) {
 	validationOptions := config.NewValidationOptions(input.Options...)
-	var validationErrors []*errors.ValidationError
+	var validationErrors []*liberrors.ValidationError
 	var renderedSchema, jsonSchema []byte
 	var referenceSchema string
 	var compiledSchema *jsonschema.Schema
 	var cachedNode *yaml.Node
 
 	if input.Schema == nil {
-		return false, []*errors.ValidationError{{
+		return false, []*liberrors.ValidationError{{
 			ValidationType:    helpers.ResponseBodyValidation,
 			ValidationSubType: helpers.Schema,
 			Message:           "schema is nil",
 			Reason:            "The schema to validate against is nil",
 		}}
 	} else if input.Schema.GoLow() == nil {
-		return false, []*errors.ValidationError{{
+		return false, []*liberrors.ValidationError{{
 			ValidationType:    helpers.ResponseBodyValidation,
 			ValidationSubType: helpers.Schema,
 			Message:           "schema cannot be rendered",
@@ -88,11 +89,11 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 
 		// If rendering failed (e.g., circular reference), return the render error
 		if renderErr != nil {
-			violation := &errors.SchemaValidationFailure{
+			violation := &liberrors.SchemaValidationFailure{
 				Reason:          renderErr.Error(),
 				ReferenceSchema: referenceSchema,
 			}
-			validationErrors = append(validationErrors, &errors.ValidationError{
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:    helpers.ResponseBodyValidation,
 				ValidationSubType: helpers.Schema,
 				Message: fmt.Sprintf("%d response body for '%s' failed schema rendering",
@@ -101,7 +102,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 					input.Response.StatusCode, renderErr.Error()),
 				SpecLine:               1,
 				SpecCol:                0,
-				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
 				HowToFix:               "check the response schema for circular references or invalid structures",
 				Context:                referenceSchema,
 			})
@@ -119,7 +120,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			input.Version,
 		)
 		if err != nil {
-			validationErrors = append(validationErrors, &errors.ValidationError{
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:    helpers.ResponseBodyValidation,
 				ValidationSubType: helpers.Schema,
 				Message: fmt.Sprintf("%d response body for '%s' failed schema compilation",
@@ -157,7 +158,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			return len(validationErrors) == 0, validationErrors
 		}
 		// cannot decode the response body, so it's not valid
-		validationErrors = append(validationErrors, &errors.ValidationError{
+		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:    "response",
 			ValidationSubType: "object",
 			Message: fmt.Sprintf("%s response object is missing for '%s'",
@@ -174,7 +175,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	responseBody, ioErr := io.ReadAll(response.Body)
 	if ioErr != nil {
 		// cannot decode the response body, so it's not valid
-		validationErrors = append(validationErrors, &errors.ValidationError{
+		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:    helpers.ResponseBodyValidation,
 			ValidationSubType: helpers.Schema,
 			Message: fmt.Sprintf("%s response body for '%s' cannot be read, it's empty or malformed",
@@ -197,12 +198,12 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	if len(responseBody) > 0 {
 		// Per RFC7231, a response to a HEAD request MUST NOT include a message body.
 		if request != nil && request.Method == http.MethodHead {
-			violation := &errors.SchemaValidationFailure{
+			violation := &liberrors.SchemaValidationFailure{
 				Reason:          "HEAD responses must not include a message body",
 				ReferenceObject: string(responseBody),
 				ReferenceSchema: referenceSchema,
 			}
-			validationErrors = append(validationErrors, &errors.ValidationError{
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:    helpers.ResponseBodyValidation,
 				ValidationSubType: helpers.Schema,
 				Message: fmt.Sprintf("%s response for '%s' must not include a body",
@@ -210,7 +211,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				Reason:                 "The response to a HEAD request must not contain a body",
 				SpecLine:               1,
 				SpecCol:                0,
-				SchemaValidationErrors: []*errors.SchemaValidationFailure{violation},
+				SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
 				HowToFix:               "ensure no response body is present for HEAD requests",
 				Context:                referenceSchema,
 			})
@@ -219,7 +220,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 		err := json.Unmarshal(responseBody, &decodedObj)
 		if err != nil {
 			// cannot decode the response body, so it's not valid
-			validationErrors = append(validationErrors, &errors.ValidationError{
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:    helpers.ResponseBodyValidation,
 				ValidationSubType: helpers.Schema,
 				Message: fmt.Sprintf("%s response body for '%s' failed to validate schema",
@@ -227,7 +228,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				Reason:   fmt.Sprintf("The response body cannot be decoded: %s", err.Error()),
 				SpecLine: 1,
 				SpecCol:  0,
-				HowToFix: errors.HowToFixInvalidSchema,
+				HowToFix: liberrors.HowToFixInvalidSchema,
 				Context:  schema,
 			})
 			return false, validationErrors
@@ -242,75 +243,77 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 	// validate the object against the schema
 	scErrs := compiledSchema.Validate(decodedObj)
 	if scErrs != nil {
-		jk := scErrs.(*jsonschema.ValidationError)
+		var jk *jsonschema.ValidationError
+		var schemaValidationErrors []*liberrors.SchemaValidationFailure
 
-		// flatten the validationErrors
-		schFlatErrs := jk.BasicOutput().Errors
-		var schemaValidationErrors []*errors.SchemaValidationFailure
+		if errors.As(scErrs, &jk) {
+			// flatten the validationErrors
+			schFlatErrs := jk.BasicOutput().Errors
 
-		renderedNode := cachedNode
-		if renderedNode == nil {
-			renderedNode = new(yaml.Node)
-			_ = yaml.Unmarshal(renderedSchema, renderedNode)
-		}
-
-		for q := range schFlatErrs {
-			er := schFlatErrs[q]
-
-			errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
-			if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
-				continue // ignore this error, it's useless tbh, utter noise.
+			renderedNode := cachedNode
+			if renderedNode == nil {
+				renderedNode = new(yaml.Node)
+				_ = yaml.Unmarshal(renderedSchema, renderedNode)
 			}
-			if er.Error != nil {
-				// locate the violated property in the schema
-				var located *yaml.Node
-				if len(renderedNode.Content) > 0 {
-					located = schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+
+			for q := range schFlatErrs {
+				er := schFlatErrs[q]
+
+				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
+				if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
+					continue // ignore this error, it's useless tbh, utter noise.
 				}
-
-				// extract the element specified by the instance
-				val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
-				var referenceObject string
-
-				if len(val) > 0 {
-					referenceIndex, _ := strconv.Atoi(val[1])
-					if reflect.ValueOf(decodedObj).Type().Kind() == reflect.Slice {
-						found := decodedObj.([]any)[referenceIndex]
-						recoded, _ := json.MarshalIndent(found, "", "  ")
-						referenceObject = string(recoded)
+				if er.Error != nil {
+					// locate the violated property in the schema
+					var located *yaml.Node
+					if len(renderedNode.Content) > 0 {
+						located = schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
 					}
-				}
-				if referenceObject == "" {
-					referenceObject = string(responseBody)
-				}
 
-				violation := &errors.SchemaValidationFailure{
-					Reason:                  errMsg,
-					FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
-					FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
-					InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
-					KeywordLocation:         er.KeywordLocation,
-					ReferenceSchema:         referenceSchema,
-					ReferenceObject:         referenceObject,
-					OriginalJsonSchemaError: jk,
-				}
-				// if we have a location within the schema, add it to the error
-				if located != nil {
+					// extract the element specified by the instance
+					val := instanceLocationRegex.FindStringSubmatch(er.InstanceLocation)
+					var referenceObject string
 
-					line := located.Line
-					// if the located node is a map or an array, then the actual human interpretable
-					// line on which the violation occurred is the line of the key, not the value.
-					if located.Kind == yaml.MappingNode || located.Kind == yaml.SequenceNode {
-						if line > 0 {
-							line--
+					if len(val) > 0 {
+						referenceIndex, _ := strconv.Atoi(val[1])
+						if reflect.ValueOf(decodedObj).Type().Kind() == reflect.Slice {
+							found := decodedObj.([]any)[referenceIndex]
+							recoded, _ := json.MarshalIndent(found, "", "  ")
+							referenceObject = string(recoded)
 						}
 					}
+					if referenceObject == "" {
+						referenceObject = string(responseBody)
+					}
 
-					// location of the violation within the rendered schema.
-					violation.Line = line
-					violation.Column = located.Column
+					violation := &liberrors.SchemaValidationFailure{
+						Reason:                  errMsg,
+						FieldName:               helpers.ExtractFieldNameFromStringLocation(er.InstanceLocation),
+						FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
+						InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
+						KeywordLocation:         er.KeywordLocation,
+						ReferenceSchema:         referenceSchema,
+						ReferenceObject:         referenceObject,
+						OriginalJsonSchemaError: jk,
+					}
+					// if we have a location within the schema, add it to the error
+					if located != nil {
+
+						line := located.Line
+						// if the located node is a map or an array, then the actual human interpretable
+						// line on which the violation occurred is the line of the key, not the value.
+						if located.Kind == yaml.MappingNode || located.Kind == yaml.SequenceNode {
+							if line > 0 {
+								line--
+							}
+						}
+
+						// location of the violation within the rendered schema.
+						violation.Line = line
+						violation.Column = located.Column
+					}
+					schemaValidationErrors = append(schemaValidationErrors, violation)
 				}
-				schemaValidationErrors = append(schemaValidationErrors, violation)
 			}
 		}
 
@@ -322,7 +325,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 		}
 
 		// add the error to the list
-		validationErrors = append(validationErrors, &errors.ValidationError{
+		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:    helpers.ResponseBodyValidation,
 			ValidationSubType: helpers.Schema,
 			Message: fmt.Sprintf("%d response body for '%s' failed to validate schema",
@@ -332,7 +335,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 			SpecLine:               line,
 			SpecCol:                col,
 			SchemaValidationErrors: schemaValidationErrors,
-			HowToFix:               errors.HowToFixInvalidSchema,
+			HowToFix:               liberrors.HowToFixInvalidSchema,
 			Context:                schema,
 		})
 	}
@@ -357,14 +360,14 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*errors
 				switch undeclared.Type {
 				case strict.TypeWriteOnlyProperty:
 					validationErrors = append(validationErrors,
-						errors.WriteOnlyPropertyError(
+						liberrors.WriteOnlyPropertyError(
 							undeclared.Path, undeclared.Name, undeclared.Value,
 							request.URL.Path, request.Method,
 							undeclared.SpecLine, undeclared.SpecCol,
 						))
 				default:
 					validationErrors = append(validationErrors,
-						errors.UndeclaredPropertyError(
+						liberrors.UndeclaredPropertyError(
 							undeclared.Path,
 							undeclared.Name,
 							undeclared.Value,
