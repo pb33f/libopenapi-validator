@@ -60,6 +60,12 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					continue
 				}
 
+				// guard against length mismatch (e.g. request path containing
+				// a double slash producing extra empty segments).
+				if x >= len(submittedSegments) {
+					continue
+				}
+
 				var rgx *regexp.Regexp
 
 				if v.options.RegexCache != nil {
@@ -83,6 +89,9 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 				}
 
 				matches := rgx.FindStringSubmatch(submittedSegments[x])
+				if matches == nil {
+					continue
+				}
 				matches = matches[1:]
 
 				// Check if it is well-formed.

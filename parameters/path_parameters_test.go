@@ -2348,3 +2348,35 @@ paths:
 	assert.EqualValues(t, 1, cache.storeCount, "No new stores on cache hit")
 	assert.EqualValues(t, 1, cache.hitCount, "Second OData lookup should hit cache")
 }
+
+func TestValidatePathParamsWithPathItem_DoubleSlashDoesNotPanic(t *testing.T) {
+	// Regression test for #274: ValidatePathParamsWithPathItem panics for
+	// request paths containing a leading double slash (e.g. //test/path/x),
+	// because path segments and submitted segments differ in length.
+	spec := `openapi: 3.1.0
+paths:
+  /test/path/{param}:
+    get:
+      operationId: testParam
+      parameters:
+        - in: path
+          name: param
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com//test/path/fubar", nil)
+	pathItem := m.Model.Paths.PathItems.GetOrZero("/test/path/{param}")
+	require.NotNil(t, pathItem)
+
+	assert.NotPanics(t, func() {
+		_, _ = v.ValidatePathParamsWithPathItem(req, pathItem, "/test/path/{param}")
+	})
+}
