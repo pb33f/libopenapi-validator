@@ -2379,4 +2379,11 @@ paths:
 	assert.NotPanics(t, func() {
 		_, _ = v.ValidatePathParamsWithPathItem(req, pathItem, "/test/path/{param}")
 	})
+
+	// Also cover the case where the submitted path has fewer segments than
+	// the spec path, which would otherwise index submittedSegments out of bounds.
+	shortReq, _ := http.NewRequest(http.MethodGet, "https://example.com/test/path", nil)
+	assert.NotPanics(t, func() {
+		_, _ = v.ValidatePathParamsWithPathItem(shortReq, pathItem, "/test/path/{param}")
+	})
 }
