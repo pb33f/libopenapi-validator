@@ -2376,14 +2376,18 @@ paths:
 	pathItem := m.Model.Paths.PathItems.GetOrZero("/test/path/{param}")
 	require.NotNil(t, pathItem)
 
-	assert.NotPanics(t, func() {
-		_, _ = v.ValidatePathParamsWithPathItem(req, pathItem, "/test/path/{param}")
-	})
+	// the leading double slash collapses to an empty segment that must be
+	// dropped, so the remaining segments still align and 'fubar' is validated
+	// against {param} instead of being silently accepted against the wrong
+	// segment.
+	valid, errs := v.ValidatePathParamsWithPathItem(req, pathItem, "/test/path/{param}")
+	assert.True(t, valid)
+	assert.Empty(t, errs)
 
-	// Also cover the case where the submitted path has fewer segments than
-	// the spec path, which would otherwise index submittedSegments out of bounds.
+	// When the submitted path has fewer segments than the spec path it can no
+	// longer be aligned, so it must be rejected rather than mis-validated.
 	shortReq, _ := http.NewRequest(http.MethodGet, "https://example.com/test/path", nil)
-	assert.NotPanics(t, func() {
-		_, _ = v.ValidatePathParamsWithPathItem(shortReq, pathItem, "/test/path/{param}")
-	})
+	valid, errs = v.ValidatePathParamsWithPathItem(shortReq, pathItem, "/test/path/{param}")
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
 }
