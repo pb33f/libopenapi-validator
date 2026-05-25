@@ -2391,3 +2391,37 @@ paths:
 	assert.False(t, valid)
 	assert.Len(t, errs, 1)
 }
+
+func TestValidatePathParamsWithPathItem_RegexNoMatchContinues(t *testing.T) {
+	// When a submitted path segment does not match the regex for a
+	// constrained path template segment (e.g. {id:[0-9]+} vs "abc"), the
+	// nil-match guard must skip the segment without panicking.
+	spec := `openapi: 3.1.0
+paths:
+  /items/{id:[0-9]+}:
+    get:
+      operationId: getItem
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: ok`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// "abc" does not match ^([0-9]+)$; the nil-match guard should skip the
+	// segment cleanly rather than panicking on a nil FindStringSubmatch result.
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com/items/abc", nil)
+	pathItem := m.Model.Paths.PathItems.GetOrZero("/items/{id:[0-9]+}")
+	require.NotNil(t, pathItem)
+
+	assert.NotPanics(t, func() {
+		v.ValidatePathParamsWithPathItem(req, pathItem, "/items/{id:[0-9]+}")
+	})
+}
