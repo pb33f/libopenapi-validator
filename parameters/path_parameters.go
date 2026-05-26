@@ -91,7 +91,9 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 				matches := rgx.FindStringSubmatch(submittedSegments[x])
 				if matches == nil {
-					continue
+					validationErrors = append(validationErrors,
+						errors.PathParameterMissing(p, pathValue, request.URL.Path))
+					break
 				}
 				matches = matches[1:]
 
