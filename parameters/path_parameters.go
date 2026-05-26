@@ -42,9 +42,11 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 			HowToFix: errors.HowToFixPath,
 		}}
 	}
-	// split the path into segments
-	submittedSegments := strings.Split(paths.StripRequestPath(request, v.document), helpers.Slash)
-	pathSegments := strings.Split(pathValue, helpers.Slash)
+	// split the path into segments, dropping empty segments so that a request
+	// path containing a double slash (e.g. //test/path) does not shift the
+	// index alignment between submitted and template segments.
+	submittedSegments := nonEmptyPathSegments(paths.StripRequestPath(request, v.document))
+	pathSegments := nonEmptyPathSegments(pathValue)
 
 	// get the operation method for error reporting
 	operation := strings.ToLower(request.Method)
@@ -54,12 +56,17 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 	var validationErrors []*errors.ValidationError
 	for _, p := range params {
 		if p.In == helpers.Path {
+			// a mismatch in segment counts means the submitted path cannot be
+			// aligned with the template (e.g. an extra empty segment from a
+			// double slash); reject it rather than silently mis-validating.
+			if len(submittedSegments) != len(pathSegments) {
+				validationErrors = append(validationErrors,
+					errors.PathParameterMissing(p, pathValue, request.URL.Path))
+				continue
+			}
+
 			// var paramTemplate string
 			for x := range pathSegments {
-				if pathSegments[x] == "" { // skip empty segments
-					continue
-				}
-
 				var rgx *regexp.Regexp
 
 				if v.options.RegexCache != nil {
@@ -83,6 +90,11 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 				}
 
 				matches := rgx.FindStringSubmatch(submittedSegments[x])
+				if matches == nil {
+					validationErrors = append(validationErrors,
+						errors.PathParameterMissing(p, pathValue, request.URL.Path))
+					break
+				}
 				matches = matches[1:]
 
 				// Check if it is well-formed.
@@ -378,6 +390,21 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 		return false, validationErrors
 	}
 	return true, nil
+}
+
+// nonEmptyPathSegments splits a path on "/" and drops empty segments, so that
+// leading, trailing, or repeated slashes do not introduce empty entries that
+// would shift index alignment between submitted and template segments.
+func nonEmptyPathSegments(path string) []string {
+	raw := strings.Split(path, helpers.Slash)
+	segments := make([]string, 0, len(raw))
+	for _, segment := range raw {
+		if segment == "" {
+			continue
+		}
+		segments = append(segments, segment)
+	}
+	return segments
 }
 
 func (v *paramValidator) resolveNumber(sch *base.Schema, p *v3.Parameter, isLabel bool, isMatrix bool, paramValue string, pathValue string, renderedSchema string) (string, float64, []*errors.ValidationError) {

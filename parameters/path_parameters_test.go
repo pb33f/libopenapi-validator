@@ -2348,3 +2348,79 @@ paths:
 	assert.EqualValues(t, 1, cache.storeCount, "No new stores on cache hit")
 	assert.EqualValues(t, 1, cache.hitCount, "Second OData lookup should hit cache")
 }
+
+func TestValidatePathParamsWithPathItem_DoubleSlashDoesNotPanic(t *testing.T) {
+	// Regression test for #274: ValidatePathParamsWithPathItem panics for
+	// request paths containing a leading double slash (e.g. //test/path/x),
+	// because path segments and submitted segments differ in length.
+	spec := `openapi: 3.1.0
+paths:
+  /test/path/{param}:
+    get:
+      operationId: testParam
+      parameters:
+        - in: path
+          name: param
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com//test/path/fubar", nil)
+	pathItem := m.Model.Paths.PathItems.GetOrZero("/test/path/{param}")
+	require.NotNil(t, pathItem)
+
+	// the leading double slash collapses to an empty segment that must be
+	// dropped, so the remaining segments still align and 'fubar' is validated
+	// against {param} instead of being silently accepted against the wrong
+	// segment.
+	valid, errs := v.ValidatePathParamsWithPathItem(req, pathItem, "/test/path/{param}")
+	assert.True(t, valid)
+	assert.Empty(t, errs)
+
+	// When the submitted path has fewer segments than the spec path it can no
+	// longer be aligned, so it must be rejected rather than mis-validated.
+	shortReq, _ := http.NewRequest(http.MethodGet, "https://example.com/test/path", nil)
+	valid, errs = v.ValidatePathParamsWithPathItem(shortReq, pathItem, "/test/path/{param}")
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+}
+
+func TestValidatePathParamsWithPathItem_RegexNoMatchContinues(t *testing.T) {
+	// When a submitted path segment does not match the regex for a
+	// constrained path template segment (e.g. {id:[0-9]+} vs "abc"), the
+	// guard must not panic and must return a validation error.
+	spec := `openapi: 3.1.0
+paths:
+  /items/{id:[0-9]+}:
+    get:
+      operationId: getItem
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: ok`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	// "abc" does not match ^([0-9]+)$; expect invalid + at least one error.
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com/items/abc", nil)
+	pathItem := m.Model.Paths.PathItems.GetOrZero("/items/{id:[0-9]+}")
+	require.NotNil(t, pathItem)
+
+	valid, errs := v.ValidatePathParamsWithPathItem(req, pathItem, "/items/{id:[0-9]+}")
+	assert.False(t, valid)
+	assert.NotEmpty(t, errs)
+}
