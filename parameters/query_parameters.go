@@ -197,9 +197,21 @@ doneLooking:
 									}
 								}
 
+								if encodedObj == nil {
+									break skipValues
+								}
+								objVal, objExists := encodedObj[params[p].Name]
+								if !objExists || objVal == nil {
+									break skipValues
+								}
+								objMap, mapOk := objVal.(map[string]interface{})
+								if !mapOk {
+									break skipValues
+								}
+
 								numErrors := len(validationErrors)
 								validationErrors = append(validationErrors,
-									ValidateParameterSchema(sch, encodedObj[params[p].Name].(map[string]interface{}),
+									ValidateParameterSchema(sch, objMap,
 										ef,
 										"Query parameter",
 										"The query parameter",

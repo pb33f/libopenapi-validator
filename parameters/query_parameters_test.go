@@ -4140,3 +4140,45 @@ paths:
 	assert.True(t, valid, "issue #91: item_count=10 with type: string should not fail with 'expected string, but got number'")
 	assert.Empty(t, errors)
 }
+
+func TestQueryParamObjectMissingKey_NoPanic(t *testing.T) {
+	// This test verifies that the validator does not panic when a query parameter
+	// is declared as type: object with a content media type that is not JSON.
+	// Previously a bare type assertion on encodedObj[paramName] would panic when
+	// encodedObj was nil (non-JSON content wrapper) or the key was absent.
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          content:
+            text/plain:
+              schema:
+                type: object
+                properties:
+                  color:
+                    type: string
+      operationId: testFilter
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	v := NewParameterValidator(&m.Model)
+
+	// Send a request with the filter parameter present; because the content type
+	// is text/plain (not application/json), the Object branch cannot decode the
+	// value into a map and previously panicked.
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test?filter=color,blue", nil)
+
+	// Must not panic.
+	assert.NotPanics(t, func() {
+		v.ValidateQueryParams(request)
+	})
+}
