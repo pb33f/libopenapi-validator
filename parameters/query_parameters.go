@@ -198,14 +198,20 @@ doneLooking:
 								}
 
 								if encodedObj == nil {
+									validationErrors = append(validationErrors,
+										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
 									break skipValues
 								}
 								objVal, objExists := encodedObj[params[p].Name]
 								if !objExists || objVal == nil {
+									validationErrors = append(validationErrors,
+										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
 									break skipValues
 								}
 								objMap, mapOk := objVal.(map[string]interface{})
 								if !mapOk {
+									validationErrors = append(validationErrors,
+										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
 									break skipValues
 								}
 
