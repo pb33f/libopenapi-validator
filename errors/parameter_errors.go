@@ -470,6 +470,31 @@ func IncorrectCookieParamArrayNumber(
 	}
 }
 
+func QueryParameterCannotBeDecoded(param *v3.Parameter, val string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
+	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
+	specLine, specCol := paramSchemaTypeLineCol(param)
+
+	return &ValidationError{
+		ValidationType:    helpers.ParameterValidation,
+		ValidationSubType: helpers.ParameterValidationQuery,
+		Message:           fmt.Sprintf("Query parameter '%s' cannot be decoded", param.Name),
+		Reason: fmt.Sprintf("The query parameter '%s' is defined as an object, "+
+			"however the value '%s' cannot be decoded as an object", param.Name, val),
+		SpecLine:      specLine,
+		SpecCol:       specCol,
+		ParameterName: param.Name,
+		Context:       sch,
+		HowToFix:      HowToFixInvalidEncoding,
+		SchemaValidationErrors: []*SchemaValidationFailure{{
+			Reason:          fmt.Sprintf("Query value '%s' cannot be decoded as object", val),
+			FieldName:       param.Name,
+			InstancePath:    []string{param.Name},
+			KeywordLocation: keywordLocation,
+			ReferenceSchema: renderedSchema,
+		}},
+	}
+}
+
 func IncorrectParamEncodingJSON(param *v3.Parameter, ef string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
 	escapedPath := strings.ReplaceAll(pathTemplate, "~", "~0")
 	escapedPath = strings.ReplaceAll(escapedPath, "/", "~1")
