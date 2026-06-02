@@ -91,9 +91,18 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 				matches := rgx.FindStringSubmatch(submittedSegments[x])
 				if matches == nil {
-					validationErrors = append(validationErrors,
-						errors.PathParameterMissing(p, pathValue, request.URL.Path))
-					break
+					// the submitted segment doesn't satisfy this template
+					// segment's regex. only flag the current outer-loop
+					// parameter as missing if this template segment is
+					// actually the one that declares it; otherwise the
+					// failure belongs to a different parameter and we leave
+					// it for that parameter's iteration to report.
+					if segmentReferencesParam(pathSegments[x], p.Name) {
+						validationErrors = append(validationErrors,
+							errors.PathParameterMissing(p, pathValue, request.URL.Path))
+						break
+					}
+					continue
 				}
 				matches = matches[1:]
 
@@ -390,6 +399,36 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 		return false, validationErrors
 	}
 	return true, nil
+}
+
+// segmentReferencesParam reports whether the given path template segment
+// (e.g. "{id:[0-9]+}" or "items.{id}.json") contains a brace-pair whose
+// parameter name matches the supplied name. It is used to attribute a
+// regex no-match failure to the correct parameter on multi-param routes.
+func segmentReferencesParam(segment, name string) bool {
+	idxs, err := helpers.BraceIndices(segment)
+	if err != nil || len(idxs) < 2 {
+		return false
+	}
+	for i := 0; i+1 < len(idxs); i += 2 {
+		raw := segment[idxs[i]+1 : idxs[i+1]-1]
+		// strip explode suffix
+		if strings.HasSuffix(raw, helpers.Asterisk) {
+			raw = raw[:len(raw)-1]
+		}
+		// strip label/matrix prefix
+		if strings.HasPrefix(raw, helpers.Period) || strings.HasPrefix(raw, helpers.SemiColon) {
+			raw = raw[1:]
+		}
+		// drop any constraining regex `name:pattern`
+		if colon := strings.Index(raw, ":"); colon >= 0 {
+			raw = raw[:colon]
+		}
+		if raw == name {
+			return true
+		}
+	}
+	return false
 }
 
 // nonEmptyPathSegments splits a path on "/" and drops empty segments, so that

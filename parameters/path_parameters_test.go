@@ -2424,3 +2424,44 @@ paths:
 	assert.False(t, valid)
 	assert.NotEmpty(t, errs)
 }
+
+func TestValidatePathParamsWithPathItem_RegexNoMatchAttributesToCorrectParam(t *testing.T) {
+	// On a multi-param route /items/{id:[0-9]+}/{slug}, submitting
+	// /items/abc/foo must report only `id` as the failing parameter; `slug`
+	// is supplied (foo) and must not be flagged missing.
+	spec := `openapi: 3.1.0
+paths:
+  /items/{id:[0-9]+}/{slug}:
+    get:
+      operationId: getItem
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewParameterValidator(&m.Model)
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com/items/abc/foo", nil)
+	pathItem := m.Model.Paths.PathItems.GetOrZero("/items/{id:[0-9]+}/{slug}")
+	require.NotNil(t, pathItem)
+
+	valid, errs := v.ValidatePathParamsWithPathItem(req, pathItem, "/items/{id:[0-9]+}/{slug}")
+	assert.False(t, valid)
+	require.NotEmpty(t, errs)
+	for _, e := range errs {
+		assert.NotContains(t, e.Message, "'slug'",
+			"slug is present (foo) and must not be flagged missing")
+	}
+}
