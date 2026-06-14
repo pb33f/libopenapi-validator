@@ -4221,3 +4221,163 @@ paths:
 	assert.True(t, valid, "valid JSON object should pass validation")
 	assert.Empty(t, valErrors)
 }
+
+func TestQueryParamObjectContentJSON_InvalidObject(t *testing.T) {
+	// A content-wrapped JSON parameter with an invalid JSON object (wrong type
+	// for a property) should fail schema validation via ValidateParameterSchema,
+	// exercising the full happy path through guards 1-3 and into the validator.
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          required: false
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+      operationId: testFilter
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, `https://example.com/test?filter={"count":"notAnInt"}`, nil)
+
+	valid, valErrors := v.ValidateQueryParams(request)
+
+	assert.False(t, valid, "wrong property type should fail schema validation")
+	require.NotEmpty(t, valErrors)
+}
+
+func TestQueryParamObjectFormEncoded_ValidObject(t *testing.T) {
+	// A form-encoded (default style, not content-wrapped) object parameter with
+	// valid comma-separated key-value pairs should pass validation.  This
+	// exercises the ConstructParamMapFromFormEncodingArrayWithSchema path through
+	// all three guards and into ValidateParameterSchema.
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: color
+          in: query
+          schema:
+            type: object
+            properties:
+              R:
+                type: integer
+              G:
+                type: integer
+              B:
+                type: integer
+      operationId: testColor
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test?color=R,100,G,200,B,150", nil)
+
+	valid, valErrors := v.ValidateQueryParams(request)
+
+	assert.True(t, valid, "valid form-encoded object should pass validation")
+	assert.Empty(t, valErrors)
+}
+
+func TestQueryParamObjectFormEncoded_InvalidProperty(t *testing.T) {
+	// A form-encoded object with an invalid property type should fail
+	// schema validation, exercising the error path after the guards.
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: color
+          in: query
+          schema:
+            type: object
+            properties:
+              R:
+                type: integer
+              G:
+                type: integer
+              B:
+                type: integer
+      operationId: testColor
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test?color=R,notAnInt,G,200,B,150", nil)
+
+	valid, valErrors := v.ValidateQueryParams(request)
+
+	assert.False(t, valid, "invalid property type should fail schema validation")
+	require.NotEmpty(t, valErrors)
+}
+
+func TestQueryParamObjectContentXML_NoPanic(t *testing.T) {
+	// A content-wrapped parameter with an unsupported content type (e.g.
+	// application/xml) hits the encodedObj==nil guard.  This is a different
+	// content type from text/plain in TestQueryParamObjectMissingKey_NoPanic,
+	// confirming the guard fires for any non-JSON content type.
+	spec := `openapi: 3.1.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: data
+          in: query
+          required: false
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+      operationId: testData
+`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	v := NewParameterValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/test?data=<key>val</key>", nil)
+
+	var valid bool
+	var valErrors []*liberrors.ValidationError
+	assert.NotPanics(t, func() {
+		valid, valErrors = v.ValidateQueryParams(request)
+	})
+
+	assert.False(t, valid, "unsupported content type should be invalid")
+	require.Len(t, valErrors, 1)
+	assert.Equal(t, "Query parameter 'data' cannot be decoded", valErrors[0].Message)
+}
