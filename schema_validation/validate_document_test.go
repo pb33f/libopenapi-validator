@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/stretchr/testify/assert"
 	"go.yaml.in/yaml/v4"
 
@@ -210,6 +211,10 @@ paths: {}`
 		},
 	}
 	info := doc.GetSpecInfo()
+	// the JSON view is built lazily behind a sync.Once; latch it before
+	// injecting the poisoned values, otherwise the first accessor call inside
+	// the validator rebuilds the real JSON view and overwrites the injection.
+	_ = info.GetSpecJSONBytes()
 	info.SpecJSON = &badSpecJSON
 	info.SpecJSONBytes = nil
 
@@ -240,6 +245,8 @@ paths: {}`
 	}
 	corrupt := []byte(`{not valid json!!!}`)
 	info := doc.GetSpecInfo()
+	// latch the lazy JSON build before injecting (see note in the test above)
+	_ = info.GetSpecJSONBytes()
 	info.SpecJSON = &badSpecJSON
 	info.SpecJSONBytes = &corrupt
 
@@ -427,12 +434,10 @@ info:
   title: Test
 `
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	// Simulate the nil SpecJSON scenario by setting both to nil
-	info := doc.GetSpecInfo()
-	info.SpecJSON = nil
-	info.SpecJSONBytes = nil
+	// SkipJSONConversion disables the JSON view entirely: the lazy accessors
+	// return nil, which is the production scenario this guard protects against.
+	docConfig := &datamodel.DocumentConfiguration{SkipJSONConversion: true}
+	doc, _ := libopenapi.NewDocumentWithConfiguration([]byte(spec), docConfig)
 
 	// validate!
 	valid, errors := ValidateOpenAPIDocument(doc)
@@ -507,8 +512,11 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 
 	info := doc.GetSpecInfo()
 
+	// The JSON view builds lazily; latch it before manipulating the fields so
+	// the validator's accessor calls don't rebuild and overwrite the setup.
+	assert.NotNil(t, info.GetSpecJSONBytes(), "SpecJSONBytes should be populated by libopenapi")
+
 	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
-	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
 	info.SpecJSON = nil
 
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -521,6 +529,10 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+
+	// latch the lazy JSON build before injecting, so the validator's accessor
+	// calls return the injected values instead of rebuilding the real view.
+	_ = info.GetSpecJSONBytes()
 
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// and nil out SpecJSON so the fallback normalizeJSON path is skipped.
@@ -543,6 +555,10 @@ func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) 
 
 	info := doc.GetSpecInfo()
 
+	// latch the lazy JSON build before injecting, so the corrupt bytes
+	// actually reach the validator instead of being rebuilt over.
+	_ = info.GetSpecJSONBytes()
+
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// but leave SpecJSON intact so the fallback to normalizeJSON executes.
 	corrupt := []byte(`{not valid json!!!}`)
@@ -560,8 +576,9 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 
 	info := doc.GetSpecInfo()
 
-	// Nil out SpecJSON but leave SpecJSONBytes intact
-	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
+	// latch the lazy JSON build, then nil out SpecJSON but leave
+	// SpecJSONBytes intact
+	assert.NotNil(t, info.GetSpecJSONBytes(), "SpecJSONBytes should be populated by libopenapi")
 	info.SpecJSON = nil
 
 	valid, errs := ValidateOpenAPIDocument(doc)

@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -235,8 +235,17 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	loadedSchema := info.APISchema
 	var validationErrors []*liberrors.ValidationError
 
-	// Check if both JSON representations are nil before proceeding
-	if info.SpecJSON == nil && info.SpecJSONBytes == nil {
+	// libopenapi builds the JSON view of the document lazily: the deprecated
+	// SpecJSON / SpecJSONBytes fields stay nil until an accessor runs, and the
+	// accessors return nil when conversion is disabled (SkipJSONConversion) or
+	// the document cannot be represented as JSON.
+	specJSON := info.GetSpecJSON()
+	specJSONBytes := info.GetSpecJSONBytes()
+
+	// Check if both JSON representations are unavailable before proceeding.
+	// Empty bytes count as unavailable: neither branch of the normalization
+	// ladder below would fire, and a nil document must not reach Validate.
+	if specJSON == nil && (specJSONBytes == nil || len(*specJSONBytes) == 0) {
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:    helpers.Schema,
 			ValidationSubType: "document",
@@ -279,13 +288,13 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	// Build the normalized document value for validation.
 	// Prefer SpecJSONBytes (single unmarshal) over SpecJSON (marshal+unmarshal round-trip).
 	var normalized any
-	if info.SpecJSONBytes != nil && len(*info.SpecJSONBytes) > 0 {
+	if specJSONBytes != nil && len(*specJSONBytes) > 0 {
 		var err error
-		normalized, err = jsonschema.UnmarshalJSON(bytes.NewReader(*info.SpecJSONBytes))
+		normalized, err = jsonschema.UnmarshalJSON(bytes.NewReader(*specJSONBytes))
 		if err != nil {
 			// Fall back to normalizeJSON if UnmarshalJSON fails
-			if info.SpecJSON != nil {
-				normalized, err = normalizeJSON(*info.SpecJSON)
+			if specJSON != nil {
+				normalized, err = normalizeJSON(*specJSON)
 				if err != nil {
 					return false, []*liberrors.ValidationError{buildDocumentDecodeError(
 						fmt.Sprintf("The OpenAPI document cannot be converted to JSON: %s", err.Error()),
@@ -299,15 +308,24 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 				)}
 			}
 		}
-	} else if info.SpecJSON != nil {
+	} else if specJSON != nil {
 		var err error
-		normalized, err = normalizeJSON(*info.SpecJSON)
+		normalized, err = normalizeJSON(*specJSON)
 		if err != nil {
 			return false, []*liberrors.ValidationError{buildDocumentDecodeError(
 				fmt.Sprintf("The OpenAPI document cannot be converted to JSON: %s", err.Error()),
 				"SpecJSON",
 			)}
 		}
+	}
+
+	// belt and braces: never validate a nil document - it produces misleading
+	// "got null, want object" schema errors instead of a clear reason.
+	if normalized == nil {
+		return false, []*liberrors.ValidationError{buildDocumentDecodeError(
+			"The document has no usable JSON representation to validate",
+			"SpecJSON",
+		)}
 	}
 
 	// Validate the document
