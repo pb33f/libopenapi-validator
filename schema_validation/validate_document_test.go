@@ -215,8 +215,8 @@ paths: {}`
 	// injecting the poisoned values, otherwise the first accessor call inside
 	// the validator rebuilds the real JSON view and overwrites the injection.
 	_ = info.GetSpecJSONBytes()
-	info.SpecJSON = &badSpecJSON
-	info.SpecJSONBytes = nil
+	info.SpecJSON = &badSpecJSON //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSONBytes = nil     //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errors := ValidateOpenAPIDocument(doc)
 
@@ -247,8 +247,8 @@ paths: {}`
 	info := doc.GetSpecInfo()
 	// latch the lazy JSON build before injecting (see note in the test above)
 	_ = info.GetSpecJSONBytes()
-	info.SpecJSON = &badSpecJSON
-	info.SpecJSONBytes = &corrupt
+	info.SpecJSON = &badSpecJSON  //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errors := ValidateOpenAPIDocument(doc)
 
@@ -517,7 +517,7 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 	assert.NotNil(t, info.GetSpecJSONBytes(), "SpecJSONBytes should be populated by libopenapi")
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
-	info.SpecJSON = nil
+	info.SpecJSON = nil //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.True(t, valid)
@@ -538,8 +538,8 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	// and nil out SpecJSON so the fallback normalizeJSON path is skipped.
 	// This exercises the nil guard on SpecJSON inside the error branch.
 	corrupt := []byte(`{not valid json!!!}`)
-	info.SpecJSONBytes = &corrupt
-	info.SpecJSON = nil
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSON = nil           //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	// Validation should fail before JSON Schema validation instead of validating nil.
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -557,8 +557,8 @@ func TestValidateDocument_SpecJSONBytesNullDoesNotValidateNil(t *testing.T) {
 	_ = info.GetSpecJSONBytes()
 
 	nullJSON := []byte("null")
-	info.SpecJSONBytes = &nullJSON
-	info.SpecJSON = nil
+	info.SpecJSONBytes = &nullJSON //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSON = nil            //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 
@@ -582,7 +582,7 @@ func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) 
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// but leave SpecJSON intact so the fallback to normalizeJSON executes.
 	corrupt := []byte(`{not valid json!!!}`)
-	info.SpecJSONBytes = &corrupt
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	// Should still validate successfully via the SpecJSON fallback
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -599,7 +599,7 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 	// latch the lazy JSON build, then nil out SpecJSON but leave
 	// SpecJSONBytes intact
 	assert.NotNil(t, info.GetSpecJSONBytes(), "SpecJSONBytes should be populated by libopenapi")
-	info.SpecJSON = nil
+	info.SpecJSON = nil //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.False(t, valid)
