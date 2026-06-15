@@ -15,7 +15,6 @@ import (
 	"strconv"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v4"
 	"golang.org/x/text/language"
@@ -83,7 +82,7 @@ func requestBodyReader(body io.ReadCloser) io.Reader {
 	}
 
 	value := reflect.ValueOf(body)
-	if value.Kind() == reflect.Ptr {
+	if value.Kind() == reflect.Pointer {
 		if value.IsNil() {
 			return nil
 		}
@@ -159,7 +158,11 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 	}
 
 	if validationOptions.SchemaCache != nil {
-		hash := input.Schema.GoLow().Hash()
+		hash := schema_validation.SchemaCacheKey(
+			input.Schema.GoLow().Hash(),
+			input.Version,
+			schema_validation.SchemaValidationPurposeRequestBody,
+		)
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
 			renderedSchema = cached.RenderedInline
 			referenceSchema = cached.ReferenceSchema
@@ -171,10 +174,16 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		renderCtx := base.NewInlineRenderContextForValidation()
-		var renderErr error
-		renderedSchema, renderErr = input.Schema.RenderInlineWithContext(renderCtx)
-		referenceSchema = string(renderedSchema)
+		rendered, renderErr := schema_validation.RenderSchemaForValidation(
+			input.Schema,
+			schema_validation.SchemaValidationPurposeRequestBody,
+		)
+		if rendered != nil {
+			renderedSchema = rendered.RenderedInline
+			referenceSchema = rendered.ReferenceSchema
+			jsonSchema = rendered.RenderedJSON
+			cachedNode = rendered.RenderedNode
+		}
 
 		// If rendering failed (e.g., circular reference), return the render error
 		if renderErr != nil {
@@ -198,10 +207,13 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 			return false, validationErrors
 		}
 
-		jsonSchema, _ = utils.ConvertYAMLtoJSON(renderedSchema)
-
 		var err error
-		schemaName := fmt.Sprintf("%x", input.Schema.GoLow().Hash())
+		hash := schema_validation.SchemaCacheKey(
+			input.Schema.GoLow().Hash(),
+			input.Version,
+			schema_validation.SchemaValidationPurposeRequestBody,
+		)
+		schemaName := fmt.Sprintf("%x", hash)
 		compiledSchema, err = helpers.NewCompiledSchemaWithVersion(
 			schemaName,
 			jsonSchema,
@@ -224,13 +236,13 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 		}
 
 		if validationOptions.SchemaCache != nil {
-			hash := input.Schema.GoLow().Hash()
 			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
 				Schema:          input.Schema,
 				RenderedInline:  renderedSchema,
 				ReferenceSchema: referenceSchema,
 				RenderedJSON:    jsonSchema,
 				CompiledSchema:  compiledSchema,
+				RenderedNode:    cachedNode,
 			})
 		}
 	}

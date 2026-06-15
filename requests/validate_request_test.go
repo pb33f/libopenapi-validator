@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 func TestValidateRequestSchema(t *testing.T) {
@@ -153,13 +154,107 @@ properties:
 	assert.Len(t, errors, 0)
 
 	// Verify cache was populated
-	hash := schema.GoLow().Hash()
+	hash := schema_validation.SchemaCacheKey(schema.GoLow().Hash(), openAPIVersion,
+		schema_validation.SchemaValidationPurposeRequestBody)
 	cached, ok := opts.SchemaCache.Load(hash)
 	assert.True(t, ok, "Schema should be in cache")
 	assert.NotNil(t, cached, "Cached entry should not be nil")
 	assert.NotNil(t, cached.CompiledSchema, "Compiled schema should be cached")
 	assert.NotNil(t, cached.RenderedInline, "Rendered schema should be cached")
 	assert.NotNil(t, cached.RenderedJSON, "JSON schema should be cached")
+}
+
+func TestValidateRequestSchema_ReadOnlyRequiredIgnored(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+required:
+  - id
+  - name
+properties:
+  id:
+    type: string
+    readOnly: true
+  name:
+    type: string`, 3.1)
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"name":"John"}`),
+		Schema:  schema,
+		Version: 3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateRequestSchema_WriteOnlyRequiredStillApplies(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+required:
+  - password
+properties:
+  password:
+    type: string
+    writeOnly: true`, 3.1)
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{}`),
+		Schema:  schema,
+		Version: 3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	require.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "missing property 'password'", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+func TestValidateRequestSchema_NestedReadOnlyRequiredIgnored(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+required:
+  - profile
+properties:
+  profile:
+    type: object
+    required:
+      - id
+      - email
+    properties:
+      id:
+        type: string
+        readOnly: true
+      email:
+        type: string`, 3.1)
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"profile":{"email":"john@example.com"}}`),
+		Schema:  schema,
+		Version: 3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateRequestSchema_AllOfReadOnlyRequiredIgnored(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `allOf:
+  - type: object
+    required:
+      - id
+      - name
+    properties:
+      id:
+        type: string
+        readOnly: true
+      name:
+        type: string`, 3.1)
+
+	valid, errors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"name":"John"}`),
+		Schema:  schema,
+		Version: 3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
 }
 
 func TestValidateRequestSchema_NilSchema(t *testing.T) {
