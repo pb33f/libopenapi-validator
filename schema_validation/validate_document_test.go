@@ -210,8 +210,9 @@ paths: {}`
 		},
 	}
 	info := doc.GetSpecInfo()
-	info.SpecJSON = &badSpecJSON
-	info.SpecJSONBytes = nil
+	info.GetSpecJSON()
+	info.SpecJSON = &badSpecJSON //nolint:staticcheck
+	info.SpecJSONBytes = nil     //nolint:staticcheck
 
 	valid, errors := ValidateOpenAPIDocument(doc)
 
@@ -240,8 +241,9 @@ paths: {}`
 	}
 	corrupt := []byte(`{not valid json!!!}`)
 	info := doc.GetSpecInfo()
-	info.SpecJSON = &badSpecJSON
-	info.SpecJSONBytes = &corrupt
+	info.GetSpecJSON()
+	info.SpecJSON = &badSpecJSON  //nolint:staticcheck
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck
 
 	valid, errors := ValidateOpenAPIDocument(doc)
 
@@ -431,8 +433,9 @@ info:
 
 	// Simulate the nil SpecJSON scenario by setting both to nil
 	info := doc.GetSpecInfo()
-	info.SpecJSON = nil
-	info.SpecJSONBytes = nil
+	info.GetSpecJSON()
+	info.SpecJSON = nil      //nolint:staticcheck
+	info.SpecJSONBytes = nil //nolint:staticcheck
 
 	// validate!
 	valid, errors := ValidateOpenAPIDocument(doc)
@@ -460,6 +463,7 @@ func TestValidateDocument_WithPrecompiledSchema(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Pre-compile the schema
 	options := config.NewValidationOptions()
@@ -482,6 +486,7 @@ func TestValidateDocument_WithPrecompiledSchema_Invalid(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Pre-compile the schema
 	options := config.NewValidationOptions()
@@ -506,10 +511,11 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
-	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
-	info.SpecJSON = nil
+	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi") //nolint:staticcheck
+	info.SpecJSON = nil                                                                     //nolint:staticcheck
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.True(t, valid)
@@ -521,13 +527,14 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// and nil out SpecJSON so the fallback normalizeJSON path is skipped.
 	// This exercises the nil guard on SpecJSON inside the error branch.
 	corrupt := []byte(`{not valid json!!!}`)
-	info.SpecJSONBytes = &corrupt
-	info.SpecJSON = nil
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck
+	info.SpecJSON = nil           //nolint:staticcheck
 
 	// Validation should fail before JSON Schema validation instead of validating nil.
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -542,11 +549,12 @@ func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) 
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// but leave SpecJSON intact so the fallback to normalizeJSON executes.
 	corrupt := []byte(`{not valid json!!!}`)
-	info.SpecJSONBytes = &corrupt
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck
 
 	// Should still validate successfully via the SpecJSON fallback
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -559,10 +567,11 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact
-	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
-	info.SpecJSON = nil
+	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi") //nolint:staticcheck
+	info.SpecJSON = nil                                                                     //nolint:staticcheck
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.False(t, valid)

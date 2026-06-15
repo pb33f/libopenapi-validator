@@ -236,7 +236,7 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	var validationErrors []*liberrors.ValidationError
 
 	// Check if both JSON representations are nil before proceeding
-	if info.SpecJSON == nil && info.SpecJSONBytes == nil {
+	if info.GetSpecJSON() == nil && info.GetSpecJSONBytes() == nil {
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:    helpers.Schema,
 			ValidationSubType: "document",
@@ -279,13 +279,13 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	// Build the normalized document value for validation.
 	// Prefer SpecJSONBytes (single unmarshal) over SpecJSON (marshal+unmarshal round-trip).
 	var normalized any
-	if info.SpecJSONBytes != nil && len(*info.SpecJSONBytes) > 0 {
+	if info.GetSpecJSONBytes() != nil && len(*info.GetSpecJSONBytes()) > 0 {
 		var err error
-		normalized, err = jsonschema.UnmarshalJSON(bytes.NewReader(*info.SpecJSONBytes))
+		normalized, err = jsonschema.UnmarshalJSON(bytes.NewReader(*info.GetSpecJSONBytes()))
 		if err != nil {
 			// Fall back to normalizeJSON if UnmarshalJSON fails
-			if info.SpecJSON != nil {
-				normalized, err = normalizeJSON(*info.SpecJSON)
+			if info.GetSpecJSON() != nil {
+				normalized, err = normalizeJSON(*info.GetSpecJSON())
 				if err != nil {
 					return false, []*liberrors.ValidationError{buildDocumentDecodeError(
 						fmt.Sprintf("The OpenAPI document cannot be converted to JSON: %s", err.Error()),
@@ -299,9 +299,9 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 				)}
 			}
 		}
-	} else if info.SpecJSON != nil {
+	} else if info.GetSpecJSON() != nil {
 		var err error
-		normalized, err = normalizeJSON(*info.SpecJSON)
+		normalized, err = normalizeJSON(*info.GetSpecJSON())
 		if err != nil {
 			return false, []*liberrors.ValidationError{buildDocumentDecodeError(
 				fmt.Sprintf("The OpenAPI document cannot be converted to JSON: %s", err.Error()),
