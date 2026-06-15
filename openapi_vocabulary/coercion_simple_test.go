@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pb33f/testify/assert"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCoercion_Vocabulary_CompilationSuccess(t *testing.T) {

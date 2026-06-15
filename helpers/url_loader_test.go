@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/require"
 )
 
 // Test the Load function for a successful case

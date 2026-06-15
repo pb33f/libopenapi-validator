@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pb33f/testify/assert"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/message"
 )
 

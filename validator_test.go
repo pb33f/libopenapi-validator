@@ -19,9 +19,9 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"

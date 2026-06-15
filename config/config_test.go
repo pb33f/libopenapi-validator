@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pb33f/testify/assert"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestNewValidationOptions_Defaults(t *testing.T) {
