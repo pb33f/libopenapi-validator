@@ -242,7 +242,7 @@ paths: {}`
 	corrupt := []byte(`{not valid json!!!}`)
 	info := doc.GetSpecInfo()
 	info.GetSpecJSON()
-	info.SpecJSON = &badSpecJSON //nolint:staticcheck
+	info.SpecJSON = &badSpecJSON  //nolint:staticcheck
 	info.SpecJSONBytes = &corrupt //nolint:staticcheck
 
 	valid, errors := ValidateOpenAPIDocument(doc)
@@ -515,7 +515,7 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
 	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi") //nolint:staticcheck
-	info.SpecJSON = nil //nolint:staticcheck
+	info.SpecJSON = nil                                                                     //nolint:staticcheck
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.True(t, valid)
@@ -534,7 +534,7 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	// This exercises the nil guard on SpecJSON inside the error branch.
 	corrupt := []byte(`{not valid json!!!}`)
 	info.SpecJSONBytes = &corrupt //nolint:staticcheck
-	info.SpecJSON = nil //nolint:staticcheck
+	info.SpecJSON = nil           //nolint:staticcheck
 
 	// Validation should fail before JSON Schema validation instead of validating nil.
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -571,7 +571,7 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact
 	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi") //nolint:staticcheck
-	info.SpecJSON = nil //nolint:staticcheck
+	info.SpecJSON = nil                                                                     //nolint:staticcheck
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.False(t, valid)
