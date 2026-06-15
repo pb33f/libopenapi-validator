@@ -6,7 +6,7 @@ package schema_validation
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/pb33f/testify/assert"
 )
 
 func TestLocateSchemaPropertyNodeByJSONPath_BadNode(t *testing.T) {

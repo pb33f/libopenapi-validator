@@ -6,8 +6,8 @@ package helpers
 import (
 	"testing"
 
+	"github.com/pb33f/testify/assert"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestDiveIntoValidationError(t *testing.T) {

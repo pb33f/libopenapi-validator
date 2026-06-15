@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewDefaultCache(t *testing.T) {

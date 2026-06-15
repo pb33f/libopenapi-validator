@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/require"
 )
 
 func TestSchemaValidationFailure_Error(t *testing.T) {
