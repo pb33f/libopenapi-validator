@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package validator
@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/cache"
@@ -2383,6 +2384,51 @@ paths:
 	assert.NotNil(t, v)
 }
 
+func TestCacheWarming_MediaTypeSchemaWithNilGoLow(t *testing.T) {
+	options := config.NewValidationOptions()
+	mediaType := &v3.MediaType{
+		Schema: base.CreateSchemaProxy(&base.Schema{
+			Type: []string{"object"},
+		}),
+	}
+
+	warmMediaTypeSchema(mediaType, options.SchemaCache, options, 3.1,
+		schema_validation.SchemaValidationPurposeRequestBody)
+
+	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
+}
+
+func TestCacheWarming_ParameterRenderFailure(t *testing.T) {
+	param := cacheWarmingTestParameter(t, `schema:
+              $ref: '#/components/schemas/Error'`, `
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`)
+	options := config.NewValidationOptions()
+
+	warmParameterSchema(param, options.SchemaCache, options, 3.1)
+
+	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
+}
+
+func TestCacheWarming_ParameterCompileFailure(t *testing.T) {
+	param := cacheWarmingTestParameter(t, `schema:
+              type: invalid-type-that-does-not-exist`, "")
+	options := config.NewValidationOptions()
+
+	warmParameterSchema(param, options.SchemaCache, options, 3.1)
+
+	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
+}
+
 func TestCacheWarming_DefaultResponse(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
@@ -2523,6 +2569,48 @@ paths:
 		return true
 	})
 	assert.Greater(t, count, 0, "Schema cache should have entries from path-level parameters")
+}
+
+func cacheWarmingTestParameter(t *testing.T, schemaYAML string, componentsYAML string) *v3.Parameter {
+	t.Helper()
+
+	spec := fmt.Sprintf(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          %s
+      responses:
+        '200':
+          description: Success
+%s`, schemaYAML, componentsYAML)
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	pathItem := model.Model.Paths.PathItems.GetOrZero("/test")
+	require.NotNil(t, pathItem)
+	require.NotNil(t, pathItem.Get)
+	require.Len(t, pathItem.Get.Parameters, 1)
+
+	return pathItem.Get.Parameters[0]
+}
+
+func schemaCacheEntryCount(schemaCache cache.SchemaCache) int {
+	count := 0
+	schemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 // TestSortValidationErrors tests that validation errors are sorted deterministically

@@ -549,6 +549,26 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	assert.Empty(t, errs[0].SchemaValidationErrors)
 }
 
+func TestValidateDocument_SpecJSONBytesNullDoesNotValidateNil(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+	_ = info.GetSpecJSONBytes()
+
+	nullJSON := []byte("null")
+	info.SpecJSONBytes = &nullJSON
+	info.SpecJSON = nil
+
+	valid, errs := ValidateOpenAPIDocument(doc)
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Reason, "no usable JSON representation")
+	assert.NotContains(t, errs[0].Reason, "got null, want object")
+	assert.Empty(t, errs[0].SchemaValidationErrors)
+}
+
 func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) {
 	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
 	doc, _ := libopenapi.NewDocument(petstore)
