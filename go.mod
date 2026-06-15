@@ -8,7 +8,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.23.1
 	github.com/goccy/go-yaml v1.19.2
 	github.com/pb33f/jsonpath v0.8.2
-	github.com/pb33f/libopenapi v0.38.0
+	github.com/pb33f/libopenapi v0.38.1
 	github.com/pb33f/testify v0.1.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.5
