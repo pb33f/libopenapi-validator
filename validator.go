@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package validator
@@ -414,15 +414,9 @@ func warmSchemaCaches(
 
 		// Get all operations for this path (handles all HTTP methods including OpenAPI 3.2+ extensions)
 		operations := pathItem.GetOperations()
-		if operations == nil {
-			continue
-		}
 
 		for opPair := operations.First(); opPair != nil; opPair = opPair.Next() {
 			operation := opPair.Value()
-			if operation == nil {
-				continue
-			}
 
 			// Warm request body schemas
 			if operation.RequestBody != nil && operation.RequestBody.Content != nil {
