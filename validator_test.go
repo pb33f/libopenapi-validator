@@ -29,6 +29,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 func TestNewValidator(t *testing.T) {
@@ -2158,6 +2159,134 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 		return true
 	})
 	assert.Greater(t, count, 0, "Schema cache should have entries from request and response bodies")
+}
+
+func TestDirectionalRequiredProperties_RequestResponseSharedSchema(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /users/123:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - password
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true`
+
+	for _, tc := range []struct {
+		name string
+		run  func(t *testing.T, v Validator)
+	}{
+		{
+			name: "request then response",
+			run: func(t *testing.T, v Validator) {
+				req := issue281Request(t, `{"name":"John","password":"secret"}`)
+				valid, errs := v.ValidateHttpRequest(req)
+				require.True(t, valid)
+				require.Empty(t, errs)
+
+				res := issue281Response(`{"id":"123","name":"John"}`)
+				valid, errs = v.ValidateHttpResponse(req, res)
+				require.True(t, valid)
+				require.Empty(t, errs)
+			},
+		},
+		{
+			name: "response then request",
+			run: func(t *testing.T, v Validator) {
+				req := issue281Request(t, "")
+				res := issue281Response(`{"id":"123","name":"John"}`)
+				valid, errs := v.ValidateHttpResponse(req, res)
+				require.True(t, valid)
+				require.Empty(t, errs)
+
+				req = issue281Request(t, `{"name":"John","password":"secret"}`)
+				valid, errs = v.ValidateHttpRequest(req)
+				require.True(t, valid)
+				require.Empty(t, errs)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, err := libopenapi.NewDocument([]byte(spec))
+			require.NoError(t, err)
+
+			v, errs := NewValidator(doc)
+			require.Nil(t, errs)
+
+			validator := v.(*validator)
+			userSchema := validator.v3Model.Components.Schemas.GetOrZero("User")
+			require.NotNil(t, userSchema)
+			require.NotNil(t, userSchema.Schema())
+
+			requestKey := schema_validation.SchemaCacheKey(
+				userSchema.Schema().GoLow().Hash(),
+				3.1,
+				schema_validation.SchemaValidationPurposeRequestBody,
+			)
+			responseKey := schema_validation.SchemaCacheKey(
+				userSchema.Schema().GoLow().Hash(),
+				3.1,
+				schema_validation.SchemaValidationPurposeResponseBody,
+			)
+
+			_, requestWarmed := validator.options.SchemaCache.Load(requestKey)
+			_, responseWarmed := validator.options.SchemaCache.Load(responseKey)
+			require.True(t, requestWarmed, "request schema variant should be warmed")
+			require.True(t, responseWarmed, "response schema variant should be warmed")
+			require.NotEqual(t, requestKey, responseKey)
+
+			tc.run(t, v)
+		})
+	}
+}
+
+func issue281Request(t *testing.T, payload string) *http.Request {
+	var body io.Reader = http.NoBody
+	if payload != "" {
+		body = strings.NewReader(payload)
+	}
+	req, err := http.NewRequest(http.MethodPost, "https://things.com/users/123", body)
+	require.NoError(t, err)
+	req.Header.Set(helpers.ContentTypeHeader, "application/json")
+	return req
+}
+
+func issue281Response(payload string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusCreated,
+		Header: http.Header{
+			helpers.ContentTypeHeader: []string{"application/json"},
+		},
+		Body: io.NopCloser(strings.NewReader(payload)),
+	}
 }
 
 func TestCacheWarming_EdgeCases(t *testing.T) {
