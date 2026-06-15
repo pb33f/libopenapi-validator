@@ -11,7 +11,7 @@ require (
 	github.com/pb33f/libopenapi v0.37.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
-	go.yaml.in/yaml/v4 v4.0.0-rc.4
+	go.yaml.in/yaml/v4 v4.0.0-rc.5
 	golang.org/x/text v0.37.0
 )
 
