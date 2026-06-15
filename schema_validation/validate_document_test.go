@@ -210,6 +210,7 @@ paths: {}`
 		},
 	}
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 	info.SpecJSON = &badSpecJSON
 	info.SpecJSONBytes = nil
 
@@ -240,6 +241,7 @@ paths: {}`
 	}
 	corrupt := []byte(`{not valid json!!!}`)
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 	info.SpecJSON = &badSpecJSON
 	info.SpecJSONBytes = &corrupt
 
@@ -431,6 +433,7 @@ info:
 
 	// Simulate the nil SpecJSON scenario by setting both to nil
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 	info.SpecJSON = nil
 	info.SpecJSONBytes = nil
 
@@ -460,6 +463,7 @@ func TestValidateDocument_WithPrecompiledSchema(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Pre-compile the schema
 	options := config.NewValidationOptions()
@@ -482,6 +486,7 @@ func TestValidateDocument_WithPrecompiledSchema_Invalid(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Pre-compile the schema
 	options := config.NewValidationOptions()
@@ -506,6 +511,7 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
 	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
@@ -521,6 +527,7 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// and nil out SpecJSON so the fallback normalizeJSON path is skipped.
@@ -542,6 +549,7 @@ func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) 
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// but leave SpecJSON intact so the fallback to normalizeJSON executes.
@@ -559,6 +567,7 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
+	info.GetSpecJSON()
 
 	// Nil out SpecJSON but leave SpecJSONBytes intact
 	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
