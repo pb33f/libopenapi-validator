@@ -2249,10 +2249,10 @@ paths:
 }
 
 type regexCacheWatcher struct {
-	inner      *sync.Map
 	missCount  int64
 	hitCount   int64
 	storeCount int64
+	inner      *sync.Map
 }
 
 func (c *regexCacheWatcher) Load(key any) (value any, ok bool) {
