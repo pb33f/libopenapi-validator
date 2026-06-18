@@ -330,7 +330,7 @@ components:
 		assert.Error(t, err, "RenderInline should not error on circular refs")
 	})
 
-	t.Run("should fail validating", func(t *testing.T) {
+	t.Run("should validate circular references", func(t *testing.T) {
 		sv := NewSchemaValidator()
 
 		schemaB := model.Model.Components.Schemas.GetOrZero("b").Schema()
@@ -341,20 +341,15 @@ components:
 		exampleJSON := `{"z": "", "b": {"z": ""}}`
 		valid, errors := sv.ValidateSchemaString(schemaB, exampleJSON)
 
-		assert.False(t, valid, "Schema with circular refs should currently fail validation")
-		assert.NotNil(t, errors, "Should have validation errors")
+		assert.True(t, valid, "Schema with circular refs should validate valid payloads")
+		assert.Empty(t, errors, "Should have no validation errors")
 
-		foundCompilationError := false
-		for _, err := range errors {
-			if err.Message == "schema does not pass validation" &&
-				err.Reason != "" &&
-				(err.Reason == "The schema cannot be decoded: schema render failure, circular reference: `#/components/schemas/b`" ||
-					err.Reason == "The schema cannot be decoded: schema render failure, circular reference: `#/components/schemas/Node`") {
-				foundCompilationError = true
-			}
-			assert.Nil(t, err.SchemaValidationErrors, "Rendering errors should not have SchemaValidationErrors")
-		}
-		assert.True(t, foundCompilationError, "Should have schema compilation error for circular references")
+		valid, errors = sv.ValidateSchemaString(schemaB, `{"z": 42, "b": {"z": ""}}`)
+
+		assert.False(t, valid, "Schema with circular refs should still reject invalid nested payloads")
+		assert.NotNil(t, errors, "Should have validation errors")
+		assert.NotEmpty(t, errors[0].SchemaValidationErrors)
+		assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "got number")
 	})
 }
 

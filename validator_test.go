@@ -2398,7 +2398,7 @@ func TestCacheWarming_MediaTypeSchemaWithNilGoLow(t *testing.T) {
 	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
 }
 
-func TestCacheWarming_ParameterRenderFailure(t *testing.T) {
+func TestCacheWarming_ParameterCircularReference(t *testing.T) {
 	param := cacheWarmingTestParameter(t, `schema:
               $ref: '#/components/schemas/Error'`, `
 components:
@@ -2416,7 +2416,7 @@ components:
 
 	warmParameterSchema(param, options.SchemaCache, options, 3.1)
 
-	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
+	assert.Equal(t, 1, schemaCacheEntryCount(options.SchemaCache))
 }
 
 func TestCacheWarming_ParameterCompileFailure(t *testing.T) {

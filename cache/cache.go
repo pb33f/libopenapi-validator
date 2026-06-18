@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2025-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package cache
@@ -18,6 +18,7 @@ type SchemaCacheEntry struct {
 	RenderedJSON    []byte
 	CompiledSchema  *jsonschema.Schema
 	RenderedNode    *yaml.Node
+	ResourceNodes   map[string]*yaml.Node
 }
 
 // SchemaCache defines the interface for schema caching implementations.

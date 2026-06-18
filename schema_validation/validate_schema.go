@@ -1,5 +1,6 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
+
 package schema_validation
 
 import (
@@ -12,9 +13,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"sync"
 
-	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v4"
@@ -72,14 +71,13 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 type schemaValidator struct {
 	options *config.ValidationOptions
 	logger  *slog.Logger
-	lock    sync.Mutex
 }
 
 // NewSchemaValidatorWithLogger will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
 func NewSchemaValidatorWithLogger(logger *slog.Logger, opts ...config.Option) SchemaValidator {
 	options := config.NewValidationOptions(opts...)
 
-	return &schemaValidator{options: options, logger: logger, lock: sync.Mutex{}}
+	return &schemaValidator{options: options, logger: logger}
 }
 
 // NewSchemaValidator will create a new SchemaValidator instance, ready to accept schemas and payloads to validate.
@@ -124,6 +122,7 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 
 	var renderedSchema []byte
 	var renderedNode *yaml.Node
+	var resourceNodes map[string]*yaml.Node
 	var compiledSchema *jsonschema.Schema
 
 	// Check cache first — reuses existing SchemaCache (populated by NewValidationOptions).
@@ -136,58 +135,21 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 			cached != nil && cached.CompiledSchema != nil {
 			renderedSchema = cached.RenderedInline
 			renderedNode = cached.RenderedNode
+			resourceNodes = cached.ResourceNodes
 			compiledSchema = cached.CompiledSchema
 		}
 	}
 
 	// Cache miss — render, convert to JSON, and compile.
 	if compiledSchema == nil {
-		renderCtx := base.NewInlineRenderContextForValidation()
-		s.lock.Lock()
-		nodeIface, renderErr := schema.MarshalYAMLInlineWithContext(renderCtx)
-		s.lock.Unlock()
-
-		if renderErr != nil {
-			validationErrors = append(validationErrors, &liberrors.ValidationError{
-				ValidationType:    helpers.RequestBodyValidation,
-				ValidationSubType: helpers.Schema,
-				Message:           "schema does not pass validation",
-				Reason:            fmt.Sprintf("The schema cannot be decoded: %s", renderErr.Error()),
-				SpecLine:          schema.GoLow().GetRootNode().Line,
-				SpecCol:           schema.GoLow().GetRootNode().Column,
-				HowToFix:          liberrors.HowToFixInvalidSchema,
-				Context:           string(renderedSchema),
-			})
-			return false, validationErrors
-		}
-
-		// MarshalYAMLInlineWithContext returns *yaml.Node (from NodeBuilder.Render)
-		renderedNode, _ = nodeIface.(*yaml.Node)
-
-		// yaml.Node → map → JSON bytes (skips yaml.Marshal + yaml.Unmarshal round-trip)
-		var jsonMap map[string]interface{}
-		if renderedNode != nil {
-			_ = renderedNode.Decode(&jsonMap)
-		}
-		jsonSchema, _ := json.Marshal(jsonMap)
-
-		// YAML bytes generated once for error messages / context strings
-		renderedSchema, _ = yaml.Marshal(renderedNode)
-
-		path := ""
-		if schema.GoLow().GetIndex() != nil {
-			path = schema.GoLow().GetIndex().GetSpecAbsolutePath()
-		}
-
-		var compileErr error
-		compiledSchema, compileErr = helpers.NewCompiledSchemaWithVersion(path, jsonSchema, s.options, version)
+		compiled, compileErr := CompileSchemaForValidation(
+			schema,
+			SchemaValidationPurposeGeneric,
+			s.options,
+			version,
+		)
 		if compileErr != nil {
-			line := 1
-			col := 0
-			if schema.GoLow().Type.KeyNode != nil {
-				line = schema.GoLow().Type.KeyNode.Line
-				col = schema.GoLow().Type.KeyNode.Column
-			}
+			line, col := schemaLineColumn(schema)
 			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:    helpers.Schema,
 				ValidationSubType: helpers.Schema,
@@ -200,17 +162,14 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 			})
 			return false, validationErrors
 		}
+		renderedSchema = compiled.RenderedInline
+		renderedNode = compiled.RenderedNode
+		resourceNodes = compiled.ResourceNodes
+		compiledSchema = compiled.CompiledSchema
 
 		// Store in cache for subsequent validations of the same schema.
 		if canCache && compiledSchema != nil {
-			s.options.SchemaCache.Store(cacheKey, &cache.SchemaCacheEntry{
-				Schema:          schema,
-				RenderedInline:  renderedSchema,
-				ReferenceSchema: string(renderedSchema),
-				RenderedJSON:    jsonSchema,
-				CompiledSchema:  compiledSchema,
-				RenderedNode:    renderedNode,
-			})
+			s.options.SchemaCache.Store(cacheKey, compiled.ToCacheEntry(schema))
 		}
 	}
 
@@ -218,12 +177,7 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 		err := json.Unmarshal(payload, &decodedObject)
 		if err != nil {
 			// cannot decode the request body, so it's not valid
-			line := 1
-			col := 0
-			if schema.GoLow().Type.KeyNode != nil {
-				line = schema.GoLow().Type.KeyNode.Line
-				col = schema.GoLow().Type.KeyNode.Column
-			}
+			line, col := schemaLineColumn(schema)
 			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:    helpers.RequestBodyValidation,
 				ValidationSubType: helpers.Schema,
@@ -248,16 +202,11 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 			if errors.As(scErrs, &jk) {
 
 				// flatten the validationErrors
-				schFlatErr := jk.BasicOutput().Errors
+				schFlatErr := helpers.FlattenSchemaOutputErrors(jk.DetailedOutput())
 				schemaValidationErrors = extractBasicErrors(schFlatErr, renderedSchema,
-					renderedNode, decodedObject, payload, jk, schemaValidationErrors)
+					renderedNode, resourceNodes, decodedObject, payload, jk, schemaValidationErrors)
 			}
-			line := 1
-			col := 0
-			if schema.GoLow().Type.KeyNode != nil {
-				line = schema.GoLow().Type.KeyNode.Line
-				col = schema.GoLow().Type.KeyNode.Column
-			}
+			line, col := schemaLineColumn(schema)
 
 			validationErrors = append(validationErrors, &liberrors.ValidationError{
 				ValidationType:         helpers.Schema,
@@ -277,8 +226,16 @@ func (s *schemaValidator) validateSchemaWithVersion(schema *base.Schema, payload
 	return true, nil
 }
 
+func schemaLineColumn(schema *base.Schema) (int, int) {
+	if schema == nil || schema.GoLow() == nil || schema.GoLow().Type.KeyNode == nil {
+		return 1, 0
+	}
+	return schema.GoLow().Type.KeyNode.Line, schema.GoLow().Type.KeyNode.Column
+}
+
 func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	renderedSchema []byte, renderedNode *yaml.Node,
+	resourceNodes map[string]*yaml.Node,
 	decodedObject interface{},
 	payload []byte, jk *jsonschema.ValidationError,
 	schemaValidationErrors []*liberrors.SchemaValidationFailure,
@@ -291,6 +248,9 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	var rootNode *yaml.Node
 	if renderedNode != nil {
 		rootNode = renderedNode
+		if rootNode.Kind == yaml.DocumentNode && len(rootNode.Content) > 0 {
+			rootNode = rootNode.Content[0]
+		}
 	} else if len(renderedSchema) > 0 {
 		// Fallback: parse bytes ONCE
 		var docNode yaml.Node
@@ -312,7 +272,12 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 			// locate the violated property in the schema
 			var located *yaml.Node
 			if rootNode != nil {
-				located = LocateSchemaPropertyNodeByJSONPath(rootNode, er.KeywordLocation)
+				located = LocateSchemaPropertyNodeByJSONPathWithResources(
+					rootNode,
+					resourceNodes,
+					er.KeywordLocation,
+					er.AbsoluteKeywordLocation,
+				)
 			}
 
 			// extract the element specified by the instance

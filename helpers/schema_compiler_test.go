@@ -46,6 +46,75 @@ func Test_SchemaWithNilOptions(t *testing.T) {
 	require.NotNil(t, jsch, "Did not return a compiled schema")
 }
 
+func TestNewCompiledSchemaResourcesWithVersion(t *testing.T) {
+	resources := map[string][]byte{
+		"https://example.com/root.json": []byte(`{
+		  "type": "object",
+		  "properties": {
+		    "name": { "$ref": "defs.json#/components/schemas/Name" }
+		  }
+		}`),
+		"https://example.com/defs.json": []byte(`{
+		  "components": {
+		    "schemas": {
+		      "Name": { "type": "string" }
+		    }
+		  }
+		}`),
+	}
+
+	jsch, err := NewCompiledSchemaResourcesWithVersion(
+		"https://example.com/root.json",
+		resources,
+		config.NewValidationOptions(),
+		3.1,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, jsch)
+	assert.NoError(t, jsch.Validate(map[string]any{"name": "ok"}))
+	assert.Error(t, jsch.Validate(map[string]any{"name": 42}))
+}
+
+func TestNewCompiledSchemaResourcesWithVersion_InvalidResourceJSON(t *testing.T) {
+	jsch, err := NewCompiledSchemaResourcesWithVersion(
+		"https://example.com/root.json",
+		map[string][]byte{"https://example.com/root.json": []byte(`{`)},
+		config.NewValidationOptions(),
+		3.1,
+	)
+
+	assert.Nil(t, jsch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmarshal JSON schema resource")
+}
+
+func TestNewCompiledSchemaResourcesWithVersion_InvalidResourceName(t *testing.T) {
+	jsch, err := NewCompiledSchemaResourcesWithVersion(
+		"https://example.com/root.json",
+		map[string][]byte{"%zz": []byte(`{}`)},
+		config.NewValidationOptions(),
+		3.1,
+	)
+
+	assert.Nil(t, jsch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to add resource")
+}
+
+func TestNewCompiledSchemaResourcesWithVersion_CompileFailure(t *testing.T) {
+	jsch, err := NewCompiledSchemaResourcesWithVersion(
+		"https://example.com/root.json#/missing",
+		map[string][]byte{"https://example.com/root.json": []byte(`{}`)},
+		config.NewValidationOptions(),
+		3.1,
+	)
+
+	assert.Nil(t, jsch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "JSON schema compile failed")
+}
+
 func Test_SchemaWithDefaultOptions(t *testing.T) {
 	valOptions := config.NewValidationOptions()
 	jsch, err := NewCompiledSchema("test", []byte(stringSchema), valOptions)

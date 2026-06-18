@@ -2,11 +2,14 @@ package parameters
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/testify/assert"
@@ -14,6 +17,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
@@ -23,6 +27,153 @@ func Test_ForceCompilerError(t *testing.T) {
 
 	// Ideally this would result in an error response, current behavior swallows the error
 	require.Empty(t, result)
+}
+
+func TestValidateParameterSchema_CircularReferenceWithCacheDisabled(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            $ref: '#/components/schemas/Node'
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+        child:
+          $ref: '#/components/schemas/Node'
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/things").Get.Parameters[0].Schema.Schema()
+	opts := config.NewValidationOptions(config.WithSchemaCache(nil))
+
+	validationErrors := ValidateParameterSchema(
+		schema,
+		map[string]interface{}{
+			"id": "root",
+			"child": map[string]interface{}{
+				"id": "leaf",
+			},
+		},
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		opts,
+	)
+	assert.Empty(t, validationErrors)
+
+	validationErrors = ValidateParameterSchema(
+		schema,
+		map[string]interface{}{
+			"id": "root",
+			"child": map[string]interface{}{
+				"id": 42,
+			},
+		},
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		opts,
+	)
+
+	require.Len(t, validationErrors, 1)
+	requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+}
+
+func TestValidateParameterSchema_ExternalReferenceWithCacheDisabled(t *testing.T) {
+	tempDir := t.TempDir()
+	rootPath := filepath.Join(tempDir, "openapi.yaml")
+	require.NoError(t, os.WriteFile(rootPath, []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            $ref: './models.yaml#/components/schemas/Filter'
+      responses:
+        '200':
+          description: ok`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "models.yaml"), []byte(`components:
+  schemas:
+    Filter:
+      type: object
+      properties:
+        id:
+          type: string`), 0o600))
+
+	docConfig := datamodel.NewDocumentConfiguration()
+	docConfig.AllowFileReferences = true
+	docConfig.BasePath = tempDir
+	docConfig.SpecFilePath = rootPath
+	docConfig.FileFilter = []string{"openapi.yaml", "models.yaml"}
+
+	rootSpec, err := os.ReadFile(rootPath)
+	require.NoError(t, err)
+	doc, err := libopenapi.NewDocumentWithConfiguration(rootSpec, docConfig)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/things").Get.Parameters[0].Schema.Schema()
+	validationErrors := ValidateParameterSchema(
+		schema,
+		map[string]interface{}{
+			"id": 42,
+		},
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		config.NewValidationOptions(config.WithSchemaCache(nil)),
+	)
+
+	require.Len(t, validationErrors, 1)
+	requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+}
+
+func requireParameterFailureContaining(
+	t *testing.T,
+	failures []*liberrors.SchemaValidationFailure,
+	expectedReason string,
+) *liberrors.SchemaValidationFailure {
+	t.Helper()
+	for _, failure := range failures {
+		if failure != nil && strings.Contains(failure.Reason, expectedReason) {
+			return failure
+		}
+	}
+	require.Failf(t, "schema failure not found", "expected reason containing %q", expectedReason)
+	return nil
 }
 
 func TestHeaderSchemaNoType(t *testing.T) {

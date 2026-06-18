@@ -20,7 +20,6 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
-	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -140,6 +139,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 	var referenceSchema string
 	var compiledSchema *jsonschema.Schema
 	var cachedNode *yaml.Node
+	var resourceNodes map[string]*yaml.Node
 
 	if input.Schema == nil {
 		return false, []*liberrors.ValidationError{{
@@ -169,54 +169,15 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 			jsonSchema = cached.RenderedJSON
 			compiledSchema = cached.CompiledSchema
 			cachedNode = cached.RenderedNode
+			resourceNodes = cached.ResourceNodes
 		}
 	}
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		rendered, renderErr := schema_validation.RenderSchemaForValidation(
+		compiled, err := schema_validation.CompileSchemaForValidation(
 			input.Schema,
 			schema_validation.SchemaValidationPurposeRequestBody,
-		)
-		if rendered != nil {
-			renderedSchema = rendered.RenderedInline
-			referenceSchema = rendered.ReferenceSchema
-			jsonSchema = rendered.RenderedJSON
-			cachedNode = rendered.RenderedNode
-		}
-
-		// If rendering failed (e.g., circular reference), return the render error
-		if renderErr != nil {
-			violation := &liberrors.SchemaValidationFailure{
-				Reason:          renderErr.Error(),
-				ReferenceSchema: referenceSchema,
-			}
-			validationErrors = append(validationErrors, &liberrors.ValidationError{
-				ValidationType:    helpers.RequestBodyValidation,
-				ValidationSubType: helpers.Schema,
-				Message: fmt.Sprintf("%s request body for '%s' failed schema rendering",
-					input.Request.Method, input.Request.URL.Path),
-				Reason: fmt.Sprintf("The request schema failed to render: %s",
-					renderErr.Error()),
-				SpecLine:               1,
-				SpecCol:                0,
-				SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-				HowToFix:               liberrors.HowToFixInvalidRenderedSchema,
-				Context:                referenceSchema,
-			})
-			return false, validationErrors
-		}
-
-		var err error
-		hash := schema_validation.SchemaCacheKey(
-			input.Schema.GoLow().Hash(),
-			input.Version,
-			schema_validation.SchemaValidationPurposeRequestBody,
-		)
-		schemaName := fmt.Sprintf("%x", hash)
-		compiledSchema, err = helpers.NewCompiledSchemaWithVersion(
-			schemaName,
-			jsonSchema,
 			validationOptions,
 			input.Version,
 		)
@@ -234,16 +195,20 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 			})
 			return false, validationErrors
 		}
+		renderedSchema = compiled.RenderedInline
+		referenceSchema = compiled.ReferenceSchema
+		jsonSchema = compiled.RenderedJSON
+		cachedNode = compiled.RenderedNode
+		resourceNodes = compiled.ResourceNodes
+		compiledSchema = compiled.CompiledSchema
 
 		if validationOptions.SchemaCache != nil {
-			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
-				Schema:          input.Schema,
-				RenderedInline:  renderedSchema,
-				ReferenceSchema: referenceSchema,
-				RenderedJSON:    jsonSchema,
-				CompiledSchema:  compiledSchema,
-				RenderedNode:    cachedNode,
-			})
+			hash := schema_validation.SchemaCacheKey(
+				input.Schema.GoLow().Hash(),
+				input.Version,
+				schema_validation.SchemaValidationPurposeRequestBody,
+			)
+			validationOptions.SchemaCache.Store(hash, compiled.ToCacheEntry(input.Schema))
 		}
 	}
 
@@ -316,7 +281,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 
 		if errors.As(scErrs, &jk) {
 			// flatten the validationErrors
-			schFlatErrs := jk.BasicOutput().Errors
+			schFlatErrs := helpers.FlattenSchemaOutputErrors(jk.DetailedOutput())
 
 			// Use cached node if available, otherwise parse
 			renderedNode := cachedNode
@@ -336,8 +301,13 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 
 					// locate the violated property in the schema
 					var located *yaml.Node
-					if len(renderedNode.Content) > 0 {
-						located = schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+					if renderedNode != nil {
+						located = schema_validation.LocateSchemaPropertyNodeByJSONPathWithResources(
+							renderedNode,
+							resourceNodes,
+							er.KeywordLocation,
+							er.AbsoluteKeywordLocation,
+						)
 					}
 
 					// extract the element specified by the instance
