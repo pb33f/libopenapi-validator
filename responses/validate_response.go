@@ -20,7 +20,6 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
-	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -48,10 +47,11 @@ type ValidateResponseSchemaInput struct {
 func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberrors.ValidationError) {
 	validationOptions := config.NewValidationOptions(input.Options...)
 	var validationErrors []*liberrors.ValidationError
-	var renderedSchema, jsonSchema []byte
+	var renderedSchema []byte
 	var referenceSchema string
 	var compiledSchema *jsonschema.Schema
 	var cachedNode *yaml.Node
+	var resourceNodes map[string]*yaml.Node
 
 	if input.Schema == nil {
 		return false, []*liberrors.ValidationError{{
@@ -78,57 +78,17 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
 			renderedSchema = cached.RenderedInline
 			referenceSchema = cached.ReferenceSchema
-			jsonSchema = cached.RenderedJSON
 			compiledSchema = cached.CompiledSchema
 			cachedNode = cached.RenderedNode
+			resourceNodes = cached.ResourceNodes
 		}
 	}
 
 	// Cache miss or no cache - render and compile
 	if compiledSchema == nil {
-		rendered, renderErr := schema_validation.RenderSchemaForValidation(
+		compiled, err := schema_validation.CompileSchemaForValidation(
 			input.Schema,
 			schema_validation.SchemaValidationPurposeResponseBody,
-		)
-		if rendered != nil {
-			renderedSchema = rendered.RenderedInline
-			referenceSchema = rendered.ReferenceSchema
-			jsonSchema = rendered.RenderedJSON
-			cachedNode = rendered.RenderedNode
-		}
-
-		// If rendering failed (e.g., circular reference), return the render error
-		if renderErr != nil {
-			violation := &liberrors.SchemaValidationFailure{
-				Reason:          renderErr.Error(),
-				ReferenceSchema: referenceSchema,
-			}
-			validationErrors = append(validationErrors, &liberrors.ValidationError{
-				ValidationType:    helpers.ResponseBodyValidation,
-				ValidationSubType: helpers.Schema,
-				Message: fmt.Sprintf("%d response body for '%s' failed schema rendering",
-					input.Response.StatusCode, input.Request.URL.Path),
-				Reason: fmt.Sprintf("The response schema for status code '%d' failed to render: %s",
-					input.Response.StatusCode, renderErr.Error()),
-				SpecLine:               1,
-				SpecCol:                0,
-				SchemaValidationErrors: []*liberrors.SchemaValidationFailure{violation},
-				HowToFix:               "check the response schema for circular references or invalid structures",
-				Context:                referenceSchema,
-			})
-			return false, validationErrors
-		}
-
-		var err error
-		hash := schema_validation.SchemaCacheKey(
-			input.Schema.GoLow().Hash(),
-			input.Version,
-			schema_validation.SchemaValidationPurposeResponseBody,
-		)
-		schemaName := fmt.Sprintf("%x", hash)
-		compiledSchema, err = helpers.NewCompiledSchemaWithVersion(
-			schemaName,
-			jsonSchema,
 			validationOptions,
 			input.Version,
 		)
@@ -147,16 +107,19 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 			})
 			return false, validationErrors
 		}
+		renderedSchema = compiled.RenderedInline
+		referenceSchema = compiled.ReferenceSchema
+		cachedNode = compiled.RenderedNode
+		resourceNodes = compiled.ResourceNodes
+		compiledSchema = compiled.CompiledSchema
 
 		if validationOptions.SchemaCache != nil {
-			validationOptions.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
-				Schema:          input.Schema,
-				RenderedInline:  renderedSchema,
-				ReferenceSchema: referenceSchema,
-				RenderedJSON:    jsonSchema,
-				CompiledSchema:  compiledSchema,
-				RenderedNode:    cachedNode,
-			})
+			hash := schema_validation.SchemaCacheKey(
+				input.Schema.GoLow().Hash(),
+				input.Version,
+				schema_validation.SchemaValidationPurposeResponseBody,
+			)
+			validationOptions.SchemaCache.Store(hash, compiled.ToCacheEntry(input.Schema))
 		}
 	}
 
@@ -261,7 +224,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 
 		if errors.As(scErrs, &jk) {
 			// flatten the validationErrors
-			schFlatErrs := jk.BasicOutput().Errors
+			schFlatErrs := helpers.FlattenSchemaOutputErrors(jk.DetailedOutput())
 
 			renderedNode := cachedNode
 			if renderedNode == nil {
@@ -279,8 +242,13 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 				if er.Error != nil {
 					// locate the violated property in the schema
 					var located *yaml.Node
-					if len(renderedNode.Content) > 0 {
-						located = schema_validation.LocateSchemaPropertyNodeByJSONPath(renderedNode.Content[0], er.KeywordLocation)
+					if renderedNode != nil {
+						located = schema_validation.LocateSchemaPropertyNodeByJSONPathWithResources(
+							renderedNode,
+							resourceNodes,
+							er.KeywordLocation,
+							er.AbsoluteKeywordLocation,
+						)
 					}
 
 					// extract the element specified by the instance

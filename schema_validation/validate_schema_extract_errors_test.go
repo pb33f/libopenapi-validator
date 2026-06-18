@@ -1,4 +1,4 @@
-// Copyright 2026 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v4"
 	"golang.org/x/text/message"
@@ -60,7 +61,16 @@ properties:
 		},
 	}
 
-	failures := extractBasicErrors(flatErrors, renderedSchema, nil, map[string]any{"item": map[string]any{}}, payload, nil, nil)
+	failures := extractBasicErrors(
+		flatErrors,
+		renderedSchema,
+		nil,
+		nil,
+		map[string]any{"item": map[string]any{}},
+		payload,
+		nil,
+		nil,
+	)
 	assert.Len(t, failures, 2)
 
 	var docNode yaml.Node
@@ -77,4 +87,52 @@ properties:
 	assert.Equal(t, mappingNode.Column, failures[0].Column)
 	assert.Equal(t, adjustedLine(sequenceNode), failures[1].Line)
 	assert.Equal(t, sequenceNode.Column, failures[1].Column)
+}
+
+func TestExtractBasicErrors_UsesExternalResourceNodeForAbsoluteKeywordLocation(t *testing.T) {
+	renderedSchema := []byte(`components:
+  schemas:
+    Entry:
+      $ref: './models.yaml#/components/schemas/External'`)
+	payload := []byte(`{"id":42}`)
+
+	var entryRoot yaml.Node
+	assert.NoError(t, yaml.Unmarshal(renderedSchema, &entryRoot))
+
+	var externalRoot yaml.Node
+	assert.NoError(t, yaml.Unmarshal([]byte(`components:
+  schemas:
+    External:
+      type: object
+      properties:
+        id:
+          type: string`), &externalRoot))
+
+	flatErrors := []jsonschema.OutputUnit{
+		{
+			KeywordLocation:         "/components/schemas/Entry/$ref/properties/id/type",
+			AbsoluteKeywordLocation: "file:///tmp/models.yaml#/components/schemas/External/properties/id/type",
+			InstanceLocation:        "/id",
+			Error: &jsonschema.OutputError{
+				Kind: stubErrorKind{msg: "got number, want string"},
+			},
+		},
+	}
+
+	failures := extractBasicErrors(
+		flatErrors,
+		renderedSchema,
+		&entryRoot,
+		map[string]*yaml.Node{"file:///tmp/models.yaml": &externalRoot},
+		map[string]any{"id": float64(42)},
+		payload,
+		nil,
+		nil,
+	)
+
+	require.Len(t, failures, 1)
+	located := LocateSchemaPropertyNodeByJSONPath(externalRoot.Content[0], "/components/schemas/External/properties/id/type")
+	require.NotNil(t, located)
+	assert.Equal(t, located.Line, failures[0].Line)
+	assert.Equal(t, located.Column, failures[0].Column)
 }

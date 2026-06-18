@@ -1,3 +1,6 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package requests
 
 import (
@@ -5,15 +8,19 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
@@ -374,7 +381,6 @@ func indentLines(s string, indent string) string {
 }
 
 func TestValidateRequestSchema_CircularReference(t *testing.T) {
-	// Test when schema has a circular reference that causes render failure
 	spec := `openapi: 3.1.0
 info:
   title: Test
@@ -408,10 +414,194 @@ components:
 		Version: 3.1,
 	})
 
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+
+	valid, errors = ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(`{"code": "abc", "details": [{"code": 42}]}`),
+		Schema:  schema.Schema(),
+		Version: 3.1,
+	})
+
 	assert.False(t, valid)
 	require.Len(t, errors, 1)
-	assert.Contains(t, errors[0].Message, "failed schema rendering")
-	assert.Contains(t, errors[0].Reason, "circular reference")
+	require.NotEmpty(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "got number")
+}
+
+func TestValidateRequestSchema_MultiFileComplexCircularReferences(t *testing.T) {
+	tempDir := t.TempDir()
+
+	files := map[string]string{
+		"openapi.yaml": `openapi: 3.1.0
+info:
+  title: Multi-file circular refs
+  version: 1.0.0
+paths:
+  /catalogs:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: './models.yaml#/components/schemas/Catalog'`,
+		"models.yaml": `components:
+  schemas:
+    Catalog:
+      type: object
+      required: [products, featured]
+      properties:
+        products:
+          type: array
+          minItems: 1
+          items:
+            $ref: './product.yaml#/components/schemas/Product'
+        featured:
+          $ref: './product.yaml#/components/schemas/Product'`,
+		"product.yaml": `components:
+  schemas:
+    Product:
+      type: object
+      required: [sku, name, children, variants]
+      properties:
+        sku:
+          type: string
+        name:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        variants:
+          type: array
+          items:
+            $ref: './variant.yaml#/components/schemas/Variant'`,
+		"variant.yaml": `components:
+  schemas:
+    Variant:
+      type: object
+      required: [code, parent]
+      properties:
+        code:
+          type: string
+        parent:
+          $ref: './product.yaml#/components/schemas/Product'
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variant'`,
+	}
+
+	for name, content := range files {
+		require.NoError(t, os.WriteFile(filepath.Join(tempDir, name), []byte(content), 0o600))
+	}
+
+	docConfig := datamodel.NewDocumentConfiguration()
+	docConfig.AllowFileReferences = true
+	docConfig.BasePath = tempDir
+	docConfig.SpecFilePath = filepath.Join(tempDir, "openapi.yaml")
+	docConfig.FileFilter = []string{"openapi.yaml", "models.yaml", "product.yaml", "variant.yaml"}
+	docConfig.SkipCircularReferenceCheck = true
+
+	rootSpec, err := os.ReadFile(filepath.Join(tempDir, "openapi.yaml"))
+	require.NoError(t, err)
+	doc, err := libopenapi.NewDocumentWithConfiguration(rootSpec, docConfig)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/catalogs").Post.RequestBody.Content.GetOrZero("application/json").Schema
+	require.NotNil(t, schema)
+
+	validPayload := `{
+  "products": [
+    {
+      "sku": "root",
+      "name": "Root",
+      "children": [
+        {
+          "sku": "child",
+          "name": "Child",
+          "children": [],
+          "variants": []
+        }
+      ],
+      "variants": [
+        {
+          "code": "red",
+          "parent": {
+            "sku": "parent",
+            "name": "Parent",
+            "children": [],
+            "variants": []
+          },
+          "alternatives": []
+        }
+      ]
+    }
+  ],
+  "featured": {
+    "sku": "featured",
+    "name": "Featured",
+    "children": [],
+    "variants": []
+  }
+}`
+
+	invalidPayload := strings.Replace(validPayload, `"code": "red"`, `"code": 42`, 1)
+	valid, validationErrors := ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(invalidPayload),
+		Schema:  schema.Schema(),
+		Version: 3.1,
+		Options: []config.Option{
+			config.WithSchemaCache(nil),
+		},
+	})
+
+	assert.False(t, valid)
+	require.Len(t, validationErrors, 1)
+	coldFailure := requireSchemaFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	assert.Equal(t, "code", coldFailure.FieldName)
+	assert.Equal(t, 8, coldFailure.Line)
+	assert.Greater(t, coldFailure.Column, 0)
+	assert.Contains(t, coldFailure.KeywordLocation, "/type")
+
+	valid, validationErrors = ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(validPayload),
+		Schema:  schema.Schema(),
+		Version: 3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, validationErrors)
+
+	valid, validationErrors = ValidateRequestSchema(&ValidateRequestSchemaInput{
+		Request: postRequestWithBody(invalidPayload),
+		Schema:  schema.Schema(),
+		Version: 3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, validationErrors, 1)
+	require.NotEmpty(t, validationErrors[0].SchemaValidationErrors)
+	cachedFailure := requireSchemaFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	assert.Equal(t, coldFailure.Line, cachedFailure.Line)
+	assert.Equal(t, coldFailure.Column, cachedFailure.Column)
+}
+
+func requireSchemaFailureContaining(
+	t *testing.T,
+	failures []*liberrors.SchemaValidationFailure,
+	expectedReason string,
+) *liberrors.SchemaValidationFailure {
+	t.Helper()
+	for _, failure := range failures {
+		if failure != nil && strings.Contains(failure.Reason, expectedReason) {
+			return failure
+		}
+	}
+	require.Failf(t, "schema failure not found", "expected reason containing %q", expectedReason)
+	return nil
 }
 
 func TestValidateRequestSchema_NilParentProxy(t *testing.T) {

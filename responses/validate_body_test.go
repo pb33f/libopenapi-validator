@@ -1266,21 +1266,14 @@ components:
 		func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(nil)
+			_, _ = w.Write([]byte(`{"code":"abc","details":[{"code":"def"}]}`))
 		},
 	)
 
 	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
 
-	assert.False(t, valid)
-	assert.Len(t, errors, 1)
-	// The error message may vary depending on whether the circular reference is caught
-	// during rendering or compilation, so we check for either pattern
-	assert.True(t,
-		strings.Contains(errors[0].Reason, "circular reference") ||
-			strings.Contains(errors[0].Reason, "json-pointer") ||
-			strings.Contains(errors[0].Reason, "not found"),
-		"Expected error about circular reference or JSON pointer not found, got: %s", errors[0].Reason)
+	assert.True(t, valid)
+	assert.Empty(t, errors)
 }
 
 func TestValidateResponseBody_XMLMarshalError(t *testing.T) {

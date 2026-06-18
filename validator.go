@@ -4,7 +4,6 @@
 package validator
 
 import (
-	"fmt"
 	"net/http"
 	"sort"
 	"sync"
@@ -496,28 +495,17 @@ func warmMediaTypeSchema(
 		hash := schema_validation.SchemaCacheKey(schema.GoLow().Hash(), version, purpose)
 
 		if _, exists := schemaCache.Load(hash); !exists {
-			rendered, err := schema_validation.RenderSchemaForValidation(schema, purpose)
-			if err != nil || rendered == nil || len(rendered.RenderedInline) == 0 {
-				return
-			}
-			compiledSchema, compileErr := helpers.NewCompiledSchemaWithVersion(
-				fmt.Sprintf("%x", hash),
-				rendered.RenderedJSON,
+			compiled, err := schema_validation.CompileSchemaForValidation(
+				schema,
+				purpose,
 				options,
 				version,
 			)
-			if compileErr != nil || compiledSchema == nil {
+			if err != nil || compiled == nil || compiled.CompiledSchema == nil {
 				return
 			}
 
-			schemaCache.Store(hash, &cache.SchemaCacheEntry{
-				Schema:          schema,
-				RenderedInline:  rendered.RenderedInline,
-				ReferenceSchema: rendered.ReferenceSchema,
-				RenderedJSON:    rendered.RenderedJSON,
-				CompiledSchema:  compiledSchema,
-				RenderedNode:    rendered.RenderedNode,
-			})
+			schemaCache.Store(hash, compiled.ToCacheEntry(schema))
 		}
 	}
 }
@@ -545,30 +533,18 @@ func warmParameterSchema(param *v3.Parameter, schemaCache cache.SchemaCache, opt
 			hash := schema_validation.SchemaCacheKey(schema.GoLow().Hash(), version,
 				schema_validation.SchemaValidationPurposeGeneric)
 			if _, exists := schemaCache.Load(hash); !exists {
-				rendered, err := schema_validation.RenderSchemaForValidation(schema,
-					schema_validation.SchemaValidationPurposeGeneric)
-				if err != nil || rendered == nil || len(rendered.RenderedInline) == 0 {
-					return
-				}
-				compiledSchema, compileErr := helpers.NewCompiledSchemaWithVersion(
-					fmt.Sprintf("%x", hash),
-					rendered.RenderedJSON,
+				compiled, err := schema_validation.CompileSchemaForValidation(
+					schema,
+					schema_validation.SchemaValidationPurposeGeneric,
 					options,
 					version,
 				)
-				if compileErr != nil || compiledSchema == nil {
+				if err != nil || compiled == nil || compiled.CompiledSchema == nil {
 					return
 				}
 
 				// Store in cache using the shared SchemaCache type
-				schemaCache.Store(hash, &cache.SchemaCacheEntry{
-					Schema:          schema,
-					RenderedInline:  rendered.RenderedInline,
-					ReferenceSchema: rendered.ReferenceSchema,
-					RenderedJSON:    rendered.RenderedJSON,
-					CompiledSchema:  compiledSchema,
-					RenderedNode:    rendered.RenderedNode,
-				})
+				schemaCache.Store(hash, compiled.ToCacheEntry(schema))
 			}
 		}
 	}

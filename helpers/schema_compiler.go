@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
@@ -58,29 +59,8 @@ func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, options *confi
 	compiler := NewCompilerWithOptions(options)
 	compiler.UseLoader(NewCompilerLoader())
 
-	// register OpenAPI vocabulary with appropriate version and coercion settings
-	if options != nil && options.OpenAPIMode {
-		var vocabVersion openapi_vocabulary.VersionType
-		if version >= 3.15 { // use 3.15 to avoid floating point precision issues (3.2+)
-			vocabVersion = openapi_vocabulary.Version32
-		} else if version >= 3.05 { // use 3.05 to avoid floating point precision issues (3.1)
-			vocabVersion = openapi_vocabulary.Version31
-		} else {
-			vocabVersion = openapi_vocabulary.Version30
-		}
-
-		vocab := openapi_vocabulary.NewOpenAPIVocabularyWithCoercion(vocabVersion, options.AllowScalarCoercion)
-		compiler.RegisterVocabulary(vocab)
-		compiler.AssertVocabs()
-
-		if version < 3.05 {
-			jsonSchema = transformOpenAPI30Schema(jsonSchema)
-		}
-
-		if options.AllowScalarCoercion {
-			jsonSchema = transformSchemaForCoercion(jsonSchema)
-		}
-	}
+	configureOpenAPICompiler(compiler, options, version)
+	jsonSchema = prepareSchemaForVersion(jsonSchema, options, version)
 
 	decodedSchema, err := jsonschema.UnmarshalJSON(bytes.NewReader(jsonSchema))
 	if err != nil {
@@ -97,6 +77,79 @@ func NewCompiledSchemaWithVersion(name string, jsonSchema []byte, options *confi
 	}
 
 	return jsch, nil
+}
+
+// NewCompiledSchemaResourcesWithVersion compiles a schema from named JSON Schema resources.
+// The name argument may include a fragment pointing at the schema inside one of the resources.
+func NewCompiledSchemaResourcesWithVersion(
+	name string,
+	resources map[string][]byte,
+	options *config.ValidationOptions,
+	version float32,
+) (*jsonschema.Schema, error) {
+	compiler := NewCompilerWithOptions(options)
+	compiler.UseLoader(NewCompilerLoader())
+	configureOpenAPICompiler(compiler, options, version)
+
+	resourceNames := make([]string, 0, len(resources))
+	for resourceName := range resources {
+		resourceNames = append(resourceNames, resourceName)
+	}
+	sort.Strings(resourceNames)
+
+	for _, resourceName := range resourceNames {
+		preparedSchema := prepareSchemaForVersion(resources[resourceName], options, version)
+		decodedSchema, err := jsonschema.UnmarshalJSON(bytes.NewReader(preparedSchema))
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal JSON schema resource %q: %w", resourceName, err)
+		}
+
+		if err = compiler.AddResource(resourceName, decodedSchema); err != nil {
+			return nil, fmt.Errorf("failed to add resource %q to schema compiler: %w", resourceName, err)
+		}
+	}
+
+	jsch, err := compiler.Compile(name)
+	if err != nil {
+		return nil, fmt.Errorf("JSON schema compile failed: %s", err.Error())
+	}
+
+	return jsch, nil
+}
+
+func configureOpenAPICompiler(compiler *jsonschema.Compiler, options *config.ValidationOptions, version float32) {
+	if options == nil || !options.OpenAPIMode {
+		return
+	}
+
+	var vocabVersion openapi_vocabulary.VersionType
+	if version >= 3.15 { // use 3.15 to avoid floating point precision issues (3.2+)
+		vocabVersion = openapi_vocabulary.Version32
+	} else if version >= 3.05 { // use 3.05 to avoid floating point precision issues (3.1)
+		vocabVersion = openapi_vocabulary.Version31
+	} else {
+		vocabVersion = openapi_vocabulary.Version30
+	}
+
+	vocab := openapi_vocabulary.NewOpenAPIVocabularyWithCoercion(vocabVersion, options.AllowScalarCoercion)
+	compiler.RegisterVocabulary(vocab)
+	compiler.AssertVocabs()
+}
+
+func prepareSchemaForVersion(jsonSchema []byte, options *config.ValidationOptions, version float32) []byte {
+	if options == nil || !options.OpenAPIMode {
+		return jsonSchema
+	}
+
+	if version < 3.05 {
+		jsonSchema = transformOpenAPI30Schema(jsonSchema)
+	}
+
+	if options.AllowScalarCoercion {
+		jsonSchema = transformSchemaForCoercion(jsonSchema)
+	}
+
+	return jsonSchema
 }
 
 // transformOpenAPI30Schema transforms OpenAPI 3.0 schemas to JSON Schema 2020-12 compatible format.

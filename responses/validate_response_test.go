@@ -350,7 +350,6 @@ func TestValidateResponseSchema_NilSchemaGoLow(t *testing.T) {
 }
 
 func TestValidateResponseSchema_CircularReference(t *testing.T) {
-	// Test when schema has a circular reference that causes render failure
 	spec := `openapi: 3.1.0
 info:
   title: Test
@@ -385,10 +384,20 @@ components:
 		Version:  3.1,
 	})
 
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+
+	valid, errors = ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"code": "abc", "details": [{"code": 42}]}`),
+		Schema:   schema.Schema(),
+		Version:  3.1,
+	})
+
 	assert.False(t, valid)
 	require.Len(t, errors, 1)
-	assert.Contains(t, errors[0].Message, "failed schema rendering")
-	assert.Contains(t, errors[0].Reason, "circular reference")
+	require.NotEmpty(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "got number")
 }
 
 func TestValidateResponseSchema_ResponseMissing(t *testing.T) {
