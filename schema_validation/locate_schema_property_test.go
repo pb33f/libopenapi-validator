@@ -113,4 +113,20 @@ func TestLookupResourceNode_EdgeCases(t *testing.T) {
 	)
 
 	assert.Same(t, escapedPathNode, located)
+
+	canonicalPathNode := &yaml.Node{Kind: yaml.MappingNode}
+	located = lookupResourceNode(
+		map[string]*yaml.Node{"file:///tmp/models.yaml": canonicalPathNode},
+		"file://localhost/tmp/models.yaml",
+	)
+
+	assert.Same(t, canonicalPathNode, located)
+
+	parsedStringNode := &yaml.Node{Kind: yaml.MappingNode}
+	located = lookupResourceNode(
+		map[string]*yaml.Node{"file:///tmp/models%20with%20space.yaml": parsedStringNode},
+		"file:///tmp/models with space.yaml",
+	)
+
+	assert.Same(t, parsedStringNode, located)
 }
