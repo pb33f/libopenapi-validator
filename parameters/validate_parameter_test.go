@@ -19,12 +19,25 @@ import (
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/message"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
+
+type parameterStubErrorKind struct {
+	msg string
+}
+
+func (p parameterStubErrorKind) KeywordPath() []string {
+	return nil
+}
+
+func (p parameterStubErrorKind) LocalizedString(_ *message.Printer) string {
+	return p.msg
+}
 
 func Test_ForceCompilerError(t *testing.T) {
 	// Try to force a panic
@@ -242,6 +255,42 @@ components:
 	require.Len(t, validationErrors, 1)
 	require.Len(t, validationErrors[0].SchemaValidationErrors, 1)
 	assert.Contains(t, validationErrors[0].SchemaValidationErrors[0].ReferenceSchema, "type: string")
+}
+
+func TestFormatJsonSchemaValidationError_IgnoresSchemaNoise(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Filter:
+      type: string
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+	schema := model.Model.Components.Schemas.GetOrZero("Filter").Schema()
+
+	validationErrors := formatJsonSchemaValidationError(
+		schema,
+		&jsonschema.ValidationError{
+			ErrorKind: parameterStubErrorKind{msg: "validation failed"},
+		},
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		"",
+		"",
+		"",
+	)
+
+	require.Len(t, validationErrors, 1)
+	assert.Empty(t, validationErrors[0].SchemaValidationErrors)
 }
 
 func TestHeaderSchemaNoType(t *testing.T) {

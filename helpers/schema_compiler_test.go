@@ -1,3 +1,6 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package helpers
 
 import (
@@ -93,6 +96,19 @@ func TestNewCompiledSchemaResourcesWithVersion_InvalidResourceName(t *testing.T)
 	jsch, err := NewCompiledSchemaResourcesWithVersion(
 		"https://example.com/root.json",
 		map[string][]byte{"%zz": []byte(`{}`)},
+		config.NewValidationOptions(),
+		3.1,
+	)
+
+	assert.Nil(t, jsch)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to add resource")
+}
+
+func TestNewCompiledSchemaWithVersion_InvalidResourceName(t *testing.T) {
+	jsch, err := NewCompiledSchemaWithVersion(
+		"%zz",
+		[]byte(`{}`),
 		config.NewValidationOptions(),
 		3.1,
 	)

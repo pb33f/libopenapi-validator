@@ -185,6 +185,39 @@ components:
 	})
 }
 
+func TestRenderRootSchemaForValidation_RenderFallbackFailure(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Node:
+      type: object
+      properties:
+        child:
+          $ref: '#/components/schemas/Node'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+	schema := model.Model.Components.Schemas.GetOrZero("Node").Schema()
+
+	originalRenderSchemaWithRefs := renderSchemaWithRefs
+	renderSchemaWithRefs = func(*base.Schema) ([]byte, error) {
+		return nil, assert.AnError
+	}
+	t.Cleanup(func() {
+		renderSchemaWithRefs = originalRenderSchemaWithRefs
+	})
+
+	rendered, err := renderRootSchemaForValidation(schema, SchemaValidationPurposeGeneric)
+
+	assert.Nil(t, rendered)
+	require.ErrorIs(t, err, assert.AnError)
+}
+
 func TestSingleSchemaCompilePreferred_LocalReferenceSchemaUsesResourceCompiler(t *testing.T) {
 	spec := `openapi: 3.1.0
 info:
@@ -584,6 +617,23 @@ func TestAddReachableSchemaResources_GuardsAndSkips(t *testing.T) {
 		specIndex,
 		childSchemaNode,
 		SchemaValidationPurposeGeneric,
+	))
+}
+
+func TestSchemaResourceIndex_Fallbacks(t *testing.T) {
+	var root yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(`type: object`), &root))
+	preferredIndex := index.NewSpecIndex(&root)
+	fallbackIndex := index.NewSpecIndex(&root)
+
+	assert.Nil(t, schemaResourceIndex(nil, nil))
+	assert.Same(t, preferredIndex, schemaResourceIndex(
+		&index.Reference{Index: fallbackIndex},
+		preferredIndex,
+	))
+	assert.Same(t, fallbackIndex, schemaResourceIndex(
+		&index.Reference{Index: fallbackIndex},
+		nil,
 	))
 }
 
