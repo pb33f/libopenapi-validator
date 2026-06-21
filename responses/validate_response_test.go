@@ -1,3 +1,6 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package responses
 
 import (
@@ -13,7 +16,9 @@ import (
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	validatorhelpers "github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
@@ -451,4 +456,96 @@ func TestValidateResponseSchema_HeadWithBodyFails(t *testing.T) {
 	assert.False(t, valid)
 	require.Len(t, errs, 1)
 	assert.Contains(t, errs[0].Reason, "must not contain a body")
+}
+
+func TestValidateResponseSchema_EmptyBodySkipsValidation(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(""),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errs)
+}
+
+func TestValidateResponseSchema_CachedSchemaWithoutRenderedNodeFallsBackToRenderedBytes(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `anyOf:
+  - type: string
+  - type: integer`, 3.1)
+
+	opts := config.NewValidationOptions()
+	compiled, err := schema_validation.CompileSchemaForValidation(
+		schema,
+		schema_validation.SchemaValidationPurposeResponseBody,
+		opts,
+		3.1,
+	)
+	require.NoError(t, err)
+
+	hash := schema_validation.SchemaCacheKey(
+		schema.GoLow().Hash(),
+		3.1,
+		schema_validation.SchemaValidationPurposeResponseBody,
+	)
+	entry := compiled.ToCacheEntry(schema)
+	entry.RenderedNode = nil
+	opts.SchemaCache.Store(hash, entry)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`true`),
+		Schema:   schema,
+		Version:  3.1,
+		Options: []config.Option{
+			config.WithExistingOpts(opts),
+		},
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "got boolean")
+}
+
+func TestValidateResponseSchema_IgnoresEmptyKeywordLocationErrors(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+	opts := config.NewValidationOptions()
+	compiledSchema, err := validatorhelpers.NewCompiledSchemaWithVersion(
+		"schema",
+		[]byte(`false`),
+		opts,
+		3.1,
+	)
+	require.NoError(t, err)
+
+	hash := schema_validation.SchemaCacheKey(
+		schema.GoLow().Hash(),
+		3.1,
+		schema_validation.SchemaValidationPurposeResponseBody,
+	)
+	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		Schema:          schema,
+		RenderedInline:  []byte("false"),
+		ReferenceSchema: "false",
+		RenderedJSON:    []byte("false"),
+		CompiledSchema:  compiledSchema,
+	})
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"name":"test"}`),
+		Schema:   schema,
+		Version:  3.1,
+		Options: []config.Option{
+			config.WithExistingOpts(opts),
+		},
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Empty(t, errors[0].SchemaValidationErrors)
 }

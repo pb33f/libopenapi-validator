@@ -136,3 +136,25 @@ func TestExtractBasicErrors_UsesExternalResourceNodeForAbsoluteKeywordLocation(t
 	assert.Equal(t, located.Line, failures[0].Line)
 	assert.Equal(t, located.Column, failures[0].Column)
 }
+
+func TestExtractBasicErrors_IgnoresGenericSchemaNoise(t *testing.T) {
+	failures := extractBasicErrors(
+		[]jsonschema.OutputUnit{
+			{
+				KeywordLocation: "/anyOf",
+				Error: &jsonschema.OutputError{
+					Kind: stubErrorKind{msg: "anyOf failed, none matched"},
+				},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	assert.Empty(t, failures)
+}

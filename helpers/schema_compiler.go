@@ -164,11 +164,8 @@ func transformOpenAPI30Schema(jsonSchema []byte) []byte {
 
 	transformed := transformOAS30Keywords(schema)
 
-	result, err := json.Marshal(transformed)
-	if err != nil {
-		return jsonSchema
-	}
-
+	// json.Unmarshal only produces JSON-marshalable values here.
+	result, _ := json.Marshal(transformed)
 	return result
 }
 
@@ -326,11 +323,8 @@ func transformSchemaForCoercion(jsonSchema []byte) []byte {
 
 	transformed := transformCoercionInSchema(schema)
 
-	result, err := json.Marshal(transformed)
-	if err != nil {
-		return jsonSchema
-	}
-
+	// json.Unmarshal only produces JSON-marshalable values here.
+	result, _ := json.Marshal(transformed)
 	return result
 }
 

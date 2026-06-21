@@ -23,6 +23,11 @@ import (
 
 const syntheticSchemaResourceBase = "https://libopenapi-validator.local/schema/"
 
+// renderSchemaWithRefs keeps fallback rendering testable without depending on libopenapi internals failing.
+var renderSchemaWithRefs = func(schema *base.Schema) ([]byte, error) {
+	return schema.Render()
+}
+
 // CompiledValidationSchema contains a schema compiled for validation plus the rendered schema context.
 type CompiledValidationSchema struct {
 	RenderedInline  []byte
@@ -184,7 +189,7 @@ func renderRootSchemaForValidation(schema *base.Schema, purpose SchemaValidation
 		return rendered, nil
 	}
 
-	renderedInline, err := schema.Render()
+	renderedInline, err := renderSchemaWithRefs(schema)
 	if err != nil {
 		return nil, err
 	}
@@ -333,37 +338,43 @@ func addReachableSchemaResources(
 		if foundRef == nil {
 			continue
 		}
-		if foundIndex == nil {
-			foundIndex = foundRef.Index
-		}
-		if foundIndex == nil || foundIndex.GetRootNode() == nil {
-			continue
-		}
+		foundIndex = schemaResourceIndex(foundRef, foundIndex)
+		if foundIndex != nil && foundIndex.GetRootNode() != nil {
+			resourceName := ensureSchemaResourceName(state, foundIndex, uint64(len(resourceSet.resources)+1))
+			refKey := resourceName + "|" + foundRef.FullDefinition
+			if _, seen := state.seenRefs[refKey]; seen {
+				continue
+			}
+			state.seenRefs[refKey] = struct{}{}
 
-		resourceName := ensureSchemaResourceName(state, foundIndex, uint64(len(resourceSet.resources)+1))
-		refKey := resourceName + "|" + foundRef.FullDefinition
-		if _, seen := state.seenRefs[refKey]; seen {
-			continue
-		}
-		state.seenRefs[refKey] = struct{}{}
+			if _, exists := resourceSet.resources[resourceName]; !exists {
+				if _, err := addSchemaDocumentResource(
+					resourceSet.resources,
+					resourceSet.resourceNodes,
+					resourceName,
+					foundIndex.GetRootNode(),
+					purpose,
+				); err != nil {
+					return err
+				}
+			}
 
-		if _, exists := resourceSet.resources[resourceName]; !exists {
-			if _, err := addSchemaDocumentResource(
-				resourceSet.resources,
-				resourceSet.resourceNodes,
-				resourceName,
-				foundIndex.GetRootNode(),
-				purpose,
-			); err != nil {
+			if err := addReachableSchemaResources(resourceSet, state, foundIndex, foundRef.Node, purpose); err != nil {
 				return err
 			}
 		}
-
-		if err := addReachableSchemaResources(resourceSet, state, foundIndex, foundRef.Node, purpose); err != nil {
-			return err
-		}
 	}
 	return nil
+}
+
+func schemaResourceIndex(foundRef *index.Reference, foundIndex *index.SpecIndex) *index.SpecIndex {
+	if foundIndex != nil {
+		return foundIndex
+	}
+	if foundRef == nil {
+		return nil
+	}
+	return foundRef.Index
 }
 
 // ensureSchemaResourceName returns the stable compiler resource name for a parsed document.
@@ -536,9 +547,6 @@ func jsonPointerForNode(rootNode, targetNode *yaml.Node) (string, bool) {
 	ok := appendJSONPointerTokensForNode(rootNode, targetNode, &tokens)
 	if !ok {
 		return "", false
-	}
-	if len(tokens) == 0 {
-		return "", true
 	}
 	return "/" + strings.Join(tokens, "/"), true
 }
