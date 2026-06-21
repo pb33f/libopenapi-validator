@@ -1,6 +1,10 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package parameters
 
 import (
+	stdErrors "errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +18,7 @@ import (
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -26,6 +31,22 @@ func Test_ForceCompilerError(t *testing.T) {
 	result := ValidateSingleParameterSchema(nil, nil, "", "", "", "", "", nil, "", "")
 
 	// Ideally this would result in an error response, current behavior swallows the error
+	require.Empty(t, result)
+}
+
+func TestValidateParameterSchema_NilSchemaReturnsNoErrors(t *testing.T) {
+	result := ValidateParameterSchema(
+		nil,
+		"anything",
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		config.NewValidationOptions(),
+	)
+
 	require.Empty(t, result)
 }
 
@@ -100,7 +121,8 @@ components:
 	)
 
 	require.Len(t, validationErrors, 1)
-	requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	failure := requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	assert.NotNil(t, failure)
 }
 
 func TestValidateParameterSchema_ExternalReferenceWithCacheDisabled(t *testing.T) {
@@ -158,7 +180,8 @@ paths:
 	)
 
 	require.Len(t, validationErrors, 1)
-	requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	failure := requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	assert.NotNil(t, failure)
 }
 
 func requireParameterFailureContaining(
@@ -174,6 +197,51 @@ func requireParameterFailureContaining(
 	}
 	require.Failf(t, "schema failure not found", "expected reason containing %q", expectedReason)
 	return nil
+}
+
+func TestFormatJsonSchemaValidationError_RendersSchemaWhenReferenceSchemaMissing(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Name:
+      type: string
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+	schema := model.Model.Components.Schemas.GetOrZero("Name").Schema()
+
+	jsch, err := helpers.NewCompiledSchema(
+		"name",
+		[]byte(`{"type":"string"}`),
+		config.NewValidationOptions(),
+	)
+	require.NoError(t, err)
+
+	var validationErr *jsonschema.ValidationError
+	require.True(t, stdErrors.As(jsch.Validate(42), &validationErr))
+
+	validationErrors := formatJsonSchemaValidationError(
+		schema,
+		validationErr,
+		"query",
+		"query parameter",
+		"name",
+		helpers.ParameterValidation,
+		helpers.Query,
+		"",
+		"",
+		"",
+	)
+
+	require.Len(t, validationErrors, 1)
+	require.Len(t, validationErrors[0].SchemaValidationErrors, 1)
+	assert.Contains(t, validationErrors[0].SchemaValidationErrors[0].ReferenceSchema, "type: string")
 }
 
 func TestHeaderSchemaNoType(t *testing.T) {

@@ -75,10 +75,7 @@ func lookupResourceNode(resourceNodes map[string]*yaml.Node, resourceName string
 	if resourceNode := resourceNodes[parsedURL.String()]; resourceNode != nil {
 		return resourceNode
 	}
-	filePath, err := url.PathUnescape(parsedURL.Path)
-	if err != nil {
-		filePath = parsedURL.Path
-	}
+	filePath, _ := url.PathUnescape(parsedURL.Path)
 	if resourceNode := resourceNodes[filePath]; resourceNode != nil {
 		return resourceNode
 	}
