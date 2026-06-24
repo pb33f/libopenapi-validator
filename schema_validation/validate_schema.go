@@ -243,22 +243,7 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	// Extract property name info once before processing errors (performance optimization)
 	propertyInfo := extractPropertyNameFromError(jk)
 
-	// Determine root content node ONCE (not per-error).
-	// NodeBuilder.Render() returns MappingNode directly, no DocumentNode unwrapping needed.
-	var rootNode *yaml.Node
-	if renderedNode != nil {
-		rootNode = renderedNode
-		if rootNode.Kind == yaml.DocumentNode && len(rootNode.Content) > 0 {
-			rootNode = rootNode.Content[0]
-		}
-	} else if len(renderedSchema) > 0 {
-		// Fallback: parse bytes ONCE
-		var docNode yaml.Node
-		_ = yaml.Unmarshal(renderedSchema, &docNode)
-		if len(docNode.Content) > 0 {
-			rootNode = docNode.Content[0]
-		}
-	}
+	rootNode, resourceNodes := DiagnosticLocationNodes(renderedSchema, renderedNode, resourceNodes)
 
 	for q := range schFlatErrs {
 		er := schFlatErrs[q]
@@ -328,4 +313,54 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 		}
 	}
 	return schemaValidationErrors
+}
+
+// DiagnosticLocationNodes returns rendered-schema nodes for validation error locations.
+func DiagnosticLocationNodes(
+	renderedSchema []byte,
+	renderedNode *yaml.Node,
+	resourceNodes map[string]*yaml.Node,
+) (*yaml.Node, map[string]*yaml.Node) {
+	if len(renderedSchema) > 0 {
+		var docNode yaml.Node
+		if err := yaml.Unmarshal(renderedSchema, &docNode); err == nil && len(docNode.Content) > 0 {
+			rootNode := docNode.Content[0]
+			return rootNode, entryResourceNodesWithRenderedRoot(resourceNodes, renderedNode, rootNode)
+		}
+	}
+
+	rootNode := rootContentNode(renderedNode)
+	return rootNode, resourceNodes
+}
+
+func entryResourceNodesWithRenderedRoot(
+	resourceNodes map[string]*yaml.Node,
+	renderedNode *yaml.Node,
+	renderedRootNode *yaml.Node,
+) map[string]*yaml.Node {
+	if len(resourceNodes) == 0 || renderedNode == nil || renderedRootNode == nil {
+		return resourceNodes
+	}
+
+	diagnosticResourceNodes := make(map[string]*yaml.Node, len(resourceNodes)+1)
+	for name, resourceNode := range resourceNodes {
+		diagnosticResourceNodes[name] = resourceNode
+	}
+
+	if _, hasEntryResource := resourceNodes[""]; !hasEntryResource {
+		// Resource-graph compiles need the full document for absolute local refs
+		// like "#/components/...", while primary keyword locations use rootNode.
+		diagnosticResourceNodes[""] = rootContentNode(renderedNode)
+		return diagnosticResourceNodes
+	}
+
+	// Single-schema compiles index the entry schema by "", so swap in the
+	// reparsed root to keep diagnostic line/column data stable.
+	renderedSourceRoot := rootContentNode(renderedNode)
+	for name, resourceNode := range resourceNodes {
+		if resourceNode == renderedNode || rootContentNode(resourceNode) == renderedSourceRoot {
+			diagnosticResourceNodes[name] = renderedRootNode
+		}
+	}
+	return diagnosticResourceNodes
 }

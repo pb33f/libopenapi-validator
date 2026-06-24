@@ -1,9 +1,10 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package cache
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
@@ -203,6 +204,118 @@ func TestDefaultCache_MultipleKeys(t *testing.T) {
 	assert.Equal(t, []byte("value1"), val1.RenderedInline)
 	assert.Equal(t, []byte("value2"), val2.RenderedInline)
 	assert.Equal(t, []byte("value3"), val3.RenderedInline)
+}
+
+func TestNewDefaultSchemaResourceCache(t *testing.T) {
+	cache := NewDefaultSchemaResourceCache()
+
+	assert.NotNil(t, cache)
+	assert.NotNil(t, cache.m)
+}
+
+func TestDefaultSchemaResourceCache_StoreLoadRangeAndOverwrite(t *testing.T) {
+	cache := NewDefaultSchemaResourceCache()
+	first := &SchemaResourceCacheEntry{
+		RenderedInline:  []byte("first"),
+		ReferenceSchema: "first",
+		RenderedJSON:    []byte(`{"type":"object"}`),
+	}
+	second := &SchemaResourceCacheEntry{
+		RenderedInline: []byte("second"),
+		RenderedJSON:   []byte(`{"type":"string"}`),
+	}
+
+	cache.Store("resource", first)
+	loaded, ok := cache.Load("resource")
+	require.True(t, ok)
+	assert.Equal(t, first.RenderedInline, loaded.RenderedInline)
+	assert.Equal(t, first.ReferenceSchema, loaded.ReferenceSchema)
+
+	cache.Store("resource", second)
+	loaded, ok = cache.Load("resource")
+	require.True(t, ok)
+	assert.Equal(t, second.RenderedInline, loaded.RenderedInline)
+
+	seen := 0
+	cache.Range(func(key string, value *SchemaResourceCacheEntry) bool {
+		seen++
+		assert.Equal(t, "resource", key)
+		assert.Equal(t, second.RenderedJSON, value.RenderedJSON)
+		return false
+	})
+	assert.Equal(t, 1, seen)
+}
+
+func TestDefaultSchemaResourceCache_EdgeCases(t *testing.T) {
+	cache := NewDefaultSchemaResourceCache()
+	loaded, ok := cache.Load("missing")
+	assert.False(t, ok)
+	assert.Nil(t, loaded)
+
+	var nilCache *DefaultSchemaResourceCache
+	loaded, ok = nilCache.Load("missing")
+	assert.False(t, ok)
+	assert.Nil(t, loaded)
+	nilCache.Store("resource", &SchemaResourceCacheEntry{})
+
+	called := false
+	nilCache.Range(func(key string, value *SchemaResourceCacheEntry) bool {
+		called = true
+		return true
+	})
+	assert.False(t, called)
+
+	count := 0
+	cache.Range(func(key string, value *SchemaResourceCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Equal(t, 0, count)
+
+	cache.m.Store(42, &SchemaResourceCacheEntry{})
+	cache.m.Store("invalid", "not-a-resource-entry")
+	cache.Store("valid", &SchemaResourceCacheEntry{RenderedInline: []byte("ok")})
+	var keys []string
+	cache.Range(func(key string, value *SchemaResourceCacheEntry) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assert.Equal(t, []string{"valid"}, keys)
+}
+
+func TestDefaultSchemaResourceCache_ThreadSafety(t *testing.T) {
+	cache := NewDefaultSchemaResourceCache()
+	var wg sync.WaitGroup
+
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(val int) {
+			defer wg.Done()
+			cache.Store(string(rune('a'+val)), &SchemaResourceCacheEntry{
+				RenderedInline: []byte{byte(val)},
+				RenderedJSON:   []byte{byte(val)},
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(val int) {
+			defer wg.Done()
+			loaded, ok := cache.Load(string(rune('a' + val)))
+			assert.True(t, ok)
+			assert.NotNil(t, loaded)
+		}(i)
+	}
+	wg.Wait()
+
+	count := 0
+	cache.Range(func(key string, value *SchemaResourceCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Equal(t, 20, count)
 }
 
 func TestDefaultCache_ThreadSafety(t *testing.T) {

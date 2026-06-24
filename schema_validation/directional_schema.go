@@ -4,6 +4,7 @@
 package schema_validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 
@@ -51,15 +52,18 @@ func RenderSchemaForValidation(schema *base.Schema, purpose SchemaValidationPurp
 	}
 
 	renderCtx := base.NewInlineRenderContextForValidation()
-	renderedInline, err := schema.RenderInlineWithContext(renderCtx)
+	nodeIface, err := schema.MarshalYAMLInlineWithContext(renderCtx)
+	renderedNode, _ := nodeIface.(*yaml.Node)
 	if err != nil {
+		renderedInline, _ := yaml.Marshal(renderedNode)
 		return &RenderedValidationSchema{
 			RenderedInline:  renderedInline,
 			ReferenceSchema: string(renderedInline),
+			RenderedNode:    renderedNode,
 		}, err
 	}
 
-	return renderSchemaBytesForValidation(renderedInline, purpose)
+	return renderSchemaNodeForValidation(renderedNode, purpose)
 }
 
 func renderSchemaBytesForValidation(renderedInline []byte, purpose SchemaValidationPurpose) (*RenderedValidationSchema, error) {
@@ -68,15 +72,14 @@ func renderSchemaBytesForValidation(renderedInline []byte, purpose SchemaValidat
 		return nil, fmt.Errorf("schema render decode failed: %w", err)
 	}
 
-	if len(renderedNode.Content) > 0 {
-		pruneDirectionalRequired(renderedNode.Content[0], purpose)
-	}
+	return renderSchemaNodeForValidation(renderedNode, purpose)
+}
 
-	if purpose != SchemaValidationPurposeGeneric {
-		renderedInline, _ = yaml.Marshal(renderedNode)
-	}
+func renderSchemaNodeForValidation(renderedNode *yaml.Node, purpose SchemaValidationPurpose) (*RenderedValidationSchema, error) {
+	pruneDirectionalRequired(schemaRootNode(renderedNode), purpose)
 
-	renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+	renderedInline, _ := yaml.Marshal(renderedNode)
+	renderedJSON := renderSchemaNodeJSON(renderedNode, renderedInline)
 
 	return &RenderedValidationSchema{
 		RenderedInline:  renderedInline,
@@ -84,6 +87,28 @@ func renderSchemaBytesForValidation(renderedInline []byte, purpose SchemaValidat
 		RenderedJSON:    renderedJSON,
 		RenderedNode:    renderedNode,
 	}, nil
+}
+
+func renderSchemaNodeJSON(renderedNode *yaml.Node, renderedInline []byte) []byte {
+	var jsonValue any
+	if rootNode := schemaRootNode(renderedNode); rootNode != nil {
+		if err := rootNode.Decode(&jsonValue); err == nil {
+			renderedJSON, _ := json.Marshal(jsonValue)
+			return renderedJSON
+		}
+	}
+	renderedJSON, _ := utils.ConvertYAMLtoJSON(renderedInline)
+	return renderedJSON
+}
+
+func schemaRootNode(node *yaml.Node) *yaml.Node {
+	if node == nil {
+		return nil
+	}
+	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+		return node.Content[0]
+	}
+	return node
 }
 
 func pruneDirectionalRequired(schemaNode *yaml.Node, purpose SchemaValidationPurpose) {
@@ -200,7 +225,7 @@ func boolMappingValue(node *yaml.Node, key string) bool {
 	if value == nil || value.Kind != yaml.ScalarNode {
 		return false
 	}
-	return value.Tag == "!!bool" && value.Value == "true"
+	return (value.Tag == "!!bool" || value.Tag == "") && value.Value == "true"
 }
 
 func removeMappingPair(node *yaml.Node, keyIndex int) {
