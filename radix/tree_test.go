@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package radix
@@ -146,6 +146,33 @@ func TestTree_Lookup_NoMatch(t *testing.T) {
 	// Empty tree lookup
 	emptyTree := New[string]()
 	_, _, found = emptyTree.Lookup("/anything")
+	assert.False(t, found)
+}
+
+func TestTree_Release(t *testing.T) {
+	tree := New[string]()
+	tree.Insert("/users/{id}", "user")
+	assert.Equal(t, 1, tree.Size())
+
+	tree.Release()
+
+	assert.Equal(t, 0, tree.Size())
+	_, _, found := tree.Lookup("/users/123")
+	assert.False(t, found)
+
+	called := false
+	tree.Walk(func(path string, value string) bool {
+		called = true
+		return true
+	})
+	assert.False(t, called)
+
+	tree.Release()
+
+	var nilTree *Tree[string]
+	nilTree.Release()
+	assert.Equal(t, 0, nilTree.Size())
+	_, _, found = nilTree.Lookup("/users/123")
 	assert.False(t, found)
 }
 

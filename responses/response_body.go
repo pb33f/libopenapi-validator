@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package responses
@@ -26,6 +26,9 @@ type ResponseBodyValidator interface {
 	// locate the operation in the specification, the response is used to ensure the response code, media type and the
 	// schema of the response body are valid.
 	ValidateResponseBodyWithPathItem(request *http.Request, response *http.Response, pathItem *v3.PathItem, pathFound string) (bool, []*errors.ValidationError)
+
+	// Release clears validator-owned options and drops the OpenAPI document reference.
+	Release()
 }
 
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
@@ -38,4 +41,15 @@ func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) Resp
 type responseBodyValidator struct {
 	options  *config.ValidationOptions
 	document *v3.Document
+}
+
+func (r *responseBodyValidator) Release() {
+	if r == nil {
+		return
+	}
+	if r.options != nil {
+		r.options.Release()
+		r.options = nil
+	}
+	r.document = nil
 }

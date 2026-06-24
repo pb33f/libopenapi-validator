@@ -46,6 +46,10 @@ func (c *countingSchemaResourceCache) Range(f func(key string, value *validatorc
 	c.delegate.Range(f)
 }
 
+func (c *countingSchemaResourceCache) Release() {
+	c.delegate.Release()
+}
+
 func TestJSONPointerForNode_EscapesMappingKeysAndSequences(t *testing.T) {
 	spec := `paths:
   /objects:

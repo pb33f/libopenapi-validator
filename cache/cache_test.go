@@ -77,6 +77,30 @@ func TestDefaultCache_StoreNilCache(t *testing.T) {
 	assert.Nil(t, cache)
 }
 
+func TestDefaultCache_Release(t *testing.T) {
+	cache := NewDefaultCache()
+	cache.Store(1, &SchemaCacheEntry{RenderedInline: []byte("one")})
+	cache.Store(2, &SchemaCacheEntry{RenderedInline: []byte("two")})
+
+	cache.Release()
+
+	loaded, ok := cache.Load(1)
+	assert.False(t, ok)
+	assert.Nil(t, loaded)
+
+	count := 0
+	cache.Range(func(key uint64, value *SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Equal(t, 0, count)
+
+	cache.Release()
+
+	var nilCache *DefaultCache
+	nilCache.Release()
+}
+
 func TestDefaultCache_Range(t *testing.T) {
 	cache := NewDefaultCache()
 
@@ -244,6 +268,30 @@ func TestDefaultSchemaResourceCache_StoreLoadRangeAndOverwrite(t *testing.T) {
 		return false
 	})
 	assert.Equal(t, 1, seen)
+}
+
+func TestDefaultSchemaResourceCache_Release(t *testing.T) {
+	cache := NewDefaultSchemaResourceCache()
+	cache.Store("one", &SchemaResourceCacheEntry{RenderedInline: []byte("one")})
+	cache.Store("two", &SchemaResourceCacheEntry{RenderedInline: []byte("two")})
+
+	cache.Release()
+
+	loaded, ok := cache.Load("one")
+	assert.False(t, ok)
+	assert.Nil(t, loaded)
+
+	count := 0
+	cache.Range(func(key string, value *SchemaResourceCacheEntry) bool {
+		count++
+		return true
+	})
+	assert.Equal(t, 0, count)
+
+	cache.Release()
+
+	var nilCache *DefaultSchemaResourceCache
+	nilCache.Release()
 }
 
 func TestDefaultSchemaResourceCache_EdgeCases(t *testing.T) {

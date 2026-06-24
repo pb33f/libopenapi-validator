@@ -28,6 +28,22 @@ func NewDefaultSchemaResourceCache() *DefaultSchemaResourceCache {
 	return &DefaultSchemaResourceCache{m: &sync.Map{}}
 }
 
+// Release clears all cached schema entries.
+func (c *DefaultCache) Release() {
+	if c == nil || c.m == nil {
+		return
+	}
+	c.m.Clear()
+}
+
+// Release clears all cached rendered document resources.
+func (c *DefaultSchemaResourceCache) Release() {
+	if c == nil || c.m == nil {
+		return
+	}
+	c.m.Clear()
+}
+
 // Load retrieves a schema from the cache.
 func (c *DefaultCache) Load(key uint64) (*SchemaCacheEntry, bool) {
 	if c == nil || c.m == nil {

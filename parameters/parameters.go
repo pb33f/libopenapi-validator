@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -64,6 +64,9 @@ type ParameterValidator interface {
 	// ValidateSecurityWithPathItem validates the security requirements for the operation. It returns a boolean stating true
 	// if validation passed (false for failed), and a slice of errors if validation failed.
 	ValidateSecurityWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError)
+
+	// Release clears validator-owned options and drops the OpenAPI document reference.
+	Release()
 }
 
 // NewParameterValidator will create a new ParameterValidator from an OpenAPI 3+ document
@@ -76,4 +79,15 @@ func NewParameterValidator(document *v3.Document, opts ...config.Option) Paramet
 type paramValidator struct {
 	options  *config.ValidationOptions
 	document *v3.Document
+}
+
+func (p *paramValidator) Release() {
+	if p == nil {
+		return
+	}
+	if p.options != nil {
+		p.options.Release()
+		p.options = nil
+	}
+	p.document = nil
 }

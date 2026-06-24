@@ -89,6 +89,38 @@ func NewValidationOptions(opts ...Option) *ValidationOptions {
 	return o
 }
 
+// Release clears cached validation state and drops references that can keep
+// parsed documents, rendered schemas, path trees, or user-provided callbacks alive.
+func (o *ValidationOptions) Release() {
+	if o == nil {
+		return
+	}
+	releaseIfSupported(o.SchemaCache)
+	releaseIfSupported(o.SchemaResourceCache)
+	releaseIfSupported(o.PathTree)
+
+	o.RegexEngine = nil
+	o.RegexCache = nil
+	o.AuthenticationFunc = nil
+	o.Formats = nil
+	o.SchemaCache = nil
+	o.SchemaResourceCache = nil
+	o.PathTree = nil
+	o.Logger = nil
+	o.StrictIgnorePaths = nil
+	o.StrictIgnoredHeaders = nil
+}
+
+type releaser interface {
+	Release()
+}
+
+func releaseIfSupported(value any) {
+	if r, ok := value.(releaser); ok {
+		r.Release()
+	}
+}
+
 // WithExistingOpts returns an Option that will copy the values from the supplied ValidationOptions instance
 func WithExistingOpts(options *ValidationOptions) Option {
 	return func(o *ValidationOptions) {
