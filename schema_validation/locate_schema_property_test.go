@@ -85,6 +85,36 @@ func TestLocateSchemaPropertyNodeByJSONPathWithResources_UsesExternalResourceNod
 	assert.Equal(t, "integer", located.Value)
 }
 
+func TestLocateSchemaPropertyNodeByJSONPathWithResources_UsesEntryResourceForLocalPointer(t *testing.T) {
+	var entry yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(`components:
+  schemas:
+    Entry:
+      type: object
+      properties:
+        id:
+          type: string`), &entry))
+
+	var fallback yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(`components:
+  schemas:
+    Entry:
+      type: object
+      properties:
+        id:
+          type: integer`), &fallback))
+
+	located := LocateSchemaPropertyNodeByJSONPathWithResources(
+		fallback.Content[0],
+		map[string]*yaml.Node{"": entry.Content[0]},
+		"/components/schemas/Missing/properties/id/type",
+		"#/components/schemas/Entry/properties/id/type",
+	)
+
+	require.NotNil(t, located)
+	assert.Equal(t, "string", located.Value)
+}
+
 func TestSplitKeywordLocation_DoesNotTreatLocalPointerHashAsResource(t *testing.T) {
 	resourceName, pointer := splitKeywordLocation("/components/schemas/Model#v1#beta/properties/id/type")
 

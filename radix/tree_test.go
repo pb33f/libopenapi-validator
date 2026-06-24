@@ -174,6 +174,20 @@ func TestTree_Release(t *testing.T) {
 	assert.Equal(t, 0, nilTree.Size())
 	_, _, found = nilTree.Lookup("/users/123")
 	assert.False(t, found)
+	assert.False(t, nilTree.Insert("/ignored", "ignored"))
+	nilTree.Clear()
+}
+
+func TestTree_InsertReinitializesReleasedTree(t *testing.T) {
+	tree := New[string]()
+	tree.Release()
+
+	assert.True(t, tree.Insert("/users/{id}", "user"))
+
+	value, path, found := tree.Lookup("/users/123")
+	assert.True(t, found)
+	assert.Equal(t, "/users/{id}", path)
+	assert.Equal(t, "user", value)
 }
 
 func TestTree_Lookup_EdgeCases(t *testing.T) {
