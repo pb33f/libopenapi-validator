@@ -759,6 +759,52 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 	}
 }
 
+func TestValidateQueryParams_LookaheadPatternCompilationFailureFailsClosed(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Lookahead Repro
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^(?!bad).+$'
+      responses:
+        "200":
+          description: ok
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	validator := NewParameterValidator(&v3Model.Model)
+
+	for _, value := range []string{"badcat", "goodcat"} {
+		req, err := http.NewRequest(http.MethodGet, "/items?code="+value, nil)
+		require.NoError(t, err)
+
+		valid, validationErrors := validator.ValidateQueryParams(req)
+
+		require.False(t, valid, "schema compilation failures must not pass validation for %q", value)
+		require.NotEmpty(t, validationErrors)
+		assert.Equal(t, "code", validationErrors[0].ParameterName)
+		assert.Equal(t, helpers.ParameterValidation, validationErrors[0].ValidationType)
+		assert.Equal(t, helpers.ParameterValidationQuery, validationErrors[0].ValidationSubType)
+		assert.Contains(t, validationErrors[0].Message, "failed schema compilation")
+		assert.Contains(t, validationErrors[0].Reason, "schema compilation failed")
+		assert.Contains(t, validationErrors[0].HowToFix, "complex regex patterns")
+		assert.Empty(t, validationErrors[0].SchemaValidationErrors)
+	}
+}
+
 // TestValidateParameterSchema_SchemaCompilationFailure tests that ValidateParameterSchema
 // handles schema compilation failures gracefully instead of causing panics
 func TestValidateParameterSchema_SchemaCompilationFailure(t *testing.T) {
