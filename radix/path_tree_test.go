@@ -81,6 +81,19 @@ func TestPathTree_Release(t *testing.T) {
 	assert.Equal(t, 0, nilTree.Size())
 	_, _, found = nilTree.Lookup("/users/123")
 	assert.False(t, found)
+	nilTree.Insert("/ignored", &v3.PathItem{})
+}
+
+func TestPathTree_InsertReinitializesReleasedTree(t *testing.T) {
+	tree := NewPathTree()
+	tree.Release()
+
+	tree.Insert("/users/{id}", &v3.PathItem{})
+
+	pathItem, path, found := tree.Lookup("/users/123")
+	assert.True(t, found)
+	assert.Equal(t, "/users/{id}", path)
+	assert.NotNil(t, pathItem)
 }
 
 func TestPathTree_Walk(t *testing.T) {

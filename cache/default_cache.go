@@ -15,8 +15,10 @@ type DefaultSchemaResourceCache struct {
 	m *sync.Map
 }
 
-var _ SchemaCache = &DefaultCache{}
-var _ SchemaResourceCache = &DefaultSchemaResourceCache{}
+var (
+	_ SchemaCache         = &DefaultCache{}
+	_ SchemaResourceCache = &DefaultSchemaResourceCache{}
+)
 
 // NewDefaultCache creates a new DefaultCache with an initialized sync.Map.
 func NewDefaultCache() *DefaultCache {

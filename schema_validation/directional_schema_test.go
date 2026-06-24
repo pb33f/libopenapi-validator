@@ -110,6 +110,14 @@ func TestRenderSchemaBytesForValidation_Errors(t *testing.T) {
 	assert.Contains(t, err.Error(), "schema render decode failed")
 }
 
+func TestRenderSchemaNodeJSON_Fallbacks(t *testing.T) {
+	assert.Nil(t, schemaRootNode(nil))
+
+	renderedJSON := renderSchemaNodeJSON(nil, []byte("type: object\n"))
+
+	assert.JSONEq(t, `{"type":"object"}`, string(renderedJSON))
+}
+
 func TestRenderSchemaBytesForValidation_RemovesEmptyRequired(t *testing.T) {
 	rendered, err := renderSchemaBytesForValidation([]byte(`type: object
 required:
