@@ -46,4 +46,5 @@ type SchemaResourceCache interface {
 	Load(key string) (*SchemaResourceCacheEntry, bool)
 	Store(key string, value *SchemaResourceCacheEntry)
 	Range(f func(key string, value *SchemaResourceCacheEntry) bool)
+	Release()
 }

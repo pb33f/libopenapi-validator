@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	validatorcache "github.com/pb33f/libopenapi-validator/cache"
+	"github.com/pb33f/libopenapi-validator/radix"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/testify/assert"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -147,6 +149,53 @@ func TestWithExistingOpts(t *testing.T) {
 	assert.Equal(t, original.SecurityValidation, opts.SecurityValidation)
 	assert.Same(t, schemaCache, opts.SchemaCache)
 	assert.Same(t, schemaResourceCache, opts.SchemaResourceCache)
+}
+
+func TestValidationOptions_Release(t *testing.T) {
+	schemaCache := validatorcache.NewDefaultCache()
+	schemaCache.Store(1, &validatorcache.SchemaCacheEntry{RenderedInline: []byte("schema")})
+
+	schemaResourceCache := validatorcache.NewDefaultSchemaResourceCache()
+	schemaResourceCache.Store("resource", &validatorcache.SchemaResourceCacheEntry{RenderedInline: []byte("resource")})
+
+	pathTree := radix.NewPathTree()
+	pathTree.Insert("/pets", &v3.PathItem{})
+
+	opts := NewValidationOptions(
+		WithSchemaCache(schemaCache),
+		WithSchemaResourceCache(schemaResourceCache),
+		WithPathTree(pathTree),
+		WithRegexCache(&sync.Map{}),
+		WithCustomFormat("custom", func(v any) error { return nil }),
+		WithStrictIgnorePaths("$.body.internal"),
+		WithStrictIgnoredHeaders("X-Internal"),
+		WithLogger(slog.Default()),
+	)
+
+	opts.Release()
+
+	assert.Nil(t, opts.RegexEngine)
+	assert.Nil(t, opts.RegexCache)
+	assert.Nil(t, opts.AuthenticationFunc)
+	assert.Nil(t, opts.Formats)
+	assert.Nil(t, opts.SchemaCache)
+	assert.Nil(t, opts.SchemaResourceCache)
+	assert.Nil(t, opts.PathTree)
+	assert.Nil(t, opts.Logger)
+	assert.Nil(t, opts.StrictIgnorePaths)
+	assert.Nil(t, opts.StrictIgnoredHeaders)
+
+	_, schemaFound := schemaCache.Load(1)
+	assert.False(t, schemaFound)
+
+	_, resourceFound := schemaResourceCache.Load("resource")
+	assert.False(t, resourceFound)
+	assert.Equal(t, 0, pathTree.Size())
+
+	opts.Release()
+
+	var nilOptions *ValidationOptions
+	nilOptions.Release()
 }
 
 func TestWithExistingOpts_NilSource(t *testing.T) {

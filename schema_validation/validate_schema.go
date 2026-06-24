@@ -64,6 +64,9 @@ type SchemaValidator interface {
 	// When version is 3.0, OpenAPI 3.0-specific keywords like 'nullable' are allowed and processed.
 	// When version is 3.1+, OpenAPI 3.0-specific keywords like 'nullable' will cause validation to fail.
 	ValidateSchemaBytesWithVersion(schema *base.Schema, payload []byte, version float32) (bool, []*liberrors.ValidationError)
+
+	// Release clears validator-owned options and logger references.
+	Release()
 }
 
 var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
@@ -86,6 +89,17 @@ func NewSchemaValidator(opts ...config.Option) SchemaValidator {
 		Level: slog.LevelError,
 	}))
 	return NewSchemaValidatorWithLogger(logger, opts...)
+}
+
+func (s *schemaValidator) Release() {
+	if s == nil {
+		return
+	}
+	if s.options != nil {
+		s.options.Release()
+		s.options = nil
+	}
+	s.logger = nil
 }
 
 func (s *schemaValidator) ValidateSchemaString(schema *base.Schema, payload string) (bool, []*liberrors.ValidationError) {

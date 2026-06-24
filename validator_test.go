@@ -2162,6 +2162,75 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 	assert.Greater(t, count, 0, "Schema cache should have entries from request and response bodies")
 }
 
+func TestValidator_Release(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /nodes:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Node'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+components:
+  schemas:
+    Node:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        next:
+          $ref: '#/components/schemas/Node'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Nil(t, errs)
+	require.NotNil(t, v)
+
+	concrete := v.(*validator)
+	require.NotNil(t, concrete.options)
+	schemaCache := concrete.options.SchemaCache
+	resourceCache := concrete.options.SchemaResourceCache
+	pathTree, ok := concrete.options.PathTree.(interface{ Size() int })
+	require.True(t, ok)
+
+	require.Greater(t, schemaCacheEntryCount(schemaCache), 0)
+	require.Greater(t, schemaResourceCacheEntryCount(resourceCache), 0)
+	require.Greater(t, pathTree.Size(), 0)
+	require.NotNil(t, doc.GetSpecInfo())
+
+	v.Release()
+
+	assert.Nil(t, concrete.options)
+	assert.Nil(t, concrete.v3Model)
+	assert.Nil(t, concrete.document)
+	assert.Nil(t, concrete.paramValidator)
+	assert.Nil(t, concrete.requestValidator)
+	assert.Nil(t, concrete.responseValidator)
+	assert.Equal(t, 0, schemaCacheEntryCount(schemaCache))
+	assert.Equal(t, 0, schemaResourceCacheEntryCount(resourceCache))
+	assert.Equal(t, 0, pathTree.Size())
+	assert.NotNil(t, doc.GetSpecInfo())
+
+	v.Release()
+
+	var nilValidator *validator
+	nilValidator.Release()
+}
+
 func TestDirectionalRequiredProperties_RequestResponseSharedSchema(t *testing.T) {
 	spec := `openapi: 3.1.0
 info:
@@ -2607,6 +2676,15 @@ paths:
 func schemaCacheEntryCount(schemaCache cache.SchemaCache) int {
 	count := 0
 	schemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+func schemaResourceCacheEntryCount(schemaResourceCache cache.SchemaResourceCache) int {
+	count := 0
+	schemaResourceCache.Range(func(key string, value *cache.SchemaResourceCacheEntry) bool {
 		count++
 		return true
 	})

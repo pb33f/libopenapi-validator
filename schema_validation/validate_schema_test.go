@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi-validator/cache"
+	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/testify/assert"
 	"go.yaml.in/yaml/v4"
 )
@@ -42,6 +44,38 @@ paths:
 		"/i/do/not/exist")
 
 	assert.Nil(t, foundNode)
+}
+
+func TestSchemaValidator_Release(t *testing.T) {
+	schemaCache := cache.NewDefaultCache()
+	schemaCache.Store(1, &cache.SchemaCacheEntry{RenderedInline: []byte("schema")})
+
+	schemaResourceCache := cache.NewDefaultSchemaResourceCache()
+	schemaResourceCache.Store("resource", &cache.SchemaResourceCacheEntry{RenderedInline: []byte("resource")})
+
+	v := NewSchemaValidator(
+		config.WithSchemaCache(schemaCache),
+		config.WithSchemaResourceCache(schemaResourceCache),
+	)
+	validator := v.(*schemaValidator)
+	assert.NotNil(t, validator.options)
+	assert.NotNil(t, validator.logger)
+
+	v.Release()
+
+	assert.Nil(t, validator.options)
+	assert.Nil(t, validator.logger)
+
+	_, schemaFound := schemaCache.Load(1)
+	assert.False(t, schemaFound)
+
+	_, resourceFound := schemaResourceCache.Load("resource")
+	assert.False(t, resourceFound)
+
+	v.Release()
+
+	var nilValidator *schemaValidator
+	nilValidator.Release()
 }
 
 func TestValidateSchema_SimpleValid_String(t *testing.T) {

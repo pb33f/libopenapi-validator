@@ -69,6 +69,9 @@ type Validator interface {
 
 	// SetDocument will set the OpenAPI 3+ document to be validated
 	SetDocument(document libopenapi.Document)
+
+	// Release clears validator-owned caches and drops references to the model, document, and child validators.
+	Release()
 }
 
 // NewValidator will create a new Validator from an OpenAPI 3+ document
@@ -112,6 +115,30 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 
 func (v *validator) SetDocument(document libopenapi.Document) {
 	v.document = document
+}
+
+func (v *validator) Release() {
+	if v == nil {
+		return
+	}
+	releaseIfSupported(v.paramValidator)
+	releaseIfSupported(v.requestValidator)
+	releaseIfSupported(v.responseValidator)
+	if v.options != nil {
+		v.options.Release()
+		v.options = nil
+	}
+	v.v3Model = nil
+	v.document = nil
+	v.paramValidator = nil
+	v.requestValidator = nil
+	v.responseValidator = nil
+}
+
+func releaseIfSupported(value any) {
+	if r, ok := value.(interface{ Release() }); ok {
+		r.Release()
+	}
 }
 
 func (v *validator) GetParameterValidator() parameters.ParameterValidator {
