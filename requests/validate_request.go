@@ -283,12 +283,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 			// flatten the validationErrors
 			schFlatErrs := helpers.FlattenSchemaOutputErrors(jk.DetailedOutput())
 
-			// Use cached node if available, otherwise parse
-			renderedNode := cachedNode
-			if renderedNode == nil {
-				renderedNode = new(yaml.Node)
-				_ = yaml.Unmarshal(renderedSchema, renderedNode)
-			}
+			renderedNode, resourceNodes := schema_validation.DiagnosticLocationNodes(renderedSchema, cachedNode, resourceNodes)
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
 

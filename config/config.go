@@ -1,3 +1,6 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package config
 
 import (
@@ -46,12 +49,13 @@ type ValidationOptions struct {
 	OpenAPIMode                   bool // Enable OpenAPI-specific vocabulary validation
 	AllowScalarCoercion           bool // Enable string->boolean/number coercion
 	Formats                       map[string]func(v any) error
-	SchemaCache                   cache.SchemaCache // Optional cache for compiled schemas
-	PathTree                      radix.PathLookup  // O(k) path lookup via radix tree (built automatically)
-	pathTreeDisabled              bool              // Internal: true if radix tree auto-build was disabled via DisablePathTree
-	Logger                        *slog.Logger      // Logger for debug/error output (nil = silent)
-	AllowXMLBodyValidation        bool              // Allows to convert XML to JSON for validating a request/response body.
-	AllowURLEncodedBodyValidation bool              // Allows to convert URL Encoded to JSON for validating a request/response body.
+	SchemaCache                   cache.SchemaCache         // Optional cache for compiled schemas
+	SchemaResourceCache           cache.SchemaResourceCache // Optional cache for rendered document-level schema resources
+	PathTree                      radix.PathLookup          // O(k) path lookup via radix tree (built automatically)
+	pathTreeDisabled              bool                      // Internal: true if radix tree auto-build was disabled via DisablePathTree
+	Logger                        *slog.Logger              // Logger for debug/error output (nil = silent)
+	AllowXMLBodyValidation        bool                      // Allows to convert XML to JSON for validating a request/response body.
+	AllowURLEncodedBodyValidation bool                      // Allows to convert URL Encoded to JSON for validating a request/response body.
 
 	// strict mode options - detect undeclared properties even when additionalProperties: true
 	StrictMode                bool     // Enable strict property validation
@@ -69,11 +73,12 @@ type Option func(*ValidationOptions)
 func NewValidationOptions(opts ...Option) *ValidationOptions {
 	// create the set of default values
 	o := &ValidationOptions{
-		FormatAssertions:   false,
-		ContentAssertions:  false,
-		SecurityValidation: true,
-		OpenAPIMode:        true,                    // Enable OpenAPI vocabulary by default
-		SchemaCache:        cache.NewDefaultCache(), // Enable caching by default
+		FormatAssertions:    false,
+		ContentAssertions:   false,
+		SecurityValidation:  true,
+		OpenAPIMode:         true,                                  // Enable OpenAPI vocabulary by default
+		SchemaCache:         cache.NewDefaultCache(),               // Enable compiled schema caching by default
+		SchemaResourceCache: cache.NewDefaultSchemaResourceCache(), // Enable rendered resource caching by default
 	}
 
 	for _, opt := range opts {
@@ -98,6 +103,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.AllowScalarCoercion = options.AllowScalarCoercion
 			o.Formats = options.Formats
 			o.SchemaCache = options.SchemaCache
+			o.SchemaResourceCache = options.SchemaResourceCache
 			o.PathTree = options.PathTree
 			o.pathTreeDisabled = options.pathTreeDisabled
 			o.Logger = options.Logger
@@ -221,6 +227,15 @@ func WithURLEncodedBodyValidation() Option {
 func WithSchemaCache(schemaCache cache.SchemaCache) Option {
 	return func(o *ValidationOptions) {
 		o.SchemaCache = schemaCache
+	}
+}
+
+// WithSchemaResourceCache sets a cache for rendered document-level schema resources.
+// Pass nil to disable resource reuse when compiling referenced schemas.
+// Cached entries retain source YAML nodes, so long-lived shared caches should be bounded or scoped deliberately.
+func WithSchemaResourceCache(schemaResourceCache cache.SchemaResourceCache) Option {
+	return func(o *ValidationOptions) {
+		o.SchemaResourceCache = schemaResourceCache
 	}
 }
 

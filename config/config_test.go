@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package config
@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	validatorcache "github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/testify/assert"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -26,6 +27,8 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.False(t, opts.AllowURLEncodedBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.SchemaCache)
+	assert.NotNil(t, opts.SchemaResourceCache)
 }
 
 func TestNewValidationOptions_WithNilOption(t *testing.T) {
@@ -40,6 +43,7 @@ func TestNewValidationOptions_WithNilOption(t *testing.T) {
 	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.SchemaResourceCache)
 }
 
 func TestWithFormatAssertions(t *testing.T) {
@@ -117,9 +121,13 @@ func TestWithRegexEngine(t *testing.T) {
 func TestWithExistingOpts(t *testing.T) {
 	// Create original options with all settings enabled
 	var testEngine jsonschema.RegexpEngine = nil
+	schemaCache := validatorcache.NewDefaultCache()
+	schemaResourceCache := validatorcache.NewDefaultSchemaResourceCache()
 	original := &ValidationOptions{
 		RegexEngine:                   testEngine,
 		RegexCache:                    &sync.Map{},
+		SchemaCache:                   schemaCache,
+		SchemaResourceCache:           schemaResourceCache,
 		FormatAssertions:              true,
 		AllowXMLBodyValidation:        true,
 		AllowURLEncodedBodyValidation: true,
@@ -137,6 +145,8 @@ func TestWithExistingOpts(t *testing.T) {
 	assert.Equal(t, original.FormatAssertions, opts.FormatAssertions)
 	assert.Equal(t, original.ContentAssertions, opts.ContentAssertions)
 	assert.Equal(t, original.SecurityValidation, opts.SecurityValidation)
+	assert.Same(t, schemaCache, opts.SchemaCache)
+	assert.Same(t, schemaResourceCache, opts.SchemaResourceCache)
 }
 
 func TestWithExistingOpts_NilSource(t *testing.T) {
@@ -153,6 +163,17 @@ func TestWithExistingOpts_NilSource(t *testing.T) {
 	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.SchemaResourceCache)
+}
+
+func TestWithSchemaResourceCache(t *testing.T) {
+	schemaResourceCache := validatorcache.NewDefaultSchemaResourceCache()
+	opts := NewValidationOptions(WithSchemaResourceCache(schemaResourceCache))
+
+	assert.Same(t, schemaResourceCache, opts.SchemaResourceCache)
+
+	opts = NewValidationOptions(WithSchemaResourceCache(nil))
+	assert.Nil(t, opts.SchemaResourceCache)
 }
 
 func TestMultipleOptions(t *testing.T) {

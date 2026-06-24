@@ -69,11 +69,16 @@ func CompileSchemaForValidation(
 		return nil, err
 	}
 
-	if singleSchemaCompilePreferred(schema, rendered) {
+	if purpose == SchemaValidationPurposeGeneric && singleSchemaCompilePreferred(rendered) {
 		return compileSingleValidationSchema(schema, rendered, options, version)
 	}
 
-	resourceSet, err := buildSchemaDocumentResources(schema, purpose)
+	var resourceCache cache.SchemaResourceCache
+	if options != nil {
+		resourceCache = options.SchemaResourceCache
+	}
+
+	resourceSet, err := buildSchemaDocumentResources(schema, purpose, resourceCache)
 	if err != nil {
 		return nil, err
 	}
@@ -197,13 +202,32 @@ func renderRootSchemaForValidation(schema *base.Schema, purpose SchemaValidation
 	return renderSchemaBytesForValidation(renderedInline, purpose)
 }
 
-// singleSchemaCompilePreferred reports whether the schema can safely use the one-resource compiler path.
+// singleSchemaCompilePreferred reports whether the rendered schema is already self-contained.
 //
-// The decision is based on reachable schema-keyword refs in the source tree, not
-// a rendered-output scan, so examples, property names, enum values, or const
-// values that literally contain "$ref" do not force the slower resource graph.
-func singleSchemaCompilePreferred(schema *base.Schema, rendered *RenderedValidationSchema) bool {
-	return rendered != nil && !schemaHasReachableRefs(schema)
+// Source schemas can contain refs that the inline renderer resolves cheaply. The
+// document-resource compiler is needed only when refs survive rendering, usually
+// because the schema graph is circular or otherwise must stay addressable.
+func singleSchemaCompilePreferred(rendered *RenderedValidationSchema) bool {
+	return rendered != nil && !renderedSchemaHasReachableRefs(rendered)
+}
+
+func renderedSchemaHasReachableRefs(rendered *RenderedValidationSchema) bool {
+	if rendered == nil {
+		return false
+	}
+	if rendered.RenderedNode != nil {
+		return hasSchemaRefValue(rendered.RenderedNode)
+	}
+	if len(rendered.RenderedInline) == 0 {
+		return false
+	}
+
+	var renderedNode yaml.Node
+	if err := yaml.Unmarshal(rendered.RenderedInline, &renderedNode); err != nil {
+		// Invalid YAML should fall back to the resource compiler, which returns the real compile error.
+		return true
+	}
+	return hasSchemaRefValue(&renderedNode)
 }
 
 // schemaHasReachableRefs checks whether the entry schema tree contains refs that jsonschema must resolve.
@@ -211,7 +235,7 @@ func schemaHasReachableRefs(schema *base.Schema) bool {
 	if schema == nil || schema.GoLow() == nil {
 		return false
 	}
-	return len(collectSchemaRefValues(schema.GoLow().GetRootNode())) > 0
+	return hasSchemaRefValue(schema.GoLow().GetRootNode())
 }
 
 // renderYAMLNodeForValidation renders a YAML node to the YAML and JSON forms used by jsonschema.
@@ -219,6 +243,8 @@ func schemaHasReachableRefs(schema *base.Schema) bool {
 // Request and response validation prune directional "required" markers, so they
 // clone before mutating. Generic validation does not prune, which keeps the
 // whole-document resource path allocation-light for ordinary document schemas.
+// Generic rendered nodes may be cached, so downstream diagnostic code must keep
+// treating them as read-only.
 func renderYAMLNodeForValidation(node *yaml.Node, purpose SchemaValidationPurpose) (*RenderedValidationSchema, error) {
 	if node == nil {
 		return nil, nil
@@ -256,6 +282,7 @@ func renderYAMLNodeForValidation(node *yaml.Node, purpose SchemaValidationPurpos
 func buildSchemaDocumentResources(
 	schema *base.Schema,
 	purpose SchemaValidationPurpose,
+	resourceCache cache.SchemaResourceCache,
 ) (*schemaDocumentResourceSet, error) {
 	if schema == nil || schema.GoLow() == nil {
 		return nil, nil
@@ -291,6 +318,7 @@ func buildSchemaDocumentResources(
 		rootResourceName,
 		schemaIndex.GetRootNode(),
 		purpose,
+		resourceCache,
 	)
 	if err != nil {
 		return nil, err
@@ -302,6 +330,7 @@ func buildSchemaDocumentResources(
 		schemaIndex,
 		schema.GoLow().GetRootNode(),
 		purpose,
+		resourceCache,
 	); err != nil {
 		return nil, err
 	}
@@ -324,6 +353,7 @@ func addReachableSchemaResources(
 	currentIndex *index.SpecIndex,
 	node *yaml.Node,
 	purpose SchemaValidationPurpose,
+	resourceCache cache.SchemaResourceCache,
 ) error {
 	if resourceSet == nil || state == nil || currentIndex == nil || node == nil {
 		return nil
@@ -354,12 +384,13 @@ func addReachableSchemaResources(
 					resourceName,
 					foundIndex.GetRootNode(),
 					purpose,
+					resourceCache,
 				); err != nil {
 					return err
 				}
 			}
 
-			if err := addReachableSchemaResources(resourceSet, state, foundIndex, foundRef.Node, purpose); err != nil {
+			if err := addReachableSchemaResources(resourceSet, state, foundIndex, foundRef.Node, purpose, resourceCache); err != nil {
 				return err
 			}
 		}
@@ -397,23 +428,80 @@ func addSchemaDocumentResource(
 	resourceName string,
 	rootNode *yaml.Node,
 	purpose SchemaValidationPurpose,
+	resourceCache cache.SchemaResourceCache,
 ) (*RenderedValidationSchema, error) {
 	if resourceName == "" || rootNode == nil {
 		return nil, nil
+	}
+	cacheKey := schemaResourceCacheKey(rootNode, purpose)
+	if resourceCache != nil && cacheKey != "" {
+		if cached, ok := resourceCache.Load(cacheKey); ok && cached != nil {
+			rendered := renderedSchemaFromResourceCache(cached)
+			registerSchemaDocumentResource(resources, resourceNodes, resourceName, rendered)
+			return rendered, nil
+		}
 	}
 
 	rendered, err := renderYAMLNodeForValidation(rootNode, purpose)
 	if err != nil {
 		return nil, fmt.Errorf("schema resource %q render failed: %w", resourceName, err)
 	}
+	if resourceCache != nil && cacheKey != "" {
+		resourceCache.Store(cacheKey, resourceCacheEntryFromRenderedSchema(rendered, rootNode))
+	}
+	registerSchemaDocumentResource(resources, resourceNodes, resourceName, rendered)
+	return rendered, nil
+}
 
+func registerSchemaDocumentResource(
+	resources map[string][]byte,
+	resourceNodes map[string]*yaml.Node,
+	resourceName string,
+	rendered *RenderedValidationSchema,
+) {
+	if rendered == nil {
+		return
+	}
 	if resources != nil {
 		resources[resourceName] = rendered.RenderedJSON
 	}
 	if resourceNodes != nil {
 		resourceNodes[resourceName] = rendered.RenderedNode
 	}
-	return rendered, nil
+}
+
+func schemaResourceCacheKey(rootNode *yaml.Node, purpose SchemaValidationPurpose) string {
+	if rootNode == nil {
+		return ""
+	}
+	// Cache entries retain rootNode, so this parsed-document identity key cannot
+	// be reused by another document while the entry remains cached.
+	return fmt.Sprintf("%p:%d", rootNode, purpose)
+}
+
+func resourceCacheEntryFromRenderedSchema(rendered *RenderedValidationSchema, sourceRootNode *yaml.Node) *cache.SchemaResourceCacheEntry {
+	if rendered == nil {
+		return nil
+	}
+	return &cache.SchemaResourceCacheEntry{
+		RenderedInline:  rendered.RenderedInline,
+		ReferenceSchema: rendered.ReferenceSchema,
+		RenderedJSON:    rendered.RenderedJSON,
+		RenderedNode:    rendered.RenderedNode,
+		SourceRootNode:  sourceRootNode,
+	}
+}
+
+func renderedSchemaFromResourceCache(cached *cache.SchemaResourceCacheEntry) *RenderedValidationSchema {
+	if cached == nil {
+		return nil
+	}
+	return &RenderedValidationSchema{
+		RenderedInline:  cached.RenderedInline,
+		ReferenceSchema: cached.ReferenceSchema,
+		RenderedJSON:    cached.RenderedJSON,
+		RenderedNode:    cached.RenderedNode,
+	}
 }
 
 // resourceNameForIndex returns the canonical resource URI for an indexed document.
@@ -453,6 +541,48 @@ func collectSchemaRefValues(node *yaml.Node) []string {
 	return refs
 }
 
+func hasSchemaRefValue(node *yaml.Node) bool {
+	return hasSchemaRefValueIn(node, "")
+}
+
+func hasSchemaRefValueIn(node *yaml.Node, parentKey string) bool {
+	if node == nil {
+		return false
+	}
+
+	switch node.Kind {
+	case yaml.DocumentNode:
+		for _, child := range node.Content {
+			if hasSchemaRefValueIn(child, parentKey) {
+				return true
+			}
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			keyNode := node.Content[i]
+			valueNode := node.Content[i+1]
+			key := ""
+			if keyNode != nil {
+				key = keyNode.Value
+			}
+			if isSchemaRefPair(key, parentKey, valueNode) {
+				return true
+			}
+			if hasSchemaRefValueIn(valueNode, key) {
+				return true
+			}
+		}
+	case yaml.SequenceNode:
+		for _, child := range node.Content {
+			if hasSchemaRefValueIn(child, parentKey) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // collectSchemaRefValuesInto walks a YAML tree and records only real schema $ref keywords.
 //
 // OpenAPI schema maps can legally contain schema names or property names called
@@ -476,7 +606,7 @@ func collectSchemaRefValuesInto(node *yaml.Node, parentKey string, refs *[]strin
 			if keyNode != nil {
 				key = keyNode.Value
 			}
-			if key == "$ref" && !isSchemaNameMap(parentKey) && valueNode != nil && valueNode.Kind == yaml.ScalarNode {
+			if isSchemaRefPair(key, parentKey, valueNode) {
 				*refs = append(*refs, valueNode.Value)
 				continue
 			}
@@ -497,6 +627,11 @@ func isSchemaNameMap(parentKey string) bool {
 	default:
 		return false
 	}
+}
+
+func isSchemaRefPair(key, parentKey string, valueNode *yaml.Node) bool {
+	return key == "$ref" && !isSchemaNameMap(parentKey) &&
+		valueNode != nil && valueNode.Kind == yaml.ScalarNode
 }
 
 // cloneYAMLNode deep-copies a YAML node tree before validation-specific pruning mutates it.

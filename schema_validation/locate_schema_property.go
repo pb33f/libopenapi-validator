@@ -51,9 +51,15 @@ func locateSchemaPropertyNodeByKeywordLocation(
 ) *yaml.Node {
 	resourceName, pointer := splitKeywordLocation(location)
 	sourceNode := doc
-	if resourceName != "" && resourceNodes != nil {
-		if resourceNode := lookupResourceNode(resourceNodes, resourceName); resourceNode != nil {
-			sourceNode = resourceNode
+	if resourceNodes != nil {
+		if resourceName != "" {
+			if resourceNode := lookupResourceNode(resourceNodes, resourceName); resourceNode != nil {
+				sourceNode = resourceNode
+			}
+		} else if strings.HasPrefix(location, "#") {
+			if resourceNode := resourceNodes[""]; resourceNode != nil {
+				sourceNode = resourceNode
+			}
 		}
 	}
 	return LocateSchemaPropertyNodeByJSONPath(rootContentNode(sourceNode), pointer)

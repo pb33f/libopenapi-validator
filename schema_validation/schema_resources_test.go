@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	validatorcache "github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
@@ -20,6 +21,30 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/config"
 )
+
+type countingSchemaResourceCache struct {
+	delegate validatorcache.SchemaResourceCache
+	loads    int
+	stores   int
+}
+
+func newCountingSchemaResourceCache() *countingSchemaResourceCache {
+	return &countingSchemaResourceCache{delegate: validatorcache.NewDefaultSchemaResourceCache()}
+}
+
+func (c *countingSchemaResourceCache) Load(key string) (*validatorcache.SchemaResourceCacheEntry, bool) {
+	c.loads++
+	return c.delegate.Load(key)
+}
+
+func (c *countingSchemaResourceCache) Store(key string, value *validatorcache.SchemaResourceCacheEntry) {
+	c.stores++
+	c.delegate.Store(key, value)
+}
+
+func (c *countingSchemaResourceCache) Range(f func(key string, value *validatorcache.SchemaResourceCacheEntry) bool) {
+	c.delegate.Range(f)
+}
 
 func TestJSONPointerForNode_EscapesMappingKeysAndSequences(t *testing.T) {
 	spec := `paths:
@@ -155,14 +180,13 @@ components:
 		require.NoError(t, yaml.Unmarshal([]byte(`$ref: '#/components/schemas/Name'`), &detached))
 		schema.GoLow().RootNode = detached.Content[0]
 
-		compiled, err := CompileSchemaForValidation(
+		resourceSet, err := buildSchemaDocumentResources(
 			schema,
 			SchemaValidationPurposeGeneric,
-			config.NewValidationOptions(),
-			3.1,
+			nil,
 		)
 
-		assert.Nil(t, compiled)
+		assert.Nil(t, resourceSet)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "schema node was not found")
 	})
@@ -218,7 +242,7 @@ components:
 	require.ErrorIs(t, err, assert.AnError)
 }
 
-func TestSingleSchemaCompilePreferred_LocalReferenceSchemaUsesResourceCompiler(t *testing.T) {
+func TestSingleSchemaCompilePreferred_ResolvedLocalReferenceUsesSingleSchemaCompiler(t *testing.T) {
 	spec := `openapi: 3.1.0
 info:
   title: Test
@@ -241,16 +265,176 @@ components:
 	inlineSchema := model.Model.Components.Schemas.GetOrZero("Inline").Schema()
 	inlineRendered, err := renderRootSchemaForValidation(inlineSchema, SchemaValidationPurposeGeneric)
 	require.NoError(t, err)
-	assert.True(t, singleSchemaCompilePreferred(inlineSchema, inlineRendered))
+	assert.True(t, singleSchemaCompilePreferred(inlineRendered))
 
 	referencedSchema := model.Model.Components.Schemas.GetOrZero("Referenced").Schema()
 	referencedRendered, err := renderRootSchemaForValidation(referencedSchema, SchemaValidationPurposeGeneric)
 	require.NoError(t, err)
-	assert.False(t, singleSchemaCompilePreferred(referencedSchema, referencedRendered))
+	assert.True(t, singleSchemaCompilePreferred(referencedRendered))
 	assert.True(t, schemaHasReachableRefs(referencedSchema))
+	assert.False(t, renderedSchemaHasReachableRefs(referencedRendered))
 }
 
-func TestSingleSchemaCompilePreferred_ExternalResourceSchemaUsesResourceCompiler(t *testing.T) {
+func TestCompileSchemaForValidation_ReusesRenderedDocumentResourceAcrossSchemas(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    First:
+      type: object
+      properties:
+        child:
+          $ref: '#/components/schemas/Node'
+    Second:
+      type: object
+      properties:
+        child:
+          $ref: '#/components/schemas/Node'
+    Node:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        next:
+          $ref: '#/components/schemas/Node'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	resourceCache := newCountingSchemaResourceCache()
+	options := config.NewValidationOptions(config.WithSchemaResourceCache(resourceCache))
+
+	firstCompiled, err := CompileSchemaForValidation(
+		model.Model.Components.Schemas.GetOrZero("First").Schema(),
+		SchemaValidationPurposeGeneric,
+		options,
+		3.1,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, firstCompiled)
+	require.NotNil(t, firstCompiled.CompiledSchema)
+	assert.NoError(t, firstCompiled.CompiledSchema.Validate(map[string]any{
+		"child": map[string]any{
+			"id": "root",
+			"next": map[string]any{
+				"id": "nested",
+			},
+		},
+	}))
+
+	secondCompiled, err := CompileSchemaForValidation(
+		model.Model.Components.Schemas.GetOrZero("Second").Schema(),
+		SchemaValidationPurposeGeneric,
+		options,
+		3.1,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, secondCompiled)
+	require.NotNil(t, secondCompiled.CompiledSchema)
+	assert.NoError(t, secondCompiled.CompiledSchema.Validate(map[string]any{
+		"child": map[string]any{
+			"id": "root",
+		},
+	}))
+
+	assert.Equal(t, 2, resourceCache.loads)
+	assert.Equal(t, 1, resourceCache.stores)
+}
+
+func TestCompileSchemaForValidation_ReusesDirectionalResourcesByPurpose(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Wrapper:
+      type: object
+      required: [product]
+      properties:
+        product:
+          $ref: '#/components/schemas/Product'
+    Product:
+      type: object
+      required: [id, name, secret]
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        secret:
+          type: string
+          writeOnly: true`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	schema := model.Model.Components.Schemas.GetOrZero("Wrapper").Schema()
+	resourceCache := newCountingSchemaResourceCache()
+	options := config.NewValidationOptions(config.WithSchemaResourceCache(resourceCache))
+
+	requestCompiled, err := CompileSchemaForValidation(schema, SchemaValidationPurposeRequestBody, options, 3.1)
+	require.NoError(t, err)
+	require.NotNil(t, requestCompiled)
+	assert.NoError(t, requestCompiled.CompiledSchema.Validate(map[string]any{
+		"product": map[string]any{
+			"name":   "Desk",
+			"secret": "internal",
+		},
+	}))
+	assert.Error(t, requestCompiled.CompiledSchema.Validate(map[string]any{
+		"product": map[string]any{
+			"name": "Desk",
+		},
+	}))
+
+	responseCompiled, err := CompileSchemaForValidation(schema, SchemaValidationPurposeResponseBody, options, 3.1)
+	require.NoError(t, err)
+	require.NotNil(t, responseCompiled)
+	assert.NoError(t, responseCompiled.CompiledSchema.Validate(map[string]any{
+		"product": map[string]any{
+			"id":   "p1",
+			"name": "Desk",
+		},
+	}))
+	assert.Error(t, responseCompiled.CompiledSchema.Validate(map[string]any{
+		"product": map[string]any{
+			"name": "Desk",
+		},
+	}))
+
+	requestCompiled, err = CompileSchemaForValidation(schema, SchemaValidationPurposeRequestBody, options, 3.1)
+	require.NoError(t, err)
+	require.NotNil(t, requestCompiled)
+	assert.NoError(t, requestCompiled.CompiledSchema.Validate(map[string]any{
+		"product": map[string]any{
+			"name":   "Desk",
+			"secret": "internal",
+		},
+	}))
+
+	var cacheKeys []string
+	resourceCache.Range(func(key string, value *validatorcache.SchemaResourceCacheEntry) bool {
+		cacheKeys = append(cacheKeys, key)
+		require.NotNil(t, value.SourceRootNode)
+		return true
+	})
+
+	assert.Equal(t, 3, resourceCache.loads)
+	assert.Equal(t, 2, resourceCache.stores)
+	require.Len(t, cacheKeys, 2)
+	assert.NotEqual(t, cacheKeys[0], cacheKeys[1])
+}
+
+func TestSingleSchemaCompilePreferred_ResolvedExternalReferenceUsesSingleSchemaCompiler(t *testing.T) {
 	tempDir := t.TempDir()
 	rootPath := filepath.Join(tempDir, "openapi.yaml")
 	require.NoError(t, os.WriteFile(rootPath, []byte(`openapi: 3.1.0
@@ -285,10 +469,11 @@ components:
 	referencedSchema := model.Model.Components.Schemas.GetOrZero("Referenced").Schema()
 	referencedRendered, err := renderRootSchemaForValidation(referencedSchema, SchemaValidationPurposeGeneric)
 	require.NoError(t, err)
-	assert.False(t, singleSchemaCompilePreferred(referencedSchema, referencedRendered))
+	assert.True(t, singleSchemaCompilePreferred(referencedRendered))
+	assert.False(t, renderedSchemaHasReachableRefs(referencedRendered))
 	require.True(t, schemaHasReachableRefs(referencedSchema))
 
-	resourceSet, err := buildSchemaDocumentResources(referencedSchema, SchemaValidationPurposeGeneric)
+	resourceSet, err := buildSchemaDocumentResources(referencedSchema, SchemaValidationPurposeGeneric, nil)
 	require.NoError(t, err)
 	require.NotNil(t, resourceSet)
 	assert.Len(t, resourceSet.resources, 2)
@@ -355,9 +540,9 @@ components:
 	inlineRendered, err := renderRootSchemaForValidation(inlineSchema, SchemaValidationPurposeGeneric)
 	require.NoError(t, err)
 
-	assert.True(t, singleSchemaCompilePreferred(inlineSchema, inlineRendered))
+	assert.True(t, singleSchemaCompilePreferred(inlineRendered))
 	assert.False(t, schemaHasReachableRefs(inlineSchema))
-	resourceSet, err := buildSchemaDocumentResources(inlineSchema, SchemaValidationPurposeGeneric)
+	resourceSet, err := buildSchemaDocumentResources(inlineSchema, SchemaValidationPurposeGeneric, nil)
 	require.NoError(t, err)
 	assert.Nil(t, resourceSet)
 }
@@ -366,11 +551,35 @@ func TestBuildSchemaDocumentResources_NoLowSchema(t *testing.T) {
 	resourceSet, err := buildSchemaDocumentResources(
 		&base.Schema{},
 		SchemaValidationPurposeGeneric,
+		nil,
 	)
 
 	assert.Nil(t, resourceSet)
 	require.NoError(t, err)
 	assert.False(t, schemaHasReachableRefs(nil))
+}
+
+func TestBuildSchemaDocumentResources_IndexWithoutRootNode(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Thing:
+      type: string`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+	schema := model.Model.Components.Schemas.GetOrZero("Thing").Schema()
+	schema.GoLow().GetIndex().SetRootNode(nil)
+
+	resourceSet, err := buildSchemaDocumentResources(schema, SchemaValidationPurposeGeneric, nil)
+
+	require.NoError(t, err)
+	assert.Nil(t, resourceSet)
 }
 
 func TestCollectSchemaRefValues_IgnoresSchemaNameMaps(t *testing.T) {
@@ -394,6 +603,14 @@ $defs:
 func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 	var compiled *CompiledValidationSchema
 	assert.Nil(t, compiled.ToCacheEntry(nil))
+	assert.Empty(t, schemaResourceCacheKey(nil, SchemaValidationPurposeGeneric))
+	assert.Nil(t, resourceCacheEntryFromRenderedSchema(nil, nil))
+	assert.Nil(t, renderedSchemaFromResourceCache(nil))
+	assert.False(t, renderedSchemaHasReachableRefs(nil))
+	assert.False(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{}))
+	assert.False(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte(`type: string`)}))
+	assert.True(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte(`$ref: '#/components/schemas/Thing'`)}))
+	assert.True(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte(":\n")}))
 
 	rendered, err := renderRootSchemaForValidation(nil, SchemaValidationPurposeGeneric)
 	require.NoError(t, err)
@@ -434,12 +651,17 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 
 	resources := make(map[string][]byte)
 	resourceNodes := make(map[string]*yaml.Node)
+	registerSchemaDocumentResource(resources, resourceNodes, "https://example.com/nil.json", nil)
+	assert.Empty(t, resources)
+	assert.Empty(t, resourceNodes)
+
 	rendered, err = addSchemaDocumentResource(
 		resources,
 		resourceNodes,
 		"",
 		&yaml.Node{Kind: yaml.MappingNode},
 		SchemaValidationPurposeGeneric,
+		nil,
 	)
 	require.NoError(t, err)
 	assert.Nil(t, rendered)
@@ -452,6 +674,7 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 		"https://example.com/root.json",
 		nil,
 		SchemaValidationPurposeGeneric,
+		nil,
 	)
 	require.NoError(t, err)
 	assert.Nil(t, rendered)
@@ -460,6 +683,12 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 
 	var resourceRoot yaml.Node
 	require.NoError(t, yaml.Unmarshal([]byte(`type: object`), &resourceRoot))
+	cacheEntry := resourceCacheEntryFromRenderedSchema(
+		&RenderedValidationSchema{RenderedNode: resourceRoot.Content[0]},
+		&resourceRoot,
+	)
+	require.NotNil(t, cacheEntry)
+	assert.Same(t, &resourceRoot, cacheEntry.SourceRootNode)
 
 	rendered, err = addSchemaDocumentResource(
 		resources,
@@ -467,11 +696,35 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 		"https://example.com/root.json",
 		&resourceRoot,
 		SchemaValidationPurposeGeneric,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, rendered)
 	assert.NotEmpty(t, resources["https://example.com/root.json"])
 	assert.Same(t, rendered.RenderedNode, resourceNodes["https://example.com/root.json"])
+
+	resourceCache := validatorcache.NewDefaultSchemaResourceCache()
+	resourceCache.Store(schemaResourceCacheKey(&resourceRoot, SchemaValidationPurposeGeneric), &validatorcache.SchemaResourceCacheEntry{
+		RenderedInline:  []byte("cached"),
+		ReferenceSchema: "cached",
+		RenderedJSON:    []byte(`{"type":"object"}`),
+		RenderedNode:    &resourceRoot,
+	})
+	resources = make(map[string][]byte)
+	resourceNodes = make(map[string]*yaml.Node)
+	rendered, err = addSchemaDocumentResource(
+		resources,
+		resourceNodes,
+		"https://example.com/cached.json",
+		&resourceRoot,
+		SchemaValidationPurposeGeneric,
+		resourceCache,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, rendered)
+	assert.Equal(t, []byte("cached"), rendered.RenderedInline)
+	assert.Equal(t, []byte(`{"type":"object"}`), resources["https://example.com/cached.json"])
+	assert.Same(t, &resourceRoot, resourceNodes["https://example.com/cached.json"])
 
 	rendered, err = addSchemaDocumentResource(
 		resources,
@@ -484,6 +737,7 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 			},
 		},
 		SchemaValidationPurposeGeneric,
+		nil,
 	)
 	assert.Nil(t, rendered)
 	require.Error(t, err)
@@ -506,6 +760,28 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 	assert.Equal(t, []string{""}, tokens)
 
 	assert.Empty(t, ensureSchemaResourceName(nil, nil, 1))
+}
+
+func TestResourceCacheEntryPinsSourceRootForClonedDirectionalRender(t *testing.T) {
+	var root yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(`type: object
+required: [id, name]
+properties:
+  id:
+    type: string
+    readOnly: true
+  name:
+    type: string`), &root))
+
+	rendered, err := renderYAMLNodeForValidation(root.Content[0], SchemaValidationPurposeRequestBody)
+	require.NoError(t, err)
+	require.NotNil(t, rendered)
+	require.NotSame(t, root.Content[0], rendered.RenderedNode)
+
+	entry := resourceCacheEntryFromRenderedSchema(rendered, root.Content[0])
+	require.NotNil(t, entry)
+	assert.Same(t, root.Content[0], entry.SourceRootNode)
+	assert.Same(t, rendered.RenderedNode, entry.RenderedNode)
 }
 
 func TestRenderYAMLNodeForValidation_DirectionalPurposeClonesAndPrunes(t *testing.T) {
@@ -545,6 +821,7 @@ func TestCanonicalResourceName_EdgeCases(t *testing.T) {
 
 func TestCollectSchemaRefValues_DocumentSequenceAndNilEdges(t *testing.T) {
 	assert.Empty(t, collectSchemaRefValues(nil))
+	assert.False(t, hasSchemaRefValueIn(nil, ""))
 
 	var root yaml.Node
 	require.NoError(t, yaml.Unmarshal([]byte(`allOf:
@@ -561,10 +838,11 @@ func TestCollectSchemaRefValues_DocumentSequenceAndNilEdges(t *testing.T) {
 		"#/components/schemas/First",
 		"#/components/schemas/Second",
 	}, refs)
+	assert.True(t, hasSchemaRefValue(mappingValue(root.Content[0], "allOf")))
 }
 
 func TestAddReachableSchemaResources_GuardsAndSkips(t *testing.T) {
-	assert.NoError(t, addReachableSchemaResources(nil, nil, nil, nil, SchemaValidationPurposeGeneric))
+	assert.NoError(t, addReachableSchemaResources(nil, nil, nil, nil, SchemaValidationPurposeGeneric, nil))
 
 	var root yaml.Node
 	require.NoError(t, yaml.Unmarshal([]byte(`components:
@@ -608,6 +886,7 @@ func TestAddReachableSchemaResources_GuardsAndSkips(t *testing.T) {
 		specIndex,
 		rootSchemaNode,
 		SchemaValidationPurposeGeneric,
+		nil,
 	))
 	assert.NotEmpty(t, state.seenRefs)
 
@@ -617,6 +896,7 @@ func TestAddReachableSchemaResources_GuardsAndSkips(t *testing.T) {
 		specIndex,
 		childSchemaNode,
 		SchemaValidationPurposeGeneric,
+		nil,
 	))
 }
 
@@ -742,14 +1022,13 @@ components:
 	schema := model.Model.Components.Schemas.GetOrZero("Root").Schema()
 
 	appendInvalidAliasValue(schema.GoLow().GetIndex().GetRootNode())
-	compiled, err := CompileSchemaForValidation(
+	resourceSet, err := buildSchemaDocumentResources(
 		schema,
 		SchemaValidationPurposeGeneric,
-		config.NewValidationOptions(),
-		3.1,
+		nil,
 	)
 
-	assert.Nil(t, compiled)
+	assert.Nil(t, resourceSet)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "schema resource")
 }
@@ -796,14 +1075,13 @@ components:
 	require.NotNil(t, grandIndex)
 
 	appendInvalidAliasValue(grandIndex.GetRootNode())
-	compiled, err := CompileSchemaForValidation(
+	resourceSet, err := buildSchemaDocumentResources(
 		schema,
 		SchemaValidationPurposeGeneric,
-		config.NewValidationOptions(),
-		3.1,
+		nil,
 	)
 
-	assert.Nil(t, compiled)
+	assert.Nil(t, resourceSet)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "schema resource")
 }
@@ -892,6 +1170,57 @@ components:
 			map[string]any{"code": 42},
 		},
 	}))
+}
+
+func TestSchemaValidator_LocalRecursiveReferenceReportsSourceLocation(t *testing.T) {
+	spec := `openapi: "3.1.0"
+info:
+  title: Test
+  version: "1"
+paths:
+  /:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Node'
+components:
+  schemas:
+    Name:
+      type: string
+    Node:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/Name'
+        next:
+          $ref: '#/components/schemas/Node'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	validator := NewSchemaValidator()
+	schema := model.Model.Components.Schemas.GetOrZero("Node").Schema()
+	valid, validationErrors := validator.ValidateSchemaString(schema, `{"name": 42, "next": {"name": "ok"}}`)
+
+	assert.False(t, valid)
+	require.Len(t, validationErrors, 1)
+	require.NotEmpty(t, validationErrors[0].SchemaValidationErrors)
+	failureIndex := -1
+	for i, candidate := range validationErrors[0].SchemaValidationErrors {
+		if candidate != nil && strings.Contains(candidate.Reason, "got number") {
+			failureIndex = i
+			break
+		}
+	}
+	require.NotEqual(t, -1, failureIndex)
+	failure := validationErrors[0].SchemaValidationErrors[failureIndex]
+	assert.Equal(t, 16, failure.Line)
+	assert.Greater(t, failure.Column, 0)
+	assert.Contains(t, failure.KeywordLocation, "/type")
 }
 
 func TestCompileSchemaForValidation_DirectionalRequiredAcrossReferences(t *testing.T) {
