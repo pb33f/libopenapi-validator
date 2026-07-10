@@ -17,11 +17,14 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/bodycodec"
+	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/parameters"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/radix"
 	"github.com/pb33f/libopenapi-validator/requests"
 	"github.com/pb33f/libopenapi-validator/responses"
+	"github.com/pb33f/libopenapi-validator/router"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
@@ -55,7 +58,7 @@ type Validator interface {
 	// The path, query, cookie and header parameters and request and response body are validated.
 	ValidateHttpRequestResponse(request *http.Request, response *http.Response) (bool, []*errors.ValidationError)
 
-	// ValidateDocument will validate an OpenAPI 3+ document against the 3.0 or 3.1 OpenAPI 3+ specification
+	// ValidateDocument validates an OpenAPI document against the embedded 3.0, 3.1, or 3.2 specification schema.
 	ValidateDocument() (bool, []*errors.ValidationError)
 
 	// GetParameterValidator will return a parameters.ParameterValidator instance used to validate parameters
@@ -88,18 +91,32 @@ func NewValidator(document libopenapi.Document, opts ...config.Option) (Validato
 // NewValidatorFromV3Model will create a new Validator from an OpenAPI Model
 func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	options := config.NewValidationOptions(opts...)
+	bodycodec.Apply(options)
 
 	// Build radix tree for O(k) path lookup (where k = path depth)
 	// Skip if path tree is disabled or a custom tree was provided
 	if options.PathTree == nil && !options.IsPathTreeDisabled() {
 		options.PathTree = radix.BuildPathTree(m)
 	}
+	var routerOptions []router.Option
+	if options.PathTree != nil {
+		routerOptions = append(routerOptions, router.WithPathLookup(options.PathTree))
+	}
+	if options.RegexCache != nil {
+		routerOptions = append(routerOptions, router.WithRegexCache(options.RegexCache))
+	}
+	if !options.StrictServerMatching {
+		routerOptions = append(routerOptions, router.WithPathOnlyMatching())
+	}
+	routeFinder := router.NewRouter(m, routerOptions...)
+	options.Router = routeFinder
+	options.BodyRegistry = options.BodyRegistry.Precompute(declaredMediaTypes(m))
 
 	// warm the schema caches by pre-compiling all schemas in the document
 	// (warmSchemaCaches checks for nil cache and skips if disabled)
 	warmSchemaCaches(m, options)
 
-	v := &validator{options: options, v3Model: m}
+	v := &validator{options: options, v3Model: m, router: routeFinder}
 
 	// create a new parameter validator
 	v.paramValidator = parameters.NewParameterValidator(m, config.WithExistingOpts(options))
@@ -113,6 +130,62 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	return v
 }
 
+func declaredMediaTypes(document *v3.Document) []string {
+	if document == nil || document.Paths == nil || document.Paths.PathItems == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var mediaTypes []string
+	add := func(mediaType string) {
+		if _, ok := seen[mediaType]; !ok {
+			seen[mediaType] = struct{}{}
+			mediaTypes = append(mediaTypes, mediaType)
+		}
+	}
+	for path := document.Paths.PathItems.First(); path != nil; path = path.Next() {
+		pathItem := path.Value()
+		for operation := pathItem.GetOperations().First(); operation != nil; operation = operation.Next() {
+			op := operation.Value()
+			if op.RequestBody != nil && op.RequestBody.Content != nil {
+				for media := op.RequestBody.Content.First(); media != nil; media = media.Next() {
+					add(media.Key())
+				}
+			}
+			if op.Responses != nil {
+				if op.Responses.Codes != nil {
+					for response := op.Responses.Codes.First(); response != nil; response = response.Next() {
+						if response.Value() != nil && response.Value().Content != nil {
+							for media := response.Value().Content.First(); media != nil; media = media.Next() {
+								add(media.Key())
+							}
+						}
+					}
+				}
+				if op.Responses.Default != nil && op.Responses.Default.Content != nil {
+					for media := op.Responses.Default.Content.First(); media != nil; media = media.Next() {
+						add(media.Key())
+					}
+				}
+			}
+			for _, parameter := range op.Parameters {
+				if parameter != nil && parameter.Content != nil {
+					for media := parameter.Content.First(); media != nil; media = media.Next() {
+						add(media.Key())
+					}
+				}
+			}
+		}
+		for _, parameter := range pathItem.Parameters {
+			if parameter != nil && parameter.Content != nil {
+				for media := parameter.Content.First(); media != nil; media = media.Next() {
+					add(media.Key())
+				}
+			}
+		}
+	}
+	return mediaTypes
+}
+
 func (v *validator) SetDocument(document libopenapi.Document) {
 	v.document = document
 }
@@ -120,6 +193,10 @@ func (v *validator) SetDocument(document libopenapi.Document) {
 func (v *validator) Release() {
 	if v == nil {
 		return
+	}
+	if v.router != nil {
+		v.router.Release()
+		v.router = nil
 	}
 	releaseIfSupported(v.paramValidator)
 	releaseIfSupported(v.requestValidator)
@@ -200,20 +277,18 @@ func (v *validator) ValidateHttpRequestResponse(
 	request *http.Request,
 	response *http.Response,
 ) (bool, []*errors.ValidationError) {
-	var pathItem *v3.PathItem
-	var pathValue string
-	var errs []*errors.ValidationError
-
-	pathItem, errs, pathValue = paths.FindPath(request, v.v3Model, v.options)
-	if pathItem == nil || errs != nil {
+	route, errs := paths.ResolveRoute(request, v.v3Model, v.options)
+	if route == nil || errs != nil {
 		return false, errs
 	}
+	restoreRoute := requeststate.AttachRoute(request, route)
+	defer restoreRoute()
 
 	responseBodyValidator := v.responseValidator
 
 	// validate request and response
-	_, requestErrors := v.ValidateHttpRequestWithPathItem(request, pathItem, pathValue)
-	_, responseErrors := responseBodyValidator.ValidateResponseBodyWithPathItem(request, response, pathItem, pathValue)
+	_, requestErrors := v.ValidateHttpRequestWithPathItem(request, route.PathItem, route.Path)
+	_, responseErrors := responseBodyValidator.ValidateResponseBodyWithPathItem(request, response, route.PathItem, route.Path)
 
 	if len(requestErrors) > 0 || len(responseErrors) > 0 {
 		return false, append(requestErrors, responseErrors...)
@@ -222,14 +297,37 @@ func (v *validator) ValidateHttpRequestResponse(
 }
 
 func (v *validator) ValidateHttpRequest(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
+	route, errs := paths.ResolveRoute(request, v.v3Model, v.options)
 	if len(errs) > 0 {
 		return false, errs
 	}
-	return v.ValidateHttpRequestWithPathItem(request, pathItem, foundPath)
+	restoreRoute := requeststate.AttachRoute(request, route)
+	defer restoreRoute()
+	return v.ValidateHttpRequestWithPathItem(request, route.PathItem, route.Path)
 }
 
 func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	restoreRoute := v.attachRoute(request, pathItem, pathValue)
+	defer restoreRoute()
+	if v.options != nil && v.options.RequestDefaults {
+		return v.validateWithRequestDefaults(request, pathItem, pathValue, v.validateHttpRequestWithPathItem)
+	}
+	return v.validateHttpRequestWithPathItem(request, pathItem, pathValue)
+}
+
+func (v *validator) validateHttpRequestWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	if v.options != nil && v.options.AuthenticationFunc != nil {
+		if _, err := requeststate.Snapshot(request); err != nil {
+			return false, []*errors.ValidationError{{
+				ValidationType:    helpers.RequestBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message:           "request body could not be read for authentication",
+				Reason:            err.Error(),
+				HowToFix:          "provide a readable request body",
+			}}
+		}
+		return v.ValidateHttpRequestSyncWithPathItem(request, pathItem, pathValue)
+	}
 	// create a new parameter validator
 	paramValidator := v.paramValidator
 
@@ -252,8 +350,10 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 			paramValidator.ValidatePathParamsWithPathItem,
 			paramValidator.ValidateCookieParamsWithPathItem,
 			paramValidator.ValidateHeaderParamsWithPathItem,
-			paramValidator.ValidateQueryParamsWithPathItem,
 			paramValidator.ValidateSecurityWithPathItem,
+		}
+		if v.options.ValidateRequestQuery {
+			validations = append(validations, paramValidator.ValidateQueryParamsWithPathItem)
 		}
 
 		// listen for validation errors on parameters. everything will run async.
@@ -310,7 +410,9 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 	// build async functions
 	asyncFunctions := []validationFunctionAsync{
 		parameterValidationFunc,
-		requestBodyValidationFunc,
+	}
+	if v.options.ValidateRequestBody {
+		asyncFunctions = append(asyncFunctions, requestBodyValidationFunc)
 	}
 
 	var validationErrors []*errors.ValidationError
@@ -333,14 +435,41 @@ func (v *validator) ValidateHttpRequestWithPathItem(request *http.Request, pathI
 }
 
 func (v *validator) ValidateHttpRequestSync(request *http.Request) (bool, []*errors.ValidationError) {
-	pathItem, errs, foundPath := paths.FindPath(request, v.v3Model, v.options)
+	route, errs := paths.ResolveRoute(request, v.v3Model, v.options)
 	if len(errs) > 0 {
 		return false, errs
 	}
-	return v.ValidateHttpRequestSyncWithPathItem(request, pathItem, foundPath)
+	restoreRoute := requeststate.AttachRoute(request, route)
+	defer restoreRoute()
+	return v.ValidateHttpRequestSyncWithPathItem(request, route.PathItem, route.Path)
 }
 
 func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	restoreRoute := v.attachRoute(request, pathItem, pathValue)
+	defer restoreRoute()
+	if v.options != nil && v.options.RequestDefaults {
+		return v.validateWithRequestDefaults(request, pathItem, pathValue, v.validateHttpRequestSyncWithPathItem)
+	}
+	return v.validateHttpRequestSyncWithPathItem(request, pathItem, pathValue)
+}
+
+func (v *validator) attachRoute(request *http.Request, pathItem *v3.PathItem, pathValue string) func() {
+	if requeststate.Route(request) != nil {
+		return func() {}
+	}
+	route := &router.Route{
+		Document: v.v3Model, Path: pathValue, PathItem: pathItem, Method: request.Method,
+		Operation: helpers.ExtractOperation(request, pathItem),
+	}
+	if v.options != nil && v.options.Router != nil {
+		if resolved, err := v.options.Router.FindRoute(request); err == nil && resolved != nil && resolved.PathItem == pathItem {
+			route = resolved
+		}
+	}
+	return requeststate.AttachRoute(request, route)
+}
+
+func (v *validator) validateHttpRequestSyncWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
 	// create a new parameter validator
 	paramValidator := v.paramValidator
 
@@ -350,22 +479,27 @@ func (v *validator) ValidateHttpRequestSyncWithPathItem(request *http.Request, p
 	validationErrors := make([]*errors.ValidationError, 0)
 
 	paramValidationErrors := make([]*errors.ValidationError, 0)
-	for _, validateFunc := range []validationFunction{
+	validations := []validationFunction{
 		paramValidator.ValidatePathParamsWithPathItem,
 		paramValidator.ValidateCookieParamsWithPathItem,
 		paramValidator.ValidateHeaderParamsWithPathItem,
-		paramValidator.ValidateQueryParamsWithPathItem,
 		paramValidator.ValidateSecurityWithPathItem,
-	} {
+	}
+	if v.options.ValidateRequestQuery {
+		validations = append(validations, paramValidator.ValidateQueryParamsWithPathItem)
+	}
+	for _, validateFunc := range validations {
 		valid, pErrs := validateFunc(request, pathItem, pathValue)
 		if !valid {
 			paramValidationErrors = append(paramValidationErrors, pErrs...)
 		}
 	}
 
-	valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
-	if !valid {
-		paramValidationErrors = append(paramValidationErrors, pErrs...)
+	if v.options.ValidateRequestBody {
+		valid, pErrs := reqBodyValidator.ValidateRequestBodyWithPathItem(request, pathItem, pathValue)
+		if !valid {
+			paramValidationErrors = append(paramValidationErrors, pErrs...)
+		}
 	}
 
 	validationErrors = append(validationErrors, paramValidationErrors...)
@@ -379,6 +513,7 @@ type validator struct {
 	paramValidator    parameters.ParameterValidator
 	requestValidator  requests.RequestBodyValidator
 	responseValidator responses.ResponseBodyValidator
+	router            router.Router
 }
 
 func runValidation(control, doneChan chan struct{},

@@ -606,3 +606,26 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 	assert.Len(t, errs, 1)
 	assert.NotEmpty(t, errs[0].SchemaValidationErrors)
 }
+
+func TestValidateDocument_32Diagnostics(t *testing.T) {
+	validFixture, readErr := os.ReadFile("../test_specs/valid_32.yaml")
+	assert.NoError(t, readErr)
+	document, err := libopenapi.NewDocument(validFixture)
+	assert.NoError(t, err)
+	valid, errs := ValidateOpenAPIDocument(document)
+	assert.True(t, valid)
+	assert.Empty(t, errs)
+
+	invalidFixture, readErr := os.ReadFile("../test_specs/invalid_32.yaml")
+	assert.NoError(t, readErr)
+	document, err = libopenapi.NewDocument(invalidFixture)
+	assert.NoError(t, err)
+	valid, errs = ValidateOpenAPIDocument(document)
+	assert.False(t, valid)
+	if assert.NotEmpty(t, errs) && assert.NotEmpty(t, errs[0].SchemaValidationErrors) {
+		assert.Greater(t, errs[0].SpecLine, 0)
+		assert.GreaterOrEqual(t, errs[0].SpecCol, 0)
+		assert.Contains(t, fmt.Sprint(errs[0].Context), "info")
+		assert.NotEmpty(t, errs[0].SchemaValidationErrors[0].ReferenceObject)
+	}
+}

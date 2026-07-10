@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -51,9 +51,9 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
-	var validationErrors []*errors.ValidationError
+	validationErrors := v.validateContentParameters(request, pathItem, pathValue, helpers.Path)
 	for _, p := range params {
-		if p.In == helpers.Path {
+		if p.In == helpers.Path && p.Schema != nil {
 			// var paramTemplate string
 			for x := range pathSegments {
 				if pathSegments[x] == "" { // skip empty segments

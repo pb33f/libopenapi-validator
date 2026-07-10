@@ -10,15 +10,16 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	validatorcache "github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
 	"go.yaml.in/yaml/v4"
 
+	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
+
+	validatorcache "github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 )
 
@@ -233,10 +234,15 @@ components:
 	schema := model.Model.Components.Schemas.GetOrZero("Node").Schema()
 
 	originalRenderSchemaWithRefs := renderSchemaWithRefs
+	originalRenderSchemaForValidation := renderSchemaForValidation
+	renderSchemaForValidation = func(*base.Schema, SchemaValidationPurpose) (*RenderedValidationSchema, error) {
+		return nil, assert.AnError
+	}
 	renderSchemaWithRefs = func(*base.Schema) ([]byte, error) {
 		return nil, assert.AnError
 	}
 	t.Cleanup(func() {
+		renderSchemaForValidation = originalRenderSchemaForValidation
 		renderSchemaWithRefs = originalRenderSchemaWithRefs
 	})
 

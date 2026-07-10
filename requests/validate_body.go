@@ -1,10 +1,11 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package requests
 
 import (
-	"encoding/json"
+	"bytes"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,8 +13,11 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/content"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/bodycodec"
+	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
@@ -45,6 +49,22 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 		return false, []*errors.ValidationError{errors.OperationNotFound(pathItem, request, request.Method, pathValue)}
 	}
 	if operation.RequestBody == nil {
+		if v.options.RejectUndeclaredRequestBody {
+			body, err := requeststate.Snapshot(request)
+			if err != nil {
+				return false, []*errors.ValidationError{{
+					ValidationType: helpers.RequestBodyValidation, ValidationSubType: helpers.Schema,
+					Message: "request body could not be inspected", Reason: err.Error(), Context: operation,
+				}}
+			}
+			if len(body) > 0 {
+				return false, []*errors.ValidationError{{
+					ValidationType: helpers.RequestBodyValidation, ValidationSubType: helpers.Schema,
+					Message: fmt.Sprintf("%s request body for '%s' is not declared", request.Method, request.URL.Path),
+					Reason:  "the matched operation does not declare a requestBody", Context: operation,
+				}}
+			}
+		}
 		return true, nil
 	}
 
@@ -77,49 +97,61 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 	schema := mediaType.Schema.Schema()
 
 	isJson := strings.Contains(strings.ToLower(contentType), helpers.JSONType)
-
-	// we currently only support JSON, XML and URLEncoded validation for request bodies
-	if !isJson {
-		isXml := schema_validation.IsXMLContentType(contentType)
-		isUrlEncoded := schema_validation.IsURLEncodedContentType(contentType)
-
-		xmlValid := isXml && v.options.AllowXMLBodyValidation
-		urlEncodedValid := isUrlEncoded && v.options.AllowURLEncodedBodyValidation
-
-		if !xmlValid && !urlEncodedValid {
+	isXml := schema_validation.IsXMLContentType(contentType)
+	isUrlEncoded := schema_validation.IsURLEncodedContentType(contentType)
+	decoder, normalized, parameters := v.options.BodyRegistry.Decoder(contentType)
+	if decoder == nil && isJson {
+		decoder = content.JSONDecoder()
+	}
+	if decoder == nil {
+		if !v.options.RejectUnsupportedBodyContent {
 			return true, nil
 		}
-
-		if request != nil && (request.Body != nil || request.GetBody != nil) {
-			requestBody := readAndResetRequestBody(request)
-			stringedBody := string(requestBody)
-			var jsonBody any
-			var prevalidationErrors []*errors.ValidationError
-
-			switch {
-			case xmlValid:
-				jsonBody, prevalidationErrors = schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
-			case urlEncodedValid:
-				jsonBody, prevalidationErrors = schema_validation.TransformURLEncodedToSchemaJSON(stringedBody, schema, mediaType.Encoding)
-			}
-
-			if len(prevalidationErrors) > 0 {
-				return false, prevalidationErrors
-			}
-
-			transformedBytes, err := json.Marshal(jsonBody)
-			if err != nil {
-				switch {
-				case isXml:
-					return false, []*errors.ValidationError{errors.InvalidXMLParsing(err.Error(), stringedBody)}
-				case isUrlEncoded:
-					return false, []*errors.ValidationError{errors.InvalidURLEncodedParsing(err.Error(), stringedBody)}
-				}
-			}
-
-			setRequestBody(request, transformedBytes)
-		}
+		return false, []*errors.ValidationError{{
+			ValidationType: helpers.RequestBodyValidation, ValidationSubType: helpers.Schema,
+			Message: fmt.Sprintf("%s request body for '%s' has no registered decoder", request.Method, request.URL.Path),
+			Reason:  fmt.Sprintf("no body decoder is registered for %s", contentType),
+			Context: &content.FailureContext{Request: request, Operation: operation, MediaType: mediaType, Schema: schema},
+		}}
 	}
+	requestBody, readErr := requeststate.Snapshot(request)
+	if readErr != nil {
+		return false, []*errors.ValidationError{{
+			ValidationType: helpers.RequestBodyValidation, ValidationSubType: helpers.Schema,
+			Message: "request body could not be read", Reason: readErr.Error(), Context: schema,
+		}}
+	}
+	var decodedValue any
+	var decodeErr error
+	decoded := false
+
+	decodedValue, decodeErr = decoder.Decode(&content.DecodeInput{
+		Context: request.Context(), Body: bytes.NewReader(requestBody), Header: request.Header,
+		MediaType: normalized, Parameters: parameters, Schema: schema, Encoding: mediaType.Encoding, Direction: content.Request,
+	})
+	if decodeErr == nil {
+		decodedValue, decodeErr = content.Canonicalize(decodedValue)
+	}
+	if decodeErr != nil {
+		var transformErrors *bodycodec.ValidationErrors
+		if stderrors.As(decodeErr, &transformErrors) {
+			return false, transformErrors.Errors
+		}
+		structured := &content.DecodingError{MediaType: normalized, Direction: content.Request, Err: decodeErr}
+		if isXml {
+			return false, []*errors.ValidationError{errors.InvalidXMLParsing(structured.Error(), string(requestBody))}
+		}
+		if isUrlEncoded {
+			return false, []*errors.ValidationError{errors.InvalidURLEncodedParsing(structured.Error(), string(requestBody))}
+		}
+		return false, []*errors.ValidationError{{
+			ValidationType: helpers.RequestBodyValidation, ValidationSubType: helpers.Schema,
+			Message: fmt.Sprintf("%s request body for '%s' could not be decoded", request.Method, request.URL.Path),
+			Reason:  "The request body cannot be decoded: " + structured.Error(),
+			Context: &content.FailureContext{Request: request, Operation: operation, MediaType: mediaType, Schema: schema},
+		}}
+	}
+	decoded = true
 
 	validationSucceeded, validationErrors := ValidateRequestSchema(&ValidateRequestSchemaInput{
 		Request:      request,
@@ -127,6 +159,9 @@ func (v *requestBodyValidator) ValidateRequestBodyWithPathItem(request *http.Req
 		Version:      helpers.VersionToFloat(v.document.Version),
 		Options:      []config.Option{config.WithExistingOpts(v.options)},
 		BodyRequired: required,
+		DecodedValue: decodedValue,
+		RawBody:      requestBody,
+		ValueDecoded: decoded,
 	})
 
 	errors.PopulateValidationErrors(validationErrors, request, pathValue)

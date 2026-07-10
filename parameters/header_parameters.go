@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -45,13 +45,16 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
 
-	var validationErrors []*errors.ValidationError
+	validationErrors := v.validateContentParameters(request, pathItem, pathValue, helpers.Header)
 	seenHeaders := make(map[string]bool)
 	operation := strings.ToLower(request.Method)
 	for _, p := range params {
 		if p.In == helpers.Header {
 
 			seenHeaders[strings.ToLower(p.Name)] = true
+			if p.Schema == nil {
+				continue
+			}
 			if param := request.Header.Get(p.Name); param != "" {
 
 				var sch *base.Schema

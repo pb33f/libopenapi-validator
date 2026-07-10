@@ -99,7 +99,7 @@ components:
             $ref: '#/components/schemas/Error'`, "Error")
 
 	rendered, err = RenderSchemaForValidation(schema, SchemaValidationPurposeRequestBody)
-	require.Error(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, rendered)
 }
 

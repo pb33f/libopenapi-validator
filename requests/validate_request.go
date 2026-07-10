@@ -4,11 +4,9 @@
 package requests
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -23,6 +21,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 	"github.com/pb33f/libopenapi-validator/strict"
 )
@@ -36,97 +35,18 @@ type ValidateRequestSchemaInput struct {
 	Version      float32         // Required: OpenAPI version (3.0 or 3.1)
 	Options      []config.Option // Optional: Functional options (defaults applied if empty/nil)
 	BodyRequired bool            // Optional: Whether the request body is required (default false)
-}
-
-type replayableBody interface {
-	io.ReaderAt
-	Size() int64
+	DecodedValue any             // Optional: A value produced by a registered body decoder
+	RawBody      []byte          // Optional: Original bytes used for diagnostics with DecodedValue
+	ValueDecoded bool            // Distinguishes an explicitly decoded nil from the legacy JSON path
 }
 
 func setRequestBody(request *http.Request, body []byte) {
-	if request == nil {
-		return
-	}
-	bodyCopy := append([]byte(nil), body...)
-	request.Body = io.NopCloser(bytes.NewReader(bodyCopy))
-	request.ContentLength = int64(len(bodyCopy))
-	request.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(bodyCopy)), nil
-	}
-}
-
-func requestBodySnapshot(request *http.Request) ([]byte, bool) {
-	if request == nil || request.Body == nil || request.Body == http.NoBody {
-		return nil, false
-	}
-	reader := requestBodyReader(request.Body)
-	body, ok := reader.(replayableBody)
-	if !ok {
-		return nil, false
-	}
-	size := body.Size()
-	if size <= 0 {
-		return nil, false
-	}
-	snapshot, err := io.ReadAll(io.NewSectionReader(body, 0, size))
-	if err != nil {
-		return nil, false
-	}
-	return snapshot, true
-}
-
-func requestBodyReader(body io.ReadCloser) io.Reader {
-	if body == nil || body == http.NoBody {
-		return nil
-	}
-
-	value := reflect.ValueOf(body)
-	if value.Kind() == reflect.Pointer {
-		if value.IsNil() {
-			return nil
-		}
-		value = value.Elem()
-	}
-	if value.Kind() == reflect.Struct {
-		field := value.FieldByName("Reader")
-		if field.IsValid() && field.CanInterface() {
-			if reader, ok := field.Interface().(io.Reader); ok {
-				return reader
-			}
-		}
-	}
-	return body
+	requeststate.Install(request, body)
 }
 
 func readAndResetRequestBody(request *http.Request) []byte {
-	if request == nil {
-		return nil
-	}
-
-	var requestBody []byte
-	bodyRead := false
-	bodySnapshot, hasBodySnapshot := requestBodySnapshot(request)
-	if request.Body != nil {
-		requestBody, _ = io.ReadAll(request.Body)
-		_ = request.Body.Close()
-		bodyRead = true
-	}
-
-	if len(requestBody) == 0 && hasBodySnapshot && request.GetBody != nil {
-		if body, err := request.GetBody(); err == nil && body != nil {
-			replayedBody, _ := io.ReadAll(body)
-			_ = body.Close()
-			if bytes.Equal(replayedBody, bodySnapshot) {
-				requestBody = replayedBody
-				bodyRead = true
-			}
-		}
-	}
-
-	if bodyRead {
-		setRequestBody(request, requestBody)
-	}
-	return requestBody
+	body, _ := requeststate.Snapshot(request)
+	return body
 }
 
 // ValidateRequestSchema will validate a http.Request pointer against a schema.
@@ -215,11 +135,13 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 	request := input.Request
 	schema := input.Schema
 
-	requestBody := readAndResetRequestBody(request)
+	requestBody := input.RawBody
+	decodedObj := input.DecodedValue
+	if !input.ValueDecoded {
+		requestBody = readAndResetRequestBody(request)
+	}
 
-	var decodedObj interface{}
-
-	if len(requestBody) > 0 {
+	if !input.ValueDecoded && len(requestBody) > 0 {
 		err := json.Unmarshal(requestBody, &decodedObj)
 		if err != nil {
 			// cannot decode the request body, so it's not valid

@@ -1,0 +1,12 @@
+openapi: 3.2.0
+$self: https://example.com/openapi.yaml
+info:
+  title: Invalid OpenAPI 3.2 validation fixture
+  version:
+    - must-be-a-string
+paths:
+  /search:
+    query:
+      responses:
+        "200":
+          description: search result

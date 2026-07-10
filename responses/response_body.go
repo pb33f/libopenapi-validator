@@ -10,6 +10,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/internal/bodycodec"
 )
 
 // ResponseBodyValidator is an interface that defines the methods for validating response bodies for Operations.
@@ -34,6 +35,7 @@ type ResponseBodyValidator interface {
 // NewResponseBodyValidator will create a new ResponseBodyValidator from an OpenAPI 3+ document
 func NewResponseBodyValidator(document *v3.Document, opts ...config.Option) ResponseBodyValidator {
 	options := config.NewValidationOptions(opts...)
+	bodycodec.Apply(options)
 
 	return &responseBodyValidator{options: options, document: document}
 }
