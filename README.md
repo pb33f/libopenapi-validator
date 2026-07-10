@@ -11,6 +11,8 @@
 
 A validation module for [libopenapi](https://github.com/pb33f/libopenapi).
 
+Document validation is explicitly covered for OpenAPI 3.0, 3.1, and 3.2.
+
 `libopenapi-validator` will validate the following elements against an OpenAPI 3+ specification
 
 - *http.Request* - Validates the request against the OpenAPI specification
@@ -19,6 +21,23 @@ A validation module for [libopenapi](https://github.com/pb33f/libopenapi).
 - *base.Schema* - Validates a schema against a JSON or YAML blob / unmarshalled object
 
 👉👉 [Check out the full documentation](https://pb33f.io/libopenapi/validation/) 👈👈
+
+## Runtime validation features
+
+The validator now includes a standalone OpenAPI router, authentication callbacks with route context and replayable bodies, immutable custom body codecs, opt-in request defaults, `Parameter.content` decoding, validation policy switches, and explicit OpenAPI 3.2 document validation.
+
+Existing behavior remains the default. Strict server matching, non-JSON codecs, request mutation, and new rejection policies are opt-in:
+
+```go
+v := validator.NewValidatorFromV3Model(&model.Model,
+    config.WithStrictServerMatching(),
+    config.WithStandardBodyDecoders(),
+    config.WithRejectUnsupportedBodyContent(),
+    config.WithRequestDefaults(),
+)
+```
+
+Use `router.NewRouter` for routing without validation, `WithBodyDecoder` and `WithBodyEncoder` for proprietary formats, and `WithAuthenticationFunc` for application-owned security checks. See the [complete validation guide](https://pb33f.io/libopenapi/validation/) for defaults, options, and examples.
 
 ---
 

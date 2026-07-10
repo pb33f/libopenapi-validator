@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -51,7 +51,7 @@ func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, 
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
 	queryParams := make(map[string][]*helpers.QueryParam)
-	var validationErrors []*errors.ValidationError
+	validationErrors := v.validateContentParameters(request, pathItem, pathValue, helpers.Query)
 
 	// build a set of spec parameter names for exact matching
 	specParamNames := make(map[string]bool)
@@ -91,7 +91,7 @@ func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, 
 	// look through the params for the query key
 doneLooking:
 	for p := range params {
-		if params[p].In == helpers.Query {
+		if params[p].In == helpers.Query && (params[p].Schema != nil || (params[p].Content != nil && v.options.ContentParameterDecoder == nil)) {
 
 			contentWrapped := false
 			var contentType string

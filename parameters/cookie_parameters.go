@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package parameters
@@ -43,7 +43,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 	}
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
-	var validationErrors []*errors.ValidationError
+	validationErrors := v.validateContentParameters(request, pathItem, pathValue, helpers.Cookie)
 	operation := strings.ToLower(request.Method)
 
 	// build a map of cookies from the request for efficient lookup
@@ -53,7 +53,7 @@ func (v *paramValidator) ValidateCookieParamsWithPathItem(request *http.Request,
 	}
 
 	for _, p := range params {
-		if p.In == helpers.Cookie {
+		if p.In == helpers.Cookie && p.Schema != nil {
 			// look up the cookie by name (cookies are case-sensitive)
 			cookie, found := cookieMap[p.Name]
 			if !found {

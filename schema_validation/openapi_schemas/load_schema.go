@@ -1,7 +1,8 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
-// Package openapi_schemas contains the OpenAPI 3.0 and 3.1 schemas that are loaded from libopenapi, or our own
+// Package openapi_schemas contains legacy OpenAPI 3.0 and 3.1 schema loaders.
+// Document validation uses the embedded 3.0, 3.1, and 3.2 schemas selected by libopenapi.
 // fork of the official OpenAPI repo specifications. Using an MD5 hash, we can compare the local version against
 // the remote version and determine if they differ, if they do - load the remote version.
 package openapi_schemas

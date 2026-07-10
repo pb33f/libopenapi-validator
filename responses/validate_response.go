@@ -31,11 +31,14 @@ var instanceLocationRegex = regexp.MustCompile(`^/(\d+)`)
 
 // ValidateResponseSchemaInput contains parameters for response schema validation.
 type ValidateResponseSchemaInput struct {
-	Request  *http.Request   // Required: The HTTP request (for context)
-	Response *http.Response  // Required: The HTTP response to validate
-	Schema   *base.Schema    // Required: The OpenAPI schema to validate against
-	Version  float32         // Required: OpenAPI version (3.0 or 3.1)
-	Options  []config.Option // Optional: Functional options (defaults applied if empty/nil)
+	Request      *http.Request   // Required: The HTTP request (for context)
+	Response     *http.Response  // Required: The HTTP response to validate
+	Schema       *base.Schema    // Required: The OpenAPI schema to validate against
+	Version      float32         // Required: OpenAPI version (3.0 or 3.1)
+	Options      []config.Option // Optional: Functional options (defaults applied if empty/nil)
+	DecodedValue any             // Optional: A value produced by a registered body decoder
+	RawBody      []byte          // Optional: Original bytes used for diagnostics with DecodedValue
+	ValueDecoded bool            // Distinguishes an explicitly decoded nil from the legacy JSON path
 }
 
 // ValidateResponseSchema will validate the response body for a http.Response pointer. The request is used to
@@ -148,28 +151,34 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 		return false, validationErrors
 	}
 
-	responseBody, ioErr := io.ReadAll(response.Body)
-	if ioErr != nil {
-		// cannot decode the response body, so it's not valid
-		validationErrors = append(validationErrors, &liberrors.ValidationError{
-			ValidationType:    helpers.ResponseBodyValidation,
-			ValidationSubType: helpers.Schema,
-			Message: fmt.Sprintf("%s response body for '%s' cannot be read, it's empty or malformed",
-				request.Method, request.URL.Path),
-			Reason:   fmt.Sprintf("The response body cannot be decoded: %s", ioErr.Error()),
-			SpecLine: 1,
-			SpecCol:  0,
-			HowToFix: "ensure body is not empty",
-			Context:  schema,
-		})
-		return false, validationErrors
+	responseBody := input.RawBody
+	if !input.ValueDecoded {
+		var ioErr error
+		responseBody, ioErr = io.ReadAll(response.Body)
+		if ioErr != nil {
+			// cannot decode the response body, so it's not valid
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
+				ValidationType:    helpers.ResponseBodyValidation,
+				ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%s response body for '%s' cannot be read, it's empty or malformed",
+					request.Method, request.URL.Path),
+				Reason:   fmt.Sprintf("The response body cannot be decoded: %s", ioErr.Error()),
+				SpecLine: 1,
+				SpecCol:  0,
+				HowToFix: "ensure body is not empty",
+				Context:  schema,
+			})
+			return false, validationErrors
+		}
 	}
 
 	// close the request body, so it can be re-read later by another player in the chain
-	_ = response.Body.Close()
-	response.Body = io.NopCloser(bytes.NewBuffer(responseBody))
+	if !input.ValueDecoded {
+		_ = response.Body.Close()
+		response.Body = io.NopCloser(bytes.NewBuffer(responseBody))
+	}
 
-	var decodedObj interface{}
+	decodedObj := input.DecodedValue
 
 	if len(responseBody) > 0 {
 		// Per RFC7231, a response to a HEAD request MUST NOT include a message body.
@@ -193,7 +202,10 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 			})
 			return false, validationErrors
 		}
-		err := json.Unmarshal(responseBody, &decodedObj)
+		var err error
+		if !input.ValueDecoded {
+			err = json.Unmarshal(responseBody, &decodedObj)
+		}
 		if err != nil {
 			// cannot decode the response body, so it's not valid
 			validationErrors = append(validationErrors, &liberrors.ValidationError{

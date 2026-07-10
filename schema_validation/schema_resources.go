@@ -10,13 +10,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"go.yaml.in/yaml/v4"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
@@ -27,6 +27,8 @@ const syntheticSchemaResourceBase = "https://libopenapi-validator.local/schema/"
 var renderSchemaWithRefs = func(schema *base.Schema) ([]byte, error) {
 	return schema.Render()
 }
+
+var renderSchemaForValidation = RenderSchemaForValidation
 
 // CompiledValidationSchema contains a schema compiled for validation plus the rendered schema context.
 type CompiledValidationSchema struct {
@@ -189,7 +191,7 @@ func renderRootSchemaForValidation(schema *base.Schema, purpose SchemaValidation
 		return nil, fmt.Errorf("schema does not have low-level information and cannot be rendered")
 	}
 
-	rendered, err := RenderSchemaForValidation(schema, purpose)
+	rendered, err := renderSchemaForValidation(schema, purpose)
 	if err == nil {
 		return rendered, nil
 	}

@@ -218,7 +218,7 @@ func buildDocumentDecodeError(reason, context string) *liberrors.ValidationError
 	}
 }
 
-// ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
+// ValidateOpenAPIDocument validates an OpenAPI document against the embedded OpenAPI 2, 3.0, 3.1, or 3.2 schema selected by libopenapi.
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
 func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bool, []*liberrors.ValidationError) {
 	return ValidateOpenAPIDocumentWithPrecompiled(doc, nil, opts...)
@@ -378,6 +378,9 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 						// location of the violation within the rendered schema.
 						violation.Line = line
 						violation.Column = located.Column
+						if source, err := yaml.Marshal(located); err == nil {
+							violation.ReferenceObject = strings.TrimSpace(string(source))
+						}
 					} else {
 						// handles property name validation errors that don't provide useful InstanceLocation
 						applyPropertyNameFallback(propertyInfo, info.RootNode.Content[0], violation)
@@ -388,14 +391,20 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 		}
 
 		// add the error to the list
-		validationErrors = append(validationErrors, &liberrors.ValidationError{
+		documentError := &liberrors.ValidationError{
 			ValidationType: helpers.Schema,
 			Message:        "Document does not pass validation",
 			Reason: fmt.Sprintf("OpenAPI document is not valid according "+
 				"to the %s specification", info.Version),
 			SchemaValidationErrors: schemaValidationErrors,
 			HowToFix:               liberrors.HowToFixInvalidSchema,
-		})
+		}
+		if len(schemaValidationErrors) > 0 {
+			documentError.SpecLine = schemaValidationErrors[0].Line
+			documentError.SpecCol = schemaValidationErrors[0].Column
+			documentError.Context = schemaValidationErrors[0].FieldPath
+		}
+		validationErrors = append(validationErrors, documentError)
 	}
 	if len(validationErrors) > 0 {
 		return false, validationErrors

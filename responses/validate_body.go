@@ -5,7 +5,7 @@ package responses
 
 import (
 	"bytes"
-	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,10 +17,11 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/content"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/bodycodec"
 	"github.com/pb33f/libopenapi-validator/paths"
-	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 func (v *responseBodyValidator) ValidateResponseBody(
@@ -77,11 +78,11 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 	}
 
 	if foundResponse != nil {
-		if foundResponse.Content != nil { // only validate if we have content types.
+		if v.options.ValidateResponseBody && foundResponse.Content != nil { // only validate if we have content types.
 			// check content type has been defined in the contract
 			if mediaType, ok := foundResponse.Content.Get(mediaTypeSting); ok {
 				validationErrors = append(validationErrors,
-					v.checkResponseSchema(request, response, mediaTypeSting, mediaType)...)
+					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
 			} else {
 				// check that the operation *actually* returns a body. (i.e. a 204 response)
 				if foundResponse.Content != nil && orderedmap.Len(foundResponse.Content) > 0 {
@@ -95,10 +96,12 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 		// no code match, check for default response
 		if operation.Responses.Default != nil && operation.Responses.Default.Content != nil {
 			// check content type has been defined in the contract
-			if mediaType, ok := operation.Responses.Default.Content.Get(mediaTypeSting); ok {
+			if !v.options.ValidateResponseBody {
+				foundResponse = operation.Responses.Default
+			} else if mediaType, ok := operation.Responses.Default.Content.Get(mediaTypeSting); ok {
 				foundResponse = operation.Responses.Default
 				validationErrors = append(validationErrors,
-					v.checkResponseSchema(request, response, contentType, mediaType)...)
+					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
 			} else {
 				// check that the operation *actually* returns a body. (i.e. a 204 response)
 				if operation.Responses.Default.Content != nil && orderedmap.Len(operation.Responses.Default.Content) > 0 {
@@ -107,7 +110,7 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, true))
 				}
 			}
-		} else {
+		} else if v.options.ValidateResponseStatus {
 			// TODO: add support for '2XX' and '3XX' responses in the contract
 			// no default, no code match, nothing!
 			validationErrors = append(validationErrors,
@@ -137,6 +140,7 @@ func (v *responseBodyValidator) checkResponseSchema(
 	response *http.Response,
 	contentType string,
 	mediaType *v3.MediaType,
+	operation *v3.Operation,
 ) []*errors.ValidationError {
 	var validationErrors []*errors.ValidationError
 
@@ -144,64 +148,89 @@ func (v *responseBodyValidator) checkResponseSchema(
 		return validationErrors
 	}
 
-	// currently, we can only validate JSON, XML and URL Encoded based responses, so check for the presence
-	// of 'json' (what ever it may be) and for XML/URLEncoded content type so we can perform a schema check on it.
-	// anything other than JSON XML, or URL Encoded will be ignored.
-
-	isXml := schema_validation.IsXMLContentType(contentType)
-	isUrlEncoded := schema_validation.IsURLEncodedContentType(contentType)
 	isJson := strings.Contains(strings.ToLower(contentType), helpers.JSONType)
 
-	xmlValid := isXml && v.options.AllowXMLBodyValidation
-	urlEncodedValid := isUrlEncoded && v.options.AllowURLEncodedBodyValidation
-
-	if !isJson && !xmlValid && !urlEncodedValid {
-		return validationErrors
-	}
-
 	schema := mediaType.Schema.Schema()
-
-	if !isJson {
-		if response != nil && response.Body != http.NoBody {
-			responseBody, _ := io.ReadAll(response.Body)
-			_ = response.Body.Close()
-
-			stringedBody := string(responseBody)
-			var jsonBody any
-			var prevalidationErrors []*errors.ValidationError
-
-			switch {
-			case xmlValid:
-				jsonBody, prevalidationErrors = schema_validation.TransformXMLToSchemaJSON(stringedBody, schema)
-			case urlEncodedValid:
-				jsonBody, prevalidationErrors = schema_validation.TransformURLEncodedToSchemaJSON(stringedBody, schema, mediaType.Encoding)
-			}
-
-			if len(prevalidationErrors) > 0 {
-				return prevalidationErrors
-			}
-
-			transformedBytes, err := json.Marshal(jsonBody)
-			if err != nil {
-				switch {
-				case isXml:
-					return []*errors.ValidationError{errors.InvalidXMLParsing(err.Error(), stringedBody)}
-				case isUrlEncoded:
-					return []*errors.ValidationError{errors.InvalidURLEncodedParsing(err.Error(), stringedBody)}
-				}
-			}
-
-			response.Body = io.NopCloser(bytes.NewBuffer(transformedBytes))
-		}
+	decoder, normalized, parameters := v.options.BodyRegistry.Decoder(contentType)
+	if decoder == nil && isJson {
+		decoder = content.JSONDecoder()
 	}
+	if decoder == nil {
+		if !v.options.RejectUnsupportedBodyContent {
+			return validationErrors
+		}
+		return []*errors.ValidationError{{
+			ValidationType: helpers.ResponseBodyValidation, ValidationSubType: helpers.Schema,
+			Message: fmt.Sprintf("%d response body has no registered decoder", response.StatusCode),
+			Reason:  fmt.Sprintf("no body decoder is registered for %s", contentType),
+			Context: &content.FailureContext{Request: request, Response: response, Operation: operation, MediaType: mediaType, Schema: schema},
+		}}
+	}
+	if response == nil || response.Body == nil || response.Body == http.NoBody {
+		validationResponse := response
+		if response != nil && response.Body == nil {
+			copyResponse := *response
+			copyResponse.Body = http.NoBody
+			validationResponse = &copyResponse
+		}
+		_, bodyErrors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+			Request: request, Response: validationResponse, Schema: schema,
+			Version: helpers.VersionToFloat(v.document.Version), Options: []config.Option{config.WithExistingOpts(v.options)},
+		})
+		return bodyErrors
+	}
+	responseBody, readErr := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	response.Body = io.NopCloser(bytes.NewReader(responseBody))
+	if readErr != nil {
+		return []*errors.ValidationError{{
+			ValidationType: helpers.ResponseBodyValidation, ValidationSubType: helpers.Schema,
+			Message: "response body could not be read", Reason: "The response body cannot be decoded: " + readErr.Error(), Context: schema,
+		}}
+	}
+
+	var decodedValue any
+	decoded := false
+	var decodeErr error
+	decodedValue, decodeErr = decoder.Decode(&content.DecodeInput{
+		Context: request.Context(), Body: bytes.NewReader(responseBody), Header: response.Header,
+		MediaType: normalized, Parameters: parameters, Schema: schema, Encoding: mediaType.Encoding, Direction: content.Response,
+	})
+	if decodeErr == nil {
+		decodedValue, decodeErr = content.Canonicalize(decodedValue)
+	}
+	if decodeErr != nil {
+		var transformErrors *bodycodec.ValidationErrors
+		if stderrors.As(decodeErr, &transformErrors) {
+			return transformErrors.Errors
+		}
+		structured := &content.DecodingError{MediaType: normalized, Direction: content.Response, Err: decodeErr}
+		if isJson {
+			return []*errors.ValidationError{{
+				ValidationType: helpers.ResponseBodyValidation, ValidationSubType: helpers.Schema,
+				Message: fmt.Sprintf("%s response body for '%s' failed to validate schema", request.Method, request.URL.Path),
+				Reason:  "The response body cannot be decoded: " + structured.Error(),
+				Context: &content.FailureContext{Request: request, Response: response, Operation: operation, MediaType: mediaType, Schema: schema},
+			}}
+		}
+		return []*errors.ValidationError{{
+			ValidationType: helpers.ResponseBodyValidation, ValidationSubType: helpers.Schema,
+			Message: fmt.Sprintf("%d response body could not be decoded", response.StatusCode), Reason: structured.Error(),
+			Context: &content.FailureContext{Request: request, Response: response, Operation: operation, MediaType: mediaType, Schema: schema},
+		}}
+	}
+	decoded = true
 
 	// Validate response schema
 	valid, vErrs := ValidateResponseSchema(&ValidateResponseSchemaInput{
-		Request:  request,
-		Response: response,
-		Schema:   schema,
-		Version:  helpers.VersionToFloat(v.document.Version),
-		Options:  []config.Option{config.WithExistingOpts(v.options)},
+		Request:      request,
+		Response:     response,
+		Schema:       schema,
+		Version:      helpers.VersionToFloat(v.document.Version),
+		Options:      []config.Option{config.WithExistingOpts(v.options)},
+		DecodedValue: decodedValue,
+		RawBody:      responseBody,
+		ValueDecoded: decoded,
 	})
 
 	if !valid {

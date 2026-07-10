@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2025-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -327,7 +327,7 @@ components:
 
 	t.Run("should fail rendering", func(t *testing.T) {
 		_, err := schema.Schema().RenderInline()
-		assert.Error(t, err, "RenderInline should not error on circular refs")
+		assert.NoError(t, err, "RenderInline should support circular refs")
 	})
 
 	t.Run("should validate circular references", func(t *testing.T) {
