@@ -18,6 +18,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	validatorhelpers "github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
@@ -470,6 +471,52 @@ func TestValidateResponseSchema_EmptyBodySkipsValidation(t *testing.T) {
 
 	assert.True(t, valid)
 	assert.Empty(t, errs)
+}
+
+func TestValidateResponseSchema_UnreadableBodyReturnsStructuredError(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: &http.Response{StatusCode: http.StatusOK, Body: &errorReader{}},
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Equal(t, validatorhelpers.ResponseBodyValidation, errs[0].ValidationType)
+	assert.Equal(t, validatorhelpers.Schema, errs[0].ValidationSubType)
+	assert.Contains(t, errs[0].Message, "response body for '/test' cannot be read")
+	assert.Equal(t, "The response body cannot be decoded: some io error", errs[0].Reason)
+	assert.Equal(t, "ensure body is not empty", errs[0].HowToFix)
+	assert.Same(t, schema, errs[0].Context)
+}
+
+func TestValidateResponseSchema_MalformedJSONReturnsStructuredErrorAndRestoresBody(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+	const malformed = `{"name":`
+	response := responseWithBody(malformed)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: response,
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Equal(t, validatorhelpers.ResponseBodyValidation, errs[0].ValidationType)
+	assert.Equal(t, validatorhelpers.Schema, errs[0].ValidationSubType)
+	assert.Contains(t, errs[0].Message, "response body for '/test' failed to validate schema")
+	assert.Contains(t, errs[0].Reason, "The response body cannot be decoded: unexpected end of JSON input")
+	assert.Equal(t, liberrors.HowToFixInvalidSchema, errs[0].HowToFix)
+	assert.Same(t, schema, errs[0].Context)
+
+	replayed, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	assert.Equal(t, malformed, string(replayed))
 }
 
 func TestValidateResponseSchema_CachedSchemaWithoutRenderedNodeFallsBackToRenderedBytes(t *testing.T) {
