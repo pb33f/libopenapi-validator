@@ -242,19 +242,19 @@ func schemaHasReachableRefs(schema *base.Schema) bool {
 
 // renderYAMLNodeForValidation renders a YAML node to the YAML and JSON forms used by jsonschema.
 //
-// Request and response validation prune directional "required" markers, so they
-// clone before mutating. Generic validation does not prune, which keeps the
-// whole-document resource path allocation-light for ordinary document schemas.
-// Generic rendered nodes may be cached, so downstream diagnostic code must keep
-// treating them as read-only.
+// The node is always cloned before rendering: request and response validation
+// prune directional "required" markers, and yaml.Marshal itself mutates the
+// nodes it serializes (github.com/yaml/go-yaml v4 strips resolved tags in place, see
+// github.com/yaml/go-yaml/issues/371), which would corrupt nodes shared with the live document
+// model. Generic rendered nodes may be cached, so downstream diagnostic code
+// must keep treating them as read-only.
 func renderYAMLNodeForValidation(node *yaml.Node, purpose SchemaValidationPurpose) (*RenderedValidationSchema, error) {
 	if node == nil {
 		return nil, nil
 	}
 
-	renderedNode := node
+	renderedNode := cloneYAMLNode(node)
 	if purpose != SchemaValidationPurposeGeneric {
-		renderedNode = cloneYAMLNode(node)
 		pruneDirectionalRequiredEverywhere(renderedNode, purpose)
 	}
 
