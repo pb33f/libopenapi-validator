@@ -12,7 +12,7 @@ require (
 	github.com/pb33f/testify v0.1.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.6
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.40.0
 )
 
 require (
@@ -21,5 +21,5 @@ require (
 	github.com/go-openapi/swag/jsonname v0.26.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 )
