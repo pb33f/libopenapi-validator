@@ -6,6 +6,7 @@ package helpers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -21,8 +22,32 @@ import (
 type QueryParam struct {
 	Key          string
 	Values       []string
+	RawValues    []string // values as sent on the wire, index-aligned with Values
 	Property     string
 	PropertyPath []string
+}
+
+// ExtractRawQueryValues parses a URL's RawQuery into a map of decoded key to raw
+// (still percent-encoded) values, index-aligned per key with request.URL.Query().
+func ExtractRawQueryValues(rawQuery string) map[string][]string {
+	rawValues := make(map[string][]string)
+	for rawQuery != "" {
+		var segment string
+		segment, rawQuery, _ = strings.Cut(rawQuery, "&")
+		if segment == "" || strings.Contains(segment, ";") {
+			continue
+		}
+		rawKey, rawValue, _ := strings.Cut(segment, "=")
+		key, err := url.QueryUnescape(rawKey)
+		if err != nil {
+			continue
+		}
+		if _, err = url.QueryUnescape(rawValue); err != nil {
+			continue
+		}
+		rawValues[key] = append(rawValues[key], rawValue)
+	}
+	return rawValues
 }
 
 // ExtractParamsForOperation will extract the parameters for the operation based on the request method.

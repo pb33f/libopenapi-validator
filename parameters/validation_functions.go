@@ -284,8 +284,12 @@ stopValidation:
 					}
 				}
 			default:
-				// check for a delimited list.
-				if helpers.DoesFormParamContainDelimiter(qp.Values[i], param.Style) {
+				// check for a delimited list; a percent-encoded comma is data, only a literal comma delimits.
+				checkValue := qp.Values[i]
+				if i < len(qp.RawValues) {
+					checkValue = qp.RawValues[i]
+				}
+				if helpers.DoesFormParamContainDelimiter(checkValue, param.Style) {
 					if param.Explode != nil && *param.Explode {
 						validationErrors = append(validationErrors, errors.IncorrectFormEncoding(param, qp, i))
 						break stopValidation

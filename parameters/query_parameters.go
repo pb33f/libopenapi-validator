@@ -61,26 +61,31 @@ func (v *paramValidator) ValidateQueryParamsWithPathItem(request *http.Request, 
 		}
 	}
 
+	rawQueryValues := helpers.ExtractRawQueryValues(request.URL.RawQuery)
+
 	for qKey, qVal := range request.URL.Query() {
 		// check if the query key exactly matches a spec parameter name (e.g., "match[]")
 		// if so, store it literally without deepObject stripping
 		if specParamNames[qKey] {
 			queryParams[qKey] = append(queryParams[qKey], &helpers.QueryParam{
-				Key:    qKey,
-				Values: qVal,
+				Key:       qKey,
+				Values:    qVal,
+				RawValues: rawQueryValues[qKey],
 			})
 		} else if stripped, propertyPath, ok := helpers.ParseDeepObjectKey(qKey); ok {
 			// check if the param is encoded as a property / deepObject
 			queryParams[stripped] = append(queryParams[stripped], &helpers.QueryParam{
 				Key:          stripped,
 				Values:       qVal,
+				RawValues:    rawQueryValues[qKey],
 				Property:     propertyPath[0],
 				PropertyPath: propertyPath,
 			})
 		} else {
 			queryParams[qKey] = append(queryParams[qKey], &helpers.QueryParam{
-				Key:    qKey,
-				Values: qVal,
+				Key:       qKey,
+				Values:    qVal,
+				RawValues: rawQueryValues[qKey],
 			})
 		}
 	}
@@ -126,14 +131,20 @@ doneLooking:
 					pType := sch.Type
 
 					// for each param, check each type
-					for _, ef := range fp.Values {
+					for efIdx, ef := range fp.Values {
 
 						// check allowReserved values. If this is set to true, then we can allow the
 						// following characters
 						//  :/?#[]@!$&'()*+,;=
 						// to be present as they are, without being URLEncoded.
 						if !params[p].AllowReserved {
-							if rxRxp.MatchString(ef) && params[p].IsExploded() {
+							// check the raw value: a percent-encoded reserved character is compliant,
+							// only a literal one violates allowReserved. '+' reads as space (form encoding).
+							checkValue := ef
+							if efIdx < len(fp.RawValues) {
+								checkValue = strings.ReplaceAll(fp.RawValues[efIdx], "+", " ")
+							}
+							if rxRxp.MatchString(checkValue) && params[p].IsExploded() {
 								validationErrors = append(validationErrors,
 									errors.IncorrectReservedValues(params[p], ef, sch, pathValue, operation, renderedSchema))
 							}

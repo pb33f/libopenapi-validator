@@ -1419,3 +1419,14 @@ func TestEffectiveSecurityForOperation(t *testing.T) {
 		require.Equal(t, headSecurity, result)
 	})
 }
+
+func TestExtractRawQueryValues(t *testing.T) {
+	raw := ExtractRawQueryValues(
+		"filter%5Bdate%5D=2026-05-17%2C2026-07-17&tag=a&tag=b%2Cc&novalue&&bad;pair=1&bad%zzkey=1&key=bad%zzvalue",
+	)
+	require.Equal(t, map[string][]string{
+		"filter[date]": {"2026-05-17%2C2026-07-17"},
+		"tag":          {"a", "b%2Cc"},
+		"novalue":      {""},
+	}, raw)
+}

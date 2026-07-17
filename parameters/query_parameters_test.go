@@ -2164,6 +2164,104 @@ paths:
 		"reserved values are correctly encoded, for example: '%24%24oh'", errors[0].HowToFix)
 }
 
+func TestNewValidator_QueryParamAllowReserved_PercentEncodedValueAccepted(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: fishy
+         in: query
+         required: true
+         explode: true
+         schema:
+           type: array
+           items:
+             type: string
+     operationId: locateFishy`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	// '%24%24oh' is the encoding the reserved-values error's HowToFix suggests for '$$oh'
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/a/fishy/on/a/dishy?fishy=%24%24oh", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamAllowReserved_DeepObjectPercentEncodedComma(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: filter
+         in: query
+         required: true
+         style: deepObject
+         explode: true
+         schema:
+           type: object
+           properties:
+             dateRange:
+               type: string
+     operationId: locateFishy`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	// %2C is how a compliant client sends a comma when allowReserved is false
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/a/fishy/on/a/dishy?filter[dateRange]=2026-05-17%2C2026-07-17", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestNewValidator_QueryParamAllowReserved_DeepObjectRawCommaRejected(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+ /a/fishy/on/a/dishy:
+   get:
+     parameters:
+       - name: filter
+         in: query
+         required: true
+         style: deepObject
+         explode: true
+         schema:
+           type: object
+           properties:
+             dateRange:
+               type: string
+     operationId: locateFishy`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+
+	m, _ := doc.BuildV3Model()
+
+	v := NewParameterValidator(&m.Model)
+
+	// a literal comma violates allowReserved: false; the raw '[' ']' in the key must not be flagged
+	request, _ := http.NewRequest(http.MethodGet,
+		"https://things.com/a/fishy/on/a/dishy?filter[dateRange]=2026-05-17,2026-07-17", nil)
+
+	valid, errors := v.ValidateQueryParams(request)
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "Query parameter 'filter' value contains reserved values", errors[0].Message)
+}
+
 func TestNewValidator_QueryParamValidateStyle_ValidObjectArrayNoExplode(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
