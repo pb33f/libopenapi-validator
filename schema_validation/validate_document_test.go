@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -9,7 +9,8 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
+	"github.com/pb33f/libopenapi/datamodel"
+	"github.com/pb33f/testify/assert"
 	"go.yaml.in/yaml/v4"
 
 	"github.com/pb33f/libopenapi-validator/config"
@@ -210,8 +211,12 @@ paths: {}`
 		},
 	}
 	info := doc.GetSpecInfo()
-	info.SpecJSON = &badSpecJSON
-	info.SpecJSONBytes = nil
+	// the JSON view is built lazily behind a sync.Once; latch it before
+	// injecting the poisoned values, otherwise the first accessor call inside
+	// the validator rebuilds the real JSON view and overwrites the injection.
+	_ = info.GetSpecJSONBytes()
+	info.SpecJSON = &badSpecJSON //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSONBytes = nil     //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errors := ValidateOpenAPIDocument(doc)
 
@@ -240,8 +245,10 @@ paths: {}`
 	}
 	corrupt := []byte(`{not valid json!!!}`)
 	info := doc.GetSpecInfo()
-	info.SpecJSON = &badSpecJSON
-	info.SpecJSONBytes = &corrupt
+	// latch the lazy JSON build before injecting (see note in the test above)
+	_ = info.GetSpecJSONBytes()
+	info.SpecJSON = &badSpecJSON  //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errors := ValidateOpenAPIDocument(doc)
 
@@ -427,12 +434,10 @@ info:
   title: Test
 `
 
-	doc, _ := libopenapi.NewDocument([]byte(spec))
-
-	// Simulate the nil SpecJSON scenario by setting both to nil
-	info := doc.GetSpecInfo()
-	info.SpecJSON = nil
-	info.SpecJSONBytes = nil
+	// SkipJSONConversion disables the JSON view entirely: the lazy accessors
+	// return nil, which is the production scenario this guard protects against.
+	docConfig := &datamodel.DocumentConfiguration{SkipJSONConversion: true}
+	doc, _ := libopenapi.NewDocumentWithConfiguration([]byte(spec), docConfig)
 
 	// validate!
 	valid, errors := ValidateOpenAPIDocument(doc)
@@ -507,9 +512,12 @@ func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {
 
 	info := doc.GetSpecInfo()
 
+	// The JSON view builds lazily; latch it before manipulating the fields so
+	// the validator's accessor calls don't rebuild and overwrite the setup.
+	assert.NotNil(t, info.GetSpecJSONBytes(), "SpecJSONBytes should be populated by libopenapi")
+
 	// Nil out SpecJSON but leave SpecJSONBytes intact — forces the SpecJSONBytes path
-	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
-	info.SpecJSON = nil
+	info.SpecJSON = nil //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.True(t, valid)
@@ -522,12 +530,16 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 
 	info := doc.GetSpecInfo()
 
+	// latch the lazy JSON build before injecting, so the validator's accessor
+	// calls return the injected values instead of rebuilding the real view.
+	_ = info.GetSpecJSONBytes()
+
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// and nil out SpecJSON so the fallback normalizeJSON path is skipped.
 	// This exercises the nil guard on SpecJSON inside the error branch.
 	corrupt := []byte(`{not valid json!!!}`)
-	info.SpecJSONBytes = &corrupt
-	info.SpecJSON = nil
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSON = nil           //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	// Validation should fail before JSON Schema validation instead of validating nil.
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -537,16 +549,40 @@ func TestValidateDocument_SpecJSONBytesCorrupt_NilSpecJSON(t *testing.T) {
 	assert.Empty(t, errs[0].SchemaValidationErrors)
 }
 
+func TestValidateDocument_SpecJSONBytesNullDoesNotValidateNil(t *testing.T) {
+	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
+	doc, _ := libopenapi.NewDocument(petstore)
+
+	info := doc.GetSpecInfo()
+	_ = info.GetSpecJSONBytes()
+
+	nullJSON := []byte("null")
+	info.SpecJSONBytes = &nullJSON //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+	info.SpecJSON = nil            //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
+
+	valid, errs := ValidateOpenAPIDocument(doc)
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Reason, "no usable JSON representation")
+	assert.NotContains(t, errs[0].Reason, "got null, want object")
+	assert.Empty(t, errs[0].SchemaValidationErrors)
+}
+
 func TestValidateDocument_SpecJSONBytesCorrupt_FallbackToSpecJSON(t *testing.T) {
 	petstore, _ := os.ReadFile("../test_specs/petstorev3.json")
 	doc, _ := libopenapi.NewDocument(petstore)
 
 	info := doc.GetSpecInfo()
 
+	// latch the lazy JSON build before injecting, so the corrupt bytes
+	// actually reach the validator instead of being rebuilt over.
+	_ = info.GetSpecJSONBytes()
+
 	// Put corrupt bytes in SpecJSONBytes so UnmarshalJSON fails,
 	// but leave SpecJSON intact so the fallback to normalizeJSON executes.
 	corrupt := []byte(`{not valid json!!!}`)
-	info.SpecJSONBytes = &corrupt
+	info.SpecJSONBytes = &corrupt //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	// Should still validate successfully via the SpecJSON fallback
 	valid, errs := ValidateOpenAPIDocument(doc)
@@ -560,12 +596,36 @@ func TestValidateDocument_SpecJSONBytesPath_Invalid(t *testing.T) {
 
 	info := doc.GetSpecInfo()
 
-	// Nil out SpecJSON but leave SpecJSONBytes intact
-	assert.NotNil(t, info.SpecJSONBytes, "SpecJSONBytes should be populated by libopenapi")
-	info.SpecJSON = nil
+	// latch the lazy JSON build, then nil out SpecJSON but leave
+	// SpecJSONBytes intact
+	assert.NotNil(t, info.GetSpecJSONBytes(), "SpecJSONBytes should be populated by libopenapi")
+	info.SpecJSON = nil //nolint:staticcheck // test intentionally poisons lazy JSON cache fields
 
 	valid, errs := ValidateOpenAPIDocument(doc)
 	assert.False(t, valid)
 	assert.Len(t, errs, 1)
 	assert.NotEmpty(t, errs[0].SchemaValidationErrors)
+}
+
+func TestValidateDocument_32Diagnostics(t *testing.T) {
+	validFixture, readErr := os.ReadFile("../test_specs/valid_32.yaml")
+	assert.NoError(t, readErr)
+	document, err := libopenapi.NewDocument(validFixture)
+	assert.NoError(t, err)
+	valid, errs := ValidateOpenAPIDocument(document)
+	assert.True(t, valid)
+	assert.Empty(t, errs)
+
+	invalidFixture, readErr := os.ReadFile("../test_specs/invalid_32.yaml")
+	assert.NoError(t, readErr)
+	document, err = libopenapi.NewDocument(invalidFixture)
+	assert.NoError(t, err)
+	valid, errs = ValidateOpenAPIDocument(document)
+	assert.False(t, valid)
+	if assert.NotEmpty(t, errs) && assert.NotEmpty(t, errs[0].SchemaValidationErrors) {
+		assert.Greater(t, errs[0].SpecLine, 0)
+		assert.GreaterOrEqual(t, errs[0].SpecCol, 0)
+		assert.Contains(t, fmt.Sprint(errs[0].Context), "info")
+		assert.NotEmpty(t, errs[0].SchemaValidationErrors[0].ReferenceObject)
+	}
 }

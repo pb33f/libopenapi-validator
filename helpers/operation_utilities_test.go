@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/require"
 )
 
 // Test ExtractOperation for each HTTP method

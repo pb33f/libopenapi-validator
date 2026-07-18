@@ -1,9 +1,10 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package paths
 
 import (
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,13 +12,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pb33f/libopenapi/orderedmap"
-
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	"github.com/pb33f/libopenapi/orderedmap"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/router"
 )
 
 // FindPath will find the path in the document that matches the request path. If a successful match was found, then
@@ -33,6 +34,13 @@ import (
 // Path matching follows the OpenAPI specification: literal (concrete) paths take precedence over
 // parameterized paths, regardless of definition order in the specification.
 func FindPath(request *http.Request, document *v3.Document, options *config.ValidationOptions) (*v3.PathItem, []*errors.ValidationError, string) {
+	if options != nil && options.Router != nil {
+		route, validationErrors := ResolveRoute(request, document, options)
+		if route == nil {
+			return nil, validationErrors, ""
+		}
+		return route.PathItem, validationErrors, route.Path
+	}
 	stripped := StripRequestPath(request, document)
 
 	// Fast path: try radix tree first (O(k) where k = path depth)
@@ -115,6 +123,41 @@ func FindPath(request *http.Request, document *v3.Document, options *config.Vali
 
 	// path matches exist but none have the required method
 	return bestOverall.pathItem, missingOperationError(request, bestOverall.path), bestOverall.path
+}
+
+// ResolveRoute returns the complete route used by high-level validation.
+// It preserves existing ValidationError shapes while exposing the router's server,
+// operation, path-parameter, and server-variable context to internal callers.
+func ResolveRoute(request *http.Request, document *v3.Document, options *config.ValidationOptions) (*router.Route, []*errors.ValidationError) {
+	if options == nil || options.Router == nil {
+		pathItem, validationErrors, path := FindPath(request, document, options)
+		if pathItem == nil {
+			return nil, validationErrors
+		}
+		return &router.Route{
+			Document: document, Path: path, PathItem: pathItem, Method: request.Method,
+			Operation: helpers.ExtractOperation(request, pathItem),
+		}, validationErrors
+	}
+	route, err := options.Router.FindRoute(request)
+	if err == nil && route != nil {
+		return route, nil
+	}
+	if stderrors.Is(err, router.ErrMethodNotAllowed) && route != nil {
+		return route, missingOperationError(request, route.Path)
+	}
+	validationErrors := []*errors.ValidationError{{
+		ValidationType:    helpers.PathValidation,
+		ValidationSubType: helpers.ValidationMissing,
+		Message:           fmt.Sprintf("%s Path '%s' not found", request.Method, request.URL.Path),
+		Reason: fmt.Sprintf("The %s request contains a path of '%s' however that path, or the %s method for that path does not exist in the specification",
+			request.Method, request.URL.Path, request.Method),
+		SpecLine: -1,
+		SpecCol:  -1,
+		HowToFix: errors.HowToFixPath,
+	}}
+	errors.PopulateValidationErrors(validationErrors, request, "")
+	return nil, validationErrors
 }
 
 // normalizePathForMatching removes the fragment from a path template unless

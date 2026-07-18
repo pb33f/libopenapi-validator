@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -2249,10 +2249,10 @@ paths:
 }
 
 type regexCacheWatcher struct {
-	inner      *sync.Map
 	missCount  int64
 	hitCount   int64
 	storeCount int64
+	inner      *sync.Map
 }
 
 func (c *regexCacheWatcher) Load(key any) (value any, ok bool) {

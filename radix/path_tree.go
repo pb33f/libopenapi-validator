@@ -1,4 +1,4 @@
-// Copyright 2026 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package radix
@@ -42,22 +42,48 @@ func NewPathTree() *PathTree {
 // Insert adds a path and its PathItem to the tree.
 // Path should be in OpenAPI format, e.g., "/users/{id}/posts"
 func (t *PathTree) Insert(path string, pathItem *v3.PathItem) {
+	if t == nil {
+		return
+	}
+	if t.tree == nil {
+		t.tree = New[*v3.PathItem]()
+	}
 	t.tree.Insert(path, pathItem)
 }
 
 // Lookup finds the PathItem for a given request path.
 // Returns the PathItem, the matched path template, and whether a match was found.
 func (t *PathTree) Lookup(urlPath string) (*v3.PathItem, string, bool) {
+	if t == nil || t.tree == nil {
+		return nil, "", false
+	}
 	return t.tree.Lookup(urlPath)
 }
 
 // Size returns the number of paths stored in the tree.
 func (t *PathTree) Size() int {
+	if t == nil || t.tree == nil {
+		return 0
+	}
 	return t.tree.Size()
+}
+
+// Release clears all path entries and drops the backing tree.
+func (t *PathTree) Release() {
+	if t == nil {
+		return
+	}
+	if t.tree != nil {
+		t.tree.Release()
+		t.tree = nil
+	}
 }
 
 // Walk calls the given function for each path in the tree.
 func (t *PathTree) Walk(fn func(path string, pathItem *v3.PathItem) bool) {
+	if t == nil || t.tree == nil {
+		return
+	}
 	t.tree.Walk(fn)
 }
 

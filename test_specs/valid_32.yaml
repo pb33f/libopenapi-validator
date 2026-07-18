@@ -1,0 +1,21 @@
+openapi: 3.2.0
+$self: https://example.com/openapi.yaml
+info:
+  title: OpenAPI 3.2 validation fixture
+  version: 1.0.0
+servers:
+  - name: production
+    url: https://api.example.com
+paths:
+  /search:
+    query:
+      responses:
+        "200":
+          description: search result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean

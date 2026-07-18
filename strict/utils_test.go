@@ -6,7 +6,7 @@ package strict
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/pb33f/testify/assert"
 )
 
 func TestCompilePattern_EscapedDoubleAsterisk(t *testing.T) {

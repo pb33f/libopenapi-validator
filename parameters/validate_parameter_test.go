@@ -1,21 +1,43 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package parameters
 
 import (
+	stdErrors "errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/message"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
+
+type parameterStubErrorKind struct {
+	msg string
+}
+
+func (p parameterStubErrorKind) KeywordPath() []string {
+	return nil
+}
+
+func (p parameterStubErrorKind) LocalizedString(_ *message.Printer) string {
+	return p.msg
+}
 
 func Test_ForceCompilerError(t *testing.T) {
 	// Try to force a panic
@@ -23,6 +45,252 @@ func Test_ForceCompilerError(t *testing.T) {
 
 	// Ideally this would result in an error response, current behavior swallows the error
 	require.Empty(t, result)
+}
+
+func TestValidateParameterSchema_NilSchemaReturnsNoErrors(t *testing.T) {
+	result := ValidateParameterSchema(
+		nil,
+		"anything",
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		config.NewValidationOptions(),
+	)
+
+	require.Empty(t, result)
+}
+
+func TestValidateParameterSchema_CircularReferenceWithCacheDisabled(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            $ref: '#/components/schemas/Node'
+      responses:
+        '200':
+          description: ok
+components:
+  schemas:
+    Node:
+      type: object
+      properties:
+        id:
+          type: string
+        child:
+          $ref: '#/components/schemas/Node'
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/things").Get.Parameters[0].Schema.Schema()
+	opts := config.NewValidationOptions(config.WithSchemaCache(nil))
+
+	validationErrors := ValidateParameterSchema(
+		schema,
+		map[string]interface{}{
+			"id": "root",
+			"child": map[string]interface{}{
+				"id": "leaf",
+			},
+		},
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		opts,
+	)
+	assert.Empty(t, validationErrors)
+
+	validationErrors = ValidateParameterSchema(
+		schema,
+		map[string]interface{}{
+			"id": "root",
+			"child": map[string]interface{}{
+				"id": 42,
+			},
+		},
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		opts,
+	)
+
+	require.Len(t, validationErrors, 1)
+	failure := requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	assert.NotNil(t, failure)
+}
+
+func TestValidateParameterSchema_ExternalReferenceWithCacheDisabled(t *testing.T) {
+	tempDir := t.TempDir()
+	rootPath := filepath.Join(tempDir, "openapi.yaml")
+	require.NoError(t, os.WriteFile(rootPath, []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            $ref: './models.yaml#/components/schemas/Filter'
+      responses:
+        '200':
+          description: ok`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(tempDir, "models.yaml"), []byte(`components:
+  schemas:
+    Filter:
+      type: object
+      properties:
+        id:
+          type: string`), 0o600))
+
+	docConfig := datamodel.NewDocumentConfiguration()
+	docConfig.AllowFileReferences = true
+	docConfig.BasePath = tempDir
+	docConfig.SpecFilePath = rootPath
+	docConfig.FileFilter = []string{"openapi.yaml", "models.yaml"}
+
+	rootSpec, err := os.ReadFile(rootPath)
+	require.NoError(t, err)
+	doc, err := libopenapi.NewDocumentWithConfiguration(rootSpec, docConfig)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	schema := model.Model.Paths.PathItems.GetOrZero("/things").Get.Parameters[0].Schema.Schema()
+	validationErrors := ValidateParameterSchema(
+		schema,
+		map[string]interface{}{
+			"id": 42,
+		},
+		"",
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		config.NewValidationOptions(config.WithSchemaCache(nil)),
+	)
+
+	require.Len(t, validationErrors, 1)
+	failure := requireParameterFailureContaining(t, validationErrors[0].SchemaValidationErrors, "got number")
+	assert.NotNil(t, failure)
+}
+
+func requireParameterFailureContaining(
+	t *testing.T,
+	failures []*liberrors.SchemaValidationFailure,
+	expectedReason string,
+) *liberrors.SchemaValidationFailure {
+	t.Helper()
+	for _, failure := range failures {
+		if failure != nil && strings.Contains(failure.Reason, expectedReason) {
+			return failure
+		}
+	}
+	require.Failf(t, "schema failure not found", "expected reason containing %q", expectedReason)
+	return nil
+}
+
+func TestFormatJsonSchemaValidationError_RendersSchemaWhenReferenceSchemaMissing(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Name:
+      type: string
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+	schema := model.Model.Components.Schemas.GetOrZero("Name").Schema()
+
+	jsch, err := helpers.NewCompiledSchema(
+		"name",
+		[]byte(`{"type":"string"}`),
+		config.NewValidationOptions(),
+	)
+	require.NoError(t, err)
+
+	var validationErr *jsonschema.ValidationError
+	require.True(t, stdErrors.As(jsch.Validate(42), &validationErr))
+
+	validationErrors := formatJsonSchemaValidationError(
+		schema,
+		validationErr,
+		"query",
+		"query parameter",
+		"name",
+		helpers.ParameterValidation,
+		helpers.Query,
+		"",
+		"",
+		"",
+	)
+
+	require.Len(t, validationErrors, 1)
+	require.Len(t, validationErrors[0].SchemaValidationErrors, 1)
+	assert.Contains(t, validationErrors[0].SchemaValidationErrors[0].ReferenceSchema, "type: string")
+}
+
+func TestFormatJsonSchemaValidationError_IgnoresSchemaNoise(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Filter:
+      type: string
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+	schema := model.Model.Components.Schemas.GetOrZero("Filter").Schema()
+
+	validationErrors := formatJsonSchemaValidationError(
+		schema,
+		&jsonschema.ValidationError{
+			ErrorKind: parameterStubErrorKind{msg: "validation failed"},
+		},
+		"query",
+		"query parameter",
+		"filter",
+		helpers.ParameterValidation,
+		helpers.Query,
+		"",
+		"",
+		"",
+	)
+
+	require.Len(t, validationErrors, 1)
+	assert.Empty(t, validationErrors[0].SchemaValidationErrors)
 }
 
 func TestHeaderSchemaNoType(t *testing.T) {
@@ -488,6 +756,52 @@ func TestComplexRegexSchemaCompilationError(t *testing.T) {
 		// schema compiled and validated successfully
 		assert.True(t, isSuccess)
 		assert.Empty(t, valErrs)
+	}
+}
+
+func TestValidateQueryParams_LookaheadPatternCompilationFailureFailsClosed(t *testing.T) {
+	spec := []byte(`openapi: 3.1.0
+info:
+  title: Lookahead Repro
+  version: 1.0.0
+paths:
+  /items:
+    get:
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^(?!bad).+$'
+      responses:
+        "200":
+          description: ok
+`)
+
+	doc, err := libopenapi.NewDocument(spec)
+	require.NoError(t, err)
+
+	v3Model, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	validator := NewParameterValidator(&v3Model.Model)
+
+	for _, value := range []string{"badcat", "goodcat"} {
+		req, err := http.NewRequest(http.MethodGet, "/items?code="+value, nil)
+		require.NoError(t, err)
+
+		valid, validationErrors := validator.ValidateQueryParams(req)
+
+		require.False(t, valid, "schema compilation failures must not pass validation for %q", value)
+		require.NotEmpty(t, validationErrors)
+		assert.Equal(t, "code", validationErrors[0].ParameterName)
+		assert.Equal(t, helpers.ParameterValidation, validationErrors[0].ValidationType)
+		assert.Equal(t, helpers.ParameterValidationQuery, validationErrors[0].ValidationSubType)
+		assert.Contains(t, validationErrors[0].Message, "failed schema compilation")
+		assert.Contains(t, validationErrors[0].Reason, "schema compilation failed")
+		assert.Contains(t, validationErrors[0].HowToFix, "complex regex patterns")
+		assert.Empty(t, validationErrors[0].SchemaValidationErrors)
 	}
 }
 

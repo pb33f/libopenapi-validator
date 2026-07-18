@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -218,7 +218,7 @@ func buildDocumentDecodeError(reason, context string) *liberrors.ValidationError
 	}
 }
 
-// ValidateOpenAPIDocument will validate an OpenAPI document against the OpenAPI 2, 3.0 and 3.1 schemas (depending on version)
+// ValidateOpenAPIDocument validates an OpenAPI document against the embedded OpenAPI 2, 3.0, 3.1, or 3.2 schema selected by libopenapi.
 // It will return true if the document is valid, false if it is not and a slice of ValidationError pointers.
 func ValidateOpenAPIDocument(doc libopenapi.Document, opts ...config.Option) (bool, []*liberrors.ValidationError) {
 	return ValidateOpenAPIDocumentWithPrecompiled(doc, nil, opts...)
@@ -235,8 +235,17 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	loadedSchema := info.APISchema
 	var validationErrors []*liberrors.ValidationError
 
-	// Check if both JSON representations are nil before proceeding
-	if info.SpecJSON == nil && info.SpecJSONBytes == nil {
+	// libopenapi builds the JSON view of the document lazily: the deprecated
+	// SpecJSON / SpecJSONBytes fields stay nil until an accessor runs, and the
+	// accessors return nil when conversion is disabled (SkipJSONConversion) or
+	// the document cannot be represented as JSON.
+	specJSON := info.GetSpecJSON()
+	specJSONBytes := info.GetSpecJSONBytes()
+
+	// Check if both JSON representations are unavailable before proceeding.
+	// Empty bytes count as unavailable: neither branch of the normalization
+	// ladder below would fire, and a nil document must not reach Validate.
+	if specJSON == nil && (specJSONBytes == nil || len(*specJSONBytes) == 0) {
 		validationErrors = append(validationErrors, &liberrors.ValidationError{
 			ValidationType:    helpers.Schema,
 			ValidationSubType: "document",
@@ -279,13 +288,13 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	// Build the normalized document value for validation.
 	// Prefer SpecJSONBytes (single unmarshal) over SpecJSON (marshal+unmarshal round-trip).
 	var normalized any
-	if info.SpecJSONBytes != nil && len(*info.SpecJSONBytes) > 0 {
+	if specJSONBytes != nil && len(*specJSONBytes) > 0 {
 		var err error
-		normalized, err = jsonschema.UnmarshalJSON(bytes.NewReader(*info.SpecJSONBytes))
+		normalized, err = jsonschema.UnmarshalJSON(bytes.NewReader(*specJSONBytes))
 		if err != nil {
 			// Fall back to normalizeJSON if UnmarshalJSON fails
-			if info.SpecJSON != nil {
-				normalized, err = normalizeJSON(*info.SpecJSON)
+			if specJSON != nil {
+				normalized, err = normalizeJSON(*specJSON)
 				if err != nil {
 					return false, []*liberrors.ValidationError{buildDocumentDecodeError(
 						fmt.Sprintf("The OpenAPI document cannot be converted to JSON: %s", err.Error()),
@@ -299,15 +308,24 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 				)}
 			}
 		}
-	} else if info.SpecJSON != nil {
+	} else if specJSON != nil {
 		var err error
-		normalized, err = normalizeJSON(*info.SpecJSON)
+		normalized, err = normalizeJSON(*specJSON)
 		if err != nil {
 			return false, []*liberrors.ValidationError{buildDocumentDecodeError(
 				fmt.Sprintf("The OpenAPI document cannot be converted to JSON: %s", err.Error()),
 				"SpecJSON",
 			)}
 		}
+	}
+
+	// belt and braces: never validate a nil document - it produces misleading
+	// "got null, want object" schema errors instead of a clear reason.
+	if normalized == nil {
+		return false, []*liberrors.ValidationError{buildDocumentDecodeError(
+			"The document has no usable JSON representation to validate",
+			"SpecJSON",
+		)}
 	}
 
 	// Validate the document
@@ -360,6 +378,9 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 						// location of the violation within the rendered schema.
 						violation.Line = line
 						violation.Column = located.Column
+						if source, err := yaml.Marshal(located); err == nil {
+							violation.ReferenceObject = strings.TrimSpace(string(source))
+						}
 					} else {
 						// handles property name validation errors that don't provide useful InstanceLocation
 						applyPropertyNameFallback(propertyInfo, info.RootNode.Content[0], violation)
@@ -370,14 +391,20 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 		}
 
 		// add the error to the list
-		validationErrors = append(validationErrors, &liberrors.ValidationError{
+		documentError := &liberrors.ValidationError{
 			ValidationType: helpers.Schema,
 			Message:        "Document does not pass validation",
 			Reason: fmt.Sprintf("OpenAPI document is not valid according "+
 				"to the %s specification", info.Version),
 			SchemaValidationErrors: schemaValidationErrors,
 			HowToFix:               liberrors.HowToFixInvalidSchema,
-		})
+		}
+		if len(schemaValidationErrors) > 0 {
+			documentError.SpecLine = schemaValidationErrors[0].Line
+			documentError.SpecCol = schemaValidationErrors[0].Column
+			documentError.Context = schemaValidationErrors[0].FieldPath
+		}
+		validationErrors = append(validationErrors, documentError)
 	}
 	if len(validationErrors) > 0 {
 		return false, validationErrors

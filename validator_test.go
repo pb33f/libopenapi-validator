@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package validator
@@ -19,16 +19,18 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 func TestNewValidator(t *testing.T) {
@@ -2160,6 +2162,203 @@ func TestCacheWarming_PopulatesCache(t *testing.T) {
 	assert.Greater(t, count, 0, "Schema cache should have entries from request and response bodies")
 }
 
+func TestValidator_Release(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /nodes:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Node'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+components:
+  schemas:
+    Node:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        next:
+          $ref: '#/components/schemas/Node'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	v, errs := NewValidator(doc)
+	require.Nil(t, errs)
+	require.NotNil(t, v)
+
+	concrete := v.(*validator)
+	require.NotNil(t, concrete.options)
+	schemaCache := concrete.options.SchemaCache
+	resourceCache := concrete.options.SchemaResourceCache
+	pathTree, ok := concrete.options.PathTree.(interface{ Size() int })
+	require.True(t, ok)
+
+	require.Greater(t, schemaCacheEntryCount(schemaCache), 0)
+	require.Greater(t, schemaResourceCacheEntryCount(resourceCache), 0)
+	require.Greater(t, pathTree.Size(), 0)
+	require.NotNil(t, doc.GetSpecInfo())
+
+	v.Release()
+
+	assert.Nil(t, concrete.options)
+	assert.Nil(t, concrete.v3Model)
+	assert.Nil(t, concrete.document)
+	assert.Nil(t, concrete.paramValidator)
+	assert.Nil(t, concrete.requestValidator)
+	assert.Nil(t, concrete.responseValidator)
+	assert.Equal(t, 0, schemaCacheEntryCount(schemaCache))
+	assert.Equal(t, 0, schemaResourceCacheEntryCount(resourceCache))
+	assert.Equal(t, 0, pathTree.Size())
+	assert.NotNil(t, doc.GetSpecInfo())
+
+	v.Release()
+
+	var nilValidator *validator
+	nilValidator.Release()
+}
+
+func TestDirectionalRequiredProperties_RequestResponseSharedSchema(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /users/123:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - password
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        password:
+          type: string
+          writeOnly: true`
+
+	for _, tc := range []struct {
+		name string
+		run  func(t *testing.T, v Validator)
+	}{
+		{
+			name: "request then response",
+			run: func(t *testing.T, v Validator) {
+				req := issue281Request(t, `{"name":"John","password":"secret"}`)
+				valid, errs := v.ValidateHttpRequest(req)
+				require.True(t, valid)
+				require.Empty(t, errs)
+
+				res := issue281Response(`{"id":"123","name":"John"}`)
+				valid, errs = v.ValidateHttpResponse(req, res)
+				require.True(t, valid)
+				require.Empty(t, errs)
+			},
+		},
+		{
+			name: "response then request",
+			run: func(t *testing.T, v Validator) {
+				req := issue281Request(t, "")
+				res := issue281Response(`{"id":"123","name":"John"}`)
+				valid, errs := v.ValidateHttpResponse(req, res)
+				require.True(t, valid)
+				require.Empty(t, errs)
+
+				req = issue281Request(t, `{"name":"John","password":"secret"}`)
+				valid, errs = v.ValidateHttpRequest(req)
+				require.True(t, valid)
+				require.Empty(t, errs)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, err := libopenapi.NewDocument([]byte(spec))
+			require.NoError(t, err)
+
+			v, errs := NewValidator(doc)
+			require.Nil(t, errs)
+
+			validator := v.(*validator)
+			userSchema := validator.v3Model.Components.Schemas.GetOrZero("User")
+			require.NotNil(t, userSchema)
+			require.NotNil(t, userSchema.Schema())
+
+			requestKey := schema_validation.SchemaCacheKey(
+				userSchema.Schema().GoLow().Hash(),
+				3.1,
+				schema_validation.SchemaValidationPurposeRequestBody,
+			)
+			responseKey := schema_validation.SchemaCacheKey(
+				userSchema.Schema().GoLow().Hash(),
+				3.1,
+				schema_validation.SchemaValidationPurposeResponseBody,
+			)
+
+			_, requestWarmed := validator.options.SchemaCache.Load(requestKey)
+			_, responseWarmed := validator.options.SchemaCache.Load(responseKey)
+			require.True(t, requestWarmed, "request schema variant should be warmed")
+			require.True(t, responseWarmed, "response schema variant should be warmed")
+			require.NotEqual(t, requestKey, responseKey)
+
+			tc.run(t, v)
+		})
+	}
+}
+
+func issue281Request(t *testing.T, payload string) *http.Request {
+	var body io.Reader = http.NoBody
+	if payload != "" {
+		body = strings.NewReader(payload)
+	}
+	req, err := http.NewRequest(http.MethodPost, "https://things.com/users/123", body)
+	require.NoError(t, err)
+	req.Header.Set(helpers.ContentTypeHeader, "application/json")
+	return req
+}
+
+func issue281Response(payload string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusCreated,
+		Header: http.Header{
+			helpers.ContentTypeHeader: []string{"application/json"},
+		},
+		Body: io.NopCloser(strings.NewReader(payload)),
+	}
+}
+
 func TestCacheWarming_EdgeCases(t *testing.T) {
 	// Test nil document
 	warmSchemaCaches(nil, nil)
@@ -2252,6 +2451,51 @@ paths:
 	// This should not panic even with nil schemas
 	v := NewValidatorFromV3Model(&m.Model)
 	assert.NotNil(t, v)
+}
+
+func TestCacheWarming_MediaTypeSchemaWithNilGoLow(t *testing.T) {
+	options := config.NewValidationOptions()
+	mediaType := &v3.MediaType{
+		Schema: base.CreateSchemaProxy(&base.Schema{
+			Type: []string{"object"},
+		}),
+	}
+
+	warmMediaTypeSchema(mediaType, options.SchemaCache, options, 3.1,
+		schema_validation.SchemaValidationPurposeRequestBody)
+
+	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
+}
+
+func TestCacheWarming_ParameterCircularReference(t *testing.T) {
+	param := cacheWarmingTestParameter(t, `schema:
+              $ref: '#/components/schemas/Error'`, `
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'`)
+	options := config.NewValidationOptions()
+
+	warmParameterSchema(param, options.SchemaCache, options, 3.1)
+
+	assert.Equal(t, 1, schemaCacheEntryCount(options.SchemaCache))
+}
+
+func TestCacheWarming_ParameterCompileFailure(t *testing.T) {
+	param := cacheWarmingTestParameter(t, `schema:
+              type: invalid-type-that-does-not-exist`, "")
+	options := config.NewValidationOptions()
+
+	warmParameterSchema(param, options.SchemaCache, options, 3.1)
+
+	assert.Equal(t, 0, schemaCacheEntryCount(options.SchemaCache))
 }
 
 func TestCacheWarming_DefaultResponse(t *testing.T) {
@@ -2394,6 +2638,57 @@ paths:
 		return true
 	})
 	assert.Greater(t, count, 0, "Schema cache should have entries from path-level parameters")
+}
+
+func cacheWarmingTestParameter(t *testing.T, schemaYAML string, componentsYAML string) *v3.Parameter {
+	t.Helper()
+
+	spec := fmt.Sprintf(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      parameters:
+        - name: filter
+          in: query
+          %s
+      responses:
+        '200':
+          description: Success
+%s`, schemaYAML, componentsYAML)
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	pathItem := model.Model.Paths.PathItems.GetOrZero("/test")
+	require.NotNil(t, pathItem)
+	require.NotNil(t, pathItem.Get)
+	require.Len(t, pathItem.Get.Parameters, 1)
+
+	return pathItem.Get.Parameters[0]
+}
+
+func schemaCacheEntryCount(schemaCache cache.SchemaCache) int {
+	count := 0
+	schemaCache.Range(func(key uint64, value *cache.SchemaCacheEntry) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+func schemaResourceCacheEntryCount(schemaResourceCache cache.SchemaResourceCache) int {
+	count := 0
+	schemaResourceCache.Range(func(key string, value *cache.SchemaResourceCacheEntry) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 // TestSortValidationErrors tests that validation errors are sorted deterministically

@@ -9,7 +9,7 @@ import (
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/require"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )

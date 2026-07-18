@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
+	"github.com/pb33f/testify/assert"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/paths"

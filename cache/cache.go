@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package cache
@@ -18,6 +18,18 @@ type SchemaCacheEntry struct {
 	RenderedJSON    []byte
 	CompiledSchema  *jsonschema.Schema
 	RenderedNode    *yaml.Node
+	ResourceNodes   map[string]*yaml.Node
+}
+
+// SchemaResourceCacheEntry holds one rendered document-level JSON Schema resource.
+// Resource entries are shared by many compiled schema entry points from the same parsed document.
+// RenderedNode may point at source YAML for generic validation; consumers must treat it as read-only.
+type SchemaResourceCacheEntry struct {
+	RenderedInline  []byte
+	ReferenceSchema string
+	RenderedJSON    []byte
+	RenderedNode    *yaml.Node
+	SourceRootNode  *yaml.Node // Keeps pointer-identity cache keys live for the cache entry lifetime.
 }
 
 // SchemaCache defines the interface for schema caching implementations.
@@ -26,4 +38,13 @@ type SchemaCache interface {
 	Load(key uint64) (*SchemaCacheEntry, bool)
 	Store(key uint64, value *SchemaCacheEntry)
 	Range(f func(key uint64, value *SchemaCacheEntry) bool)
+}
+
+// SchemaResourceCache caches rendered document resources by parsed document identity.
+// Entries are immutable once stored; implementations must be safe for concurrent use.
+type SchemaResourceCache interface {
+	Load(key string) (*SchemaResourceCacheEntry, bool)
+	Store(key string, value *SchemaResourceCacheEntry)
+	Range(f func(key string, value *SchemaResourceCacheEntry) bool)
+	Release()
 }

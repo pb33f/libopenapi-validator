@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 // Package strict provides strict validation that detects undeclared
@@ -364,6 +364,20 @@ func NewValidator(options *config.ValidationOptions, version float32) *Validator
 	}
 
 	return v
+}
+
+// Release clears cached validation state and drops references retained by the validator.
+func (v *Validator) Release() {
+	if v == nil {
+		return
+	}
+	v.options = nil
+	v.logger = nil
+	v.localCache = nil
+	v.patternCache = nil
+	v.renderCtx = nil
+	v.compiledIgnorePaths = nil
+	v.version = 0
 }
 
 // discardHandler is a slog.Handler that discards all log records.

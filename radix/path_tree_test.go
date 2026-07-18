@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package radix
@@ -8,8 +8,8 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 )
 
 func TestNewPathTree(t *testing.T) {
@@ -52,6 +52,48 @@ paths:
 	assert.Equal(t, "/users", path)
 	assert.NotNil(t, pathItem)
 	assert.NotNil(t, pathItem.Get)
+}
+
+func TestPathTree_Release(t *testing.T) {
+	tree := NewPathTree()
+	tree.Insert("/users/{id}", &v3.PathItem{})
+	assert.Equal(t, 1, tree.Size())
+
+	tree.Release()
+
+	assert.Equal(t, 0, tree.Size())
+	pathItem, path, found := tree.Lookup("/users/123")
+	assert.False(t, found)
+	assert.Empty(t, path)
+	assert.Nil(t, pathItem)
+
+	called := false
+	tree.Walk(func(path string, pathItem *v3.PathItem) bool {
+		called = true
+		return true
+	})
+	assert.False(t, called)
+
+	tree.Release()
+
+	var nilTree *PathTree
+	nilTree.Release()
+	assert.Equal(t, 0, nilTree.Size())
+	_, _, found = nilTree.Lookup("/users/123")
+	assert.False(t, found)
+	nilTree.Insert("/ignored", &v3.PathItem{})
+}
+
+func TestPathTree_InsertReinitializesReleasedTree(t *testing.T) {
+	tree := NewPathTree()
+	tree.Release()
+
+	tree.Insert("/users/{id}", &v3.PathItem{})
+
+	pathItem, path, found := tree.Lookup("/users/123")
+	assert.True(t, found)
+	assert.Equal(t, "/users/{id}", path)
+	assert.NotNil(t, pathItem)
 }
 
 func TestPathTree_Walk(t *testing.T) {

@@ -1,3 +1,6 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package responses
 
 import (
@@ -10,10 +13,14 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 
+	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
+	liberrors "github.com/pb33f/libopenapi-validator/errors"
+	validatorhelpers "github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
 func TestValidateResponseSchema(t *testing.T) {
@@ -161,13 +168,111 @@ properties:
 	assert.Len(t, errors, 0)
 
 	// Verify cache was populated
-	hash := schema.GoLow().Hash()
+	hash := schema_validation.SchemaCacheKey(schema.GoLow().Hash(), 3.1,
+		schema_validation.SchemaValidationPurposeResponseBody)
 	cached, ok := opts.SchemaCache.Load(hash)
 	assert.True(t, ok, "Schema should be in cache")
 	assert.NotNil(t, cached, "Cached entry should not be nil")
 	assert.NotNil(t, cached.CompiledSchema, "Compiled schema should be cached")
 	assert.NotNil(t, cached.RenderedInline, "Rendered schema should be cached")
 	assert.NotNil(t, cached.RenderedJSON, "JSON schema should be cached")
+}
+
+func TestValidateResponseSchema_WriteOnlyRequiredIgnored(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+required:
+  - password
+  - name
+properties:
+  name:
+    type: string
+  password:
+    type: string
+    writeOnly: true`, 3.1)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"name":"John"}`),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateResponseSchema_ReadOnlyRequiredStillApplies(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+required:
+  - id
+properties:
+  id:
+    type: string
+    readOnly: true`, 3.1)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{}`),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	require.Len(t, errors[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "missing property 'id'", errors[0].SchemaValidationErrors[0].Reason)
+}
+
+func TestValidateResponseSchema_NestedWriteOnlyRequiredIgnored(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object
+required:
+  - profile
+properties:
+  profile:
+    type: object
+    required:
+      - password
+      - email
+    properties:
+      password:
+        type: string
+        writeOnly: true
+      email:
+        type: string`, 3.1)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"profile":{"email":"john@example.com"}}`),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateResponseSchema_AllOfWriteOnlyRequiredIgnored(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `allOf:
+  - type: object
+    required:
+      - password
+      - name
+    properties:
+      password:
+        type: string
+        writeOnly: true
+      name:
+        type: string`, 3.1)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"name":"John"}`),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errors)
 }
 
 func postRequest() *http.Request {
@@ -251,7 +356,6 @@ func TestValidateResponseSchema_NilSchemaGoLow(t *testing.T) {
 }
 
 func TestValidateResponseSchema_CircularReference(t *testing.T) {
-	// Test when schema has a circular reference that causes render failure
 	spec := `openapi: 3.1.0
 info:
   title: Test
@@ -286,10 +390,20 @@ components:
 		Version:  3.1,
 	})
 
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+
+	valid, errors = ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"code": "abc", "details": [{"code": 42}]}`),
+		Schema:   schema.Schema(),
+		Version:  3.1,
+	})
+
 	assert.False(t, valid)
 	require.Len(t, errors, 1)
-	assert.Contains(t, errors[0].Message, "failed schema rendering")
-	assert.Contains(t, errors[0].Reason, "circular reference")
+	require.NotEmpty(t, errors[0].SchemaValidationErrors)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "got number")
 }
 
 func TestValidateResponseSchema_ResponseMissing(t *testing.T) {
@@ -343,4 +457,142 @@ func TestValidateResponseSchema_HeadWithBodyFails(t *testing.T) {
 	assert.False(t, valid)
 	require.Len(t, errs, 1)
 	assert.Contains(t, errs[0].Reason, "must not contain a body")
+}
+
+func TestValidateResponseSchema_EmptyBodySkipsValidation(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(""),
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.True(t, valid)
+	assert.Empty(t, errs)
+}
+
+func TestValidateResponseSchema_UnreadableBodyReturnsStructuredError(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: &http.Response{StatusCode: http.StatusOK, Body: &errorReader{}},
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Equal(t, validatorhelpers.ResponseBodyValidation, errs[0].ValidationType)
+	assert.Equal(t, validatorhelpers.Schema, errs[0].ValidationSubType)
+	assert.Contains(t, errs[0].Message, "response body for '/test' cannot be read")
+	assert.Equal(t, "The response body cannot be decoded: some io error", errs[0].Reason)
+	assert.Equal(t, "ensure body is not empty", errs[0].HowToFix)
+	assert.Same(t, schema, errs[0].Context)
+}
+
+func TestValidateResponseSchema_MalformedJSONReturnsStructuredErrorAndRestoresBody(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+	const malformed = `{"name":`
+	response := responseWithBody(malformed)
+
+	valid, errs := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: response,
+		Schema:   schema,
+		Version:  3.1,
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Equal(t, validatorhelpers.ResponseBodyValidation, errs[0].ValidationType)
+	assert.Equal(t, validatorhelpers.Schema, errs[0].ValidationSubType)
+	assert.Contains(t, errs[0].Message, "response body for '/test' failed to validate schema")
+	assert.Contains(t, errs[0].Reason, "The response body cannot be decoded: unexpected end of JSON input")
+	assert.Equal(t, liberrors.HowToFixInvalidSchema, errs[0].HowToFix)
+	assert.Same(t, schema, errs[0].Context)
+
+	replayed, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	assert.Equal(t, malformed, string(replayed))
+}
+
+func TestValidateResponseSchema_CachedSchemaWithoutRenderedNodeFallsBackToRenderedBytes(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `anyOf:
+  - type: string
+  - type: integer`, 3.1)
+
+	opts := config.NewValidationOptions()
+	compiled, err := schema_validation.CompileSchemaForValidation(
+		schema,
+		schema_validation.SchemaValidationPurposeResponseBody,
+		opts,
+		3.1,
+	)
+	require.NoError(t, err)
+
+	hash := schema_validation.SchemaCacheKey(
+		schema.GoLow().Hash(),
+		3.1,
+		schema_validation.SchemaValidationPurposeResponseBody,
+	)
+	entry := compiled.ToCacheEntry(schema)
+	entry.RenderedNode = nil
+	opts.SchemaCache.Store(hash, entry)
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`true`),
+		Schema:   schema,
+		Version:  3.1,
+		Options: []config.Option{
+			config.WithExistingOpts(opts),
+		},
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Len(t, errors[0].SchemaValidationErrors, 2)
+	assert.Contains(t, errors[0].SchemaValidationErrors[0].Reason, "got boolean")
+}
+
+func TestValidateResponseSchema_IgnoresEmptyKeywordLocationErrors(t *testing.T) {
+	schema := parseSchemaFromSpec(t, `type: object`, 3.1)
+	opts := config.NewValidationOptions()
+	compiledSchema, err := validatorhelpers.NewCompiledSchemaWithVersion(
+		"schema",
+		[]byte(`false`),
+		opts,
+		3.1,
+	)
+	require.NoError(t, err)
+
+	hash := schema_validation.SchemaCacheKey(
+		schema.GoLow().Hash(),
+		3.1,
+		schema_validation.SchemaValidationPurposeResponseBody,
+	)
+	opts.SchemaCache.Store(hash, &cache.SchemaCacheEntry{
+		Schema:          schema,
+		RenderedInline:  []byte("false"),
+		ReferenceSchema: "false",
+		RenderedJSON:    []byte("false"),
+		CompiledSchema:  compiledSchema,
+	})
+
+	valid, errors := ValidateResponseSchema(&ValidateResponseSchemaInput{
+		Request:  postRequest(),
+		Response: responseWithBody(`{"name":"test"}`),
+		Schema:   schema,
+		Version:  3.1,
+		Options: []config.Option{
+			config.WithExistingOpts(opts),
+		},
+	})
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Empty(t, errors[0].SchemaValidationErrors)
 }

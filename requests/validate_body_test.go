@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package requests
@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -818,16 +818,19 @@ paths:
 	})
 
 	tests := []struct {
-		name string
-		body io.ReadCloser
+		name           string
+		body           io.ReadCloser
+		expectedReplay []byte
 	}{
 		{
-			name: "http no body",
-			body: http.NoBody,
+			name:           "http no body",
+			body:           http.NoBody,
+			expectedReplay: staleBodyBytes,
 		},
 		{
-			name: "empty reader",
-			body: io.NopCloser(bytes.NewReader(nil)),
+			name:           "empty reader",
+			body:           io.NopCloser(bytes.NewReader(nil)),
+			expectedReplay: []byte{},
 		},
 	}
 
@@ -848,7 +851,7 @@ paths:
 			replayedBytes, err := io.ReadAll(replayedBody)
 			require.NoError(t, err)
 			require.NoError(t, replayedBody.Close())
-			require.Empty(t, replayedBytes)
+			require.Equal(t, tc.expectedReplay, replayedBytes)
 		})
 	}
 }
@@ -856,63 +859,6 @@ paths:
 func TestRequestBodyHelpers_NilRequest(t *testing.T) {
 	setRequestBody(nil, []byte(`{"ok":true}`))
 	require.Nil(t, readAndResetRequestBody(nil))
-}
-
-type requestBodyReaderTestBody struct{}
-
-func (r *requestBodyReaderTestBody) Read(_ []byte) (int, error) {
-	return 0, io.EOF
-}
-
-func (r *requestBodyReaderTestBody) Close() error {
-	return nil
-}
-
-type failingReplayableBody struct{}
-
-func (r *failingReplayableBody) Read(_ []byte) (int, error) {
-	return 0, io.EOF
-}
-
-func (r *failingReplayableBody) Close() error {
-	return nil
-}
-
-func (r *failingReplayableBody) ReadAt(_ []byte, _ int64) (int, error) {
-	return 0, io.ErrUnexpectedEOF
-}
-
-func (r *failingReplayableBody) Size() int64 {
-	return 1
-}
-
-func TestRequestBodyReader_DefensiveBranches(t *testing.T) {
-	require.Nil(t, requestBodyReader(nil))
-	require.Nil(t, requestBodyReader(http.NoBody))
-
-	var nilBody *requestBodyReaderTestBody
-	require.Nil(t, requestBodyReader(nilBody))
-
-	body := &requestBodyReaderTestBody{}
-	require.Same(t, body, requestBodyReader(body))
-}
-
-func TestRequestBodySnapshot_DefensiveBranches(t *testing.T) {
-	snapshot, ok := requestBodySnapshot(nil)
-	require.False(t, ok)
-	require.Nil(t, snapshot)
-
-	snapshot, ok = requestBodySnapshot(&http.Request{Body: &requestBodyReaderTestBody{}})
-	require.False(t, ok)
-	require.Nil(t, snapshot)
-
-	snapshot, ok = requestBodySnapshot(&http.Request{Body: io.NopCloser(bytes.NewReader(nil))})
-	require.False(t, ok)
-	require.Nil(t, snapshot)
-
-	snapshot, ok = requestBodySnapshot(&http.Request{Body: &failingReplayableBody{}})
-	require.False(t, ok)
-	require.Nil(t, snapshot)
 }
 
 func TestValidateBody_ValidBasicSchema_WithFullContentTypeHeader(t *testing.T) {

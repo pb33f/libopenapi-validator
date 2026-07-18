@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package validator
@@ -190,7 +190,7 @@ func ExampleNewValidator_validateHttpRequestResponse() {
 		}
 	}
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
-	// Schema Error: got string, want integer, Line: 19, Col: 27
+	// Schema Error: got string, want integer, Line: 1031, Col: 21
 }
 
 func ExampleNewValidator_validateHttpResponse() {
@@ -259,7 +259,7 @@ func ExampleNewValidator_validateHttpResponse() {
 		}
 	}
 	// Output: Type: response, Failure: 200 response body for '/pet/findByStatus' failed to validate schema
-	// Schema Error: got string, want integer, Line: 19, Col: 27
+	// Schema Error: got string, want integer, Line: 1031, Col: 21
 }
 
 func ExampleNewValidator_testResponseHeaders() {

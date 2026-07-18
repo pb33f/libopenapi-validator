@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package strict
@@ -12,8 +12,8 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 
 	libcache "github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -36,6 +36,32 @@ func getSchema(t *testing.T, model *libopenapi.DocumentModel[v3.Document], name 
 	schema := schemaProxy.Schema()
 	require.NotNil(t, schema)
 	return schema
+}
+
+func TestValidator_Release(t *testing.T) {
+	opts := config.NewValidationOptions(config.WithStrictIgnorePaths("$.body.internal"))
+	v := NewValidator(opts, 3.1)
+	require.NotNil(t, v.options)
+	require.NotNil(t, v.logger)
+	require.NotNil(t, v.localCache)
+	require.NotNil(t, v.patternCache)
+	require.NotNil(t, v.renderCtx)
+	require.NotNil(t, v.compiledIgnorePaths)
+
+	v.Release()
+
+	assert.Nil(t, v.options)
+	assert.Nil(t, v.logger)
+	assert.Nil(t, v.localCache)
+	assert.Nil(t, v.patternCache)
+	assert.Nil(t, v.renderCtx)
+	assert.Nil(t, v.compiledIgnorePaths)
+	assert.Zero(t, v.version)
+
+	v.Release()
+
+	var nilValidator *Validator
+	nilValidator.Release()
 }
 
 func TestStrictValidator_SimpleUndeclaredProperty(t *testing.T) {

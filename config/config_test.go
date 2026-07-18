@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package config
@@ -9,8 +9,16 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"github.com/stretchr/testify/assert"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	validatorcache "github.com/pb33f/libopenapi-validator/cache"
+	"github.com/pb33f/libopenapi-validator/content"
+	"github.com/pb33f/libopenapi-validator/radix"
 )
 
 func TestNewValidationOptions_Defaults(t *testing.T) {
@@ -24,8 +32,11 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.False(t, opts.AllowScalarCoercion)           // Default is false
 	assert.False(t, opts.AllowXMLBodyValidation)        // Default is false
 	assert.False(t, opts.AllowURLEncodedBodyValidation) // Default is false
+	assert.False(t, opts.ValidateContentParameters)
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.SchemaCache)
+	assert.NotNil(t, opts.SchemaResourceCache)
 }
 
 func TestNewValidationOptions_WithNilOption(t *testing.T) {
@@ -40,6 +51,7 @@ func TestNewValidationOptions_WithNilOption(t *testing.T) {
 	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.SchemaResourceCache)
 }
 
 func TestWithFormatAssertions(t *testing.T) {
@@ -117,9 +129,13 @@ func TestWithRegexEngine(t *testing.T) {
 func TestWithExistingOpts(t *testing.T) {
 	// Create original options with all settings enabled
 	var testEngine jsonschema.RegexpEngine = nil
+	schemaCache := validatorcache.NewDefaultCache()
+	schemaResourceCache := validatorcache.NewDefaultSchemaResourceCache()
 	original := &ValidationOptions{
 		RegexEngine:                   testEngine,
 		RegexCache:                    &sync.Map{},
+		SchemaCache:                   schemaCache,
+		SchemaResourceCache:           schemaResourceCache,
 		FormatAssertions:              true,
 		AllowXMLBodyValidation:        true,
 		AllowURLEncodedBodyValidation: true,
@@ -137,6 +153,55 @@ func TestWithExistingOpts(t *testing.T) {
 	assert.Equal(t, original.FormatAssertions, opts.FormatAssertions)
 	assert.Equal(t, original.ContentAssertions, opts.ContentAssertions)
 	assert.Equal(t, original.SecurityValidation, opts.SecurityValidation)
+	assert.Same(t, schemaCache, opts.SchemaCache)
+	assert.Same(t, schemaResourceCache, opts.SchemaResourceCache)
+}
+
+func TestValidationOptions_Release(t *testing.T) {
+	schemaCache := validatorcache.NewDefaultCache()
+	schemaCache.Store(1, &validatorcache.SchemaCacheEntry{RenderedInline: []byte("schema")})
+
+	schemaResourceCache := validatorcache.NewDefaultSchemaResourceCache()
+	schemaResourceCache.Store("resource", &validatorcache.SchemaResourceCacheEntry{RenderedInline: []byte("resource")})
+
+	pathTree := radix.NewPathTree()
+	pathTree.Insert("/pets", &v3.PathItem{})
+
+	opts := NewValidationOptions(
+		WithSchemaCache(schemaCache),
+		WithSchemaResourceCache(schemaResourceCache),
+		WithPathTree(pathTree),
+		WithRegexCache(&sync.Map{}),
+		WithCustomFormat("custom", func(v any) error { return nil }),
+		WithStrictIgnorePaths("$.body.internal"),
+		WithStrictIgnoredHeaders("X-Internal"),
+		WithLogger(slog.Default()),
+	)
+
+	opts.Release()
+
+	assert.Nil(t, opts.RegexEngine)
+	assert.Nil(t, opts.RegexCache)
+	assert.Nil(t, opts.AuthenticationFunc)
+	assert.Nil(t, opts.Formats)
+	assert.Nil(t, opts.SchemaCache)
+	assert.Nil(t, opts.SchemaResourceCache)
+	assert.Nil(t, opts.PathTree)
+	assert.Nil(t, opts.Logger)
+	assert.Nil(t, opts.StrictIgnorePaths)
+	assert.Nil(t, opts.StrictIgnoredHeaders)
+
+	_, schemaFound := schemaCache.Load(1)
+	assert.False(t, schemaFound)
+
+	_, resourceFound := schemaResourceCache.Load("resource")
+	assert.False(t, resourceFound)
+	assert.Equal(t, 0, pathTree.Size())
+
+	opts.Release()
+
+	var nilOptions *ValidationOptions
+	nilOptions.Release()
 }
 
 func TestWithExistingOpts_NilSource(t *testing.T) {
@@ -153,6 +218,17 @@ func TestWithExistingOpts_NilSource(t *testing.T) {
 	assert.False(t, opts.AllowXMLBodyValidation) // Default is false
 	assert.Nil(t, opts.RegexEngine)
 	assert.Nil(t, opts.RegexCache)
+	assert.NotNil(t, opts.SchemaResourceCache)
+}
+
+func TestWithSchemaResourceCache(t *testing.T) {
+	schemaResourceCache := validatorcache.NewDefaultSchemaResourceCache()
+	opts := NewValidationOptions(WithSchemaResourceCache(schemaResourceCache))
+
+	assert.Same(t, schemaResourceCache, opts.SchemaResourceCache)
+
+	opts = NewValidationOptions(WithSchemaResourceCache(nil))
+	assert.Nil(t, opts.SchemaResourceCache)
 }
 
 func TestMultipleOptions(t *testing.T) {
@@ -296,6 +372,124 @@ func TestWithExistingOpts_AuthenticationFuncCopied(t *testing.T) {
 	assert.NotNil(t, opts.AuthenticationFunc)
 	assert.NoError(t, opts.AuthenticationFunc(context.Background(), &AuthenticationInput{}))
 	assert.True(t, called)
+}
+
+func TestBodyCodecAndParityOptions(t *testing.T) {
+	decoder := content.DecoderFunc(func(*content.DecodeInput) (any, error) { return "custom", nil })
+	encoder := content.EncoderFunc(func(*content.EncodeInput) ([]byte, error) { return []byte("custom"), nil })
+	zipLimits := content.ZipLimits{CompressedSize: 1024, ExpandedSize: 2048, Entries: 4, ExpansionRatio: 10}
+	opts := NewValidationOptions(
+		WithBodyDecoder("application/custom", decoder),
+		WithBodyEncoder("application/custom", encoder),
+		WithStandardBodyDecoders(),
+		WithZipBodyDecoder(zipLimits),
+		WithRejectUnsupportedBodyContent(),
+		WithRejectUndeclaredRequestBody(),
+		WithoutRequestQueryParameterValidation(),
+		WithoutRequestBodyValidation(),
+		WithoutResponseBodyValidation(),
+		WithoutResponseStatusValidation(),
+		WithRequestDefaults(),
+		WithStrictServerMatching(),
+	)
+	assert.True(t, opts.RejectUnsupportedBodyContent)
+	assert.True(t, opts.RejectUndeclaredRequestBody)
+	assert.False(t, opts.ValidateRequestQuery)
+	assert.False(t, opts.ValidateRequestBody)
+	assert.False(t, opts.ValidateResponseBody)
+	assert.False(t, opts.ValidateResponseStatus)
+	assert.True(t, opts.RequestDefaults)
+	assert.True(t, opts.StrictServerMatching)
+	resolved, _, _ := opts.BodyRegistry.Decoder("application/custom")
+	require.NotNil(t, resolved)
+	value, err := resolved.Decode(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "custom", value)
+	resolvedEncoder, _, _ := opts.BodyRegistry.Encoder("application/custom")
+	require.NotNil(t, resolvedEncoder)
+	encoded, err := resolvedEncoder.Encode(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "custom", string(encoded))
+	for _, mediaType := range []string{"application/yaml", "application/xml", "multipart/form-data", "text/plain", "application/zip"} {
+		resolved, _, _ = opts.BodyRegistry.Decoder(mediaType)
+		assert.NotNil(t, resolved, mediaType)
+	}
+}
+
+func TestCompatibilityCodecAliasesAndContentParameterDecoder(t *testing.T) {
+	parameterDecoder := func(context.Context, *ContentParameterInput) (any, *base.Schema, error) {
+		return "value", nil, nil
+	}
+	opts := NewValidationOptions(WithXmlBodyValidation(), WithURLEncodedBodyValidation(), WithContentParameterDecoder(parameterDecoder))
+	assert.True(t, opts.AllowXMLBodyValidation)
+	assert.True(t, opts.AllowURLEncodedBodyValidation)
+	assert.NotNil(t, opts.ContentParameterDecoder)
+	assert.True(t, opts.ValidateContentParameters)
+	for _, mediaType := range []string{"application/xml", "text/xml", "application/x-www-form-urlencoded"} {
+		decoder, _, _ := opts.BodyRegistry.Decoder(mediaType)
+		assert.NotNil(t, decoder, mediaType)
+	}
+}
+
+func TestContentParameterValidationOptionsAndDecoderPrecedence(t *testing.T) {
+	opts := NewValidationOptions(WithContentParameterValidation())
+	assert.True(t, opts.ValidateContentParameters)
+	assert.Nil(t, opts.ContentParameterDecoder)
+	opts = NewValidationOptions(WithContentParameterDecoder(nil))
+	assert.False(t, opts.ValidateContentParameters)
+
+	opts = NewValidationOptions(WithXmlBodyValidation(), WithStandardBodyDecoders())
+	_, genericWins := opts.BodyRegistry.ExactDecoder("application/xml").(content.CompatibilityDecoder)
+	assert.False(t, genericWins)
+	opts = NewValidationOptions(WithStandardBodyDecoders(), WithXmlBodyValidation())
+	marker, compatibilityWins := opts.BodyRegistry.ExactDecoder("application/xml").(content.CompatibilityDecoder)
+	require.True(t, compatibilityWins)
+	assert.Equal(t, "xml", marker.CompatibilityKind())
+}
+
+func TestWithExistingOptsCopiesParityStateAndRegistry(t *testing.T) {
+	decoder := content.DecoderFunc(func(*content.DecodeInput) (any, error) { return true, nil })
+	parameterDecoder := func(context.Context, *ContentParameterInput) (any, *base.Schema, error) { return nil, nil, nil }
+	original := NewValidationOptions(
+		WithBodyDecoder("application/custom", decoder), WithRejectUnsupportedBodyContent(),
+		WithRejectUndeclaredRequestBody(), WithoutRequestQueryParameterValidation(), WithoutRequestBodyValidation(),
+		WithoutResponseBodyValidation(), WithoutResponseStatusValidation(), WithRequestDefaults(),
+		WithContentParameterDecoder(parameterDecoder),
+		WithStrictServerMatching(),
+	)
+	copied := NewValidationOptions(WithExistingOpts(original))
+	assert.Same(t, original.BodyRegistry, copied.BodyRegistry)
+	assert.Equal(t, original.RejectUnsupportedBodyContent, copied.RejectUnsupportedBodyContent)
+	assert.Equal(t, original.RejectUndeclaredRequestBody, copied.RejectUndeclaredRequestBody)
+	assert.Equal(t, original.ValidateRequestQuery, copied.ValidateRequestQuery)
+	assert.Equal(t, original.ValidateRequestBody, copied.ValidateRequestBody)
+	assert.Equal(t, original.ValidateResponseBody, copied.ValidateResponseBody)
+	assert.Equal(t, original.ValidateResponseStatus, copied.ValidateResponseStatus)
+	assert.Equal(t, original.RequestDefaults, copied.RequestDefaults)
+	assert.Equal(t, original.StrictServerMatching, copied.StrictServerMatching)
+	assert.NotNil(t, copied.ContentParameterDecoder)
+	assert.True(t, copied.ValidateContentParameters)
+	original.Release()
+	assert.Nil(t, original.BodyRegistry)
+	assert.Nil(t, original.ContentParameterDecoder)
+	assert.False(t, original.ValidateContentParameters)
+}
+
+func TestWithExistingOptsBorrowsSharedReleaseState(t *testing.T) {
+	schemaCache := validatorcache.NewDefaultCache()
+	schemaCache.Store(1, &validatorcache.SchemaCacheEntry{RenderedInline: []byte("schema")})
+	pathTree := radix.NewPathTree()
+	pathTree.Insert("/pets", &v3.PathItem{})
+	original := NewValidationOptions(WithSchemaCache(schemaCache), WithPathTree(pathTree))
+	borrowed := NewValidationOptions(WithExistingOpts(original))
+	borrowed.Release()
+	_, found := schemaCache.Load(1)
+	assert.True(t, found)
+	assert.Equal(t, 1, pathTree.Size())
+	original.Release()
+	_, found = schemaCache.Load(1)
+	assert.False(t, found)
+	assert.Equal(t, 0, pathTree.Size())
 }
 
 // Tests for new OpenAPI and scalar coercion configuration options

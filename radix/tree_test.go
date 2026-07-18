@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package radix
@@ -8,8 +8,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -147,6 +147,47 @@ func TestTree_Lookup_NoMatch(t *testing.T) {
 	emptyTree := New[string]()
 	_, _, found = emptyTree.Lookup("/anything")
 	assert.False(t, found)
+}
+
+func TestTree_Release(t *testing.T) {
+	tree := New[string]()
+	tree.Insert("/users/{id}", "user")
+	assert.Equal(t, 1, tree.Size())
+
+	tree.Release()
+
+	assert.Equal(t, 0, tree.Size())
+	_, _, found := tree.Lookup("/users/123")
+	assert.False(t, found)
+
+	called := false
+	tree.Walk(func(path string, value string) bool {
+		called = true
+		return true
+	})
+	assert.False(t, called)
+
+	tree.Release()
+
+	var nilTree *Tree[string]
+	nilTree.Release()
+	assert.Equal(t, 0, nilTree.Size())
+	_, _, found = nilTree.Lookup("/users/123")
+	assert.False(t, found)
+	assert.False(t, nilTree.Insert("/ignored", "ignored"))
+	nilTree.Clear()
+}
+
+func TestTree_InsertReinitializesReleasedTree(t *testing.T) {
+	tree := New[string]()
+	tree.Release()
+
+	assert.True(t, tree.Insert("/users/{id}", "user"))
+
+	value, path, found := tree.Lookup("/users/123")
+	assert.True(t, found)
+	assert.Equal(t, "/users/{id}", path)
+	assert.Equal(t, "user", value)
 }
 
 func TestTree_Lookup_EdgeCases(t *testing.T) {

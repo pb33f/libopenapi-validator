@@ -1,4 +1,4 @@
-// Copyright 2026 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 // Package radix provides a radix tree (prefix tree) implementation optimized for
@@ -64,6 +64,9 @@ func New[T any]() *Tree[T] {
 //
 // Returns true if a new path was inserted, false if an existing path was updated.
 func (t *Tree[T]) Insert(path string, value T) bool {
+	if t == nil {
+		return false
+	}
 	if t.root == nil {
 		t.root = &node[T]{children: make(map[string]*node[T])}
 	}
@@ -116,7 +119,7 @@ func (t *Tree[T]) Insert(path string, value T) bool {
 // For example, "/users/admin" will match "/users/admin" before "/users/{id}".
 func (t *Tree[T]) Lookup(urlPath string) (value T, matchedPath string, found bool) {
 	var zero T
-	if t.root == nil {
+	if t == nil || t.root == nil {
 		return zero, "", false
 	}
 
@@ -158,12 +161,27 @@ func (t *Tree[T]) lookupRecursive(n *node[T], segments []string, depth int) *lea
 
 // Size returns the number of paths stored in the tree.
 func (t *Tree[T]) Size() int {
+	if t == nil {
+		return 0
+	}
 	return t.size
 }
 
 // Clear removes all entries from the tree.
 func (t *Tree[T]) Clear() {
+	if t == nil {
+		return
+	}
 	t.root = &node[T]{children: make(map[string]*node[T])}
+	t.size = 0
+}
+
+// Release clears the tree and drops the root node so retained values can be garbage-collected.
+func (t *Tree[T]) Release() {
+	if t == nil {
+		return
+	}
+	t.root = nil
 	t.size = 0
 }
 
@@ -171,7 +189,7 @@ func (t *Tree[T]) Clear() {
 // The function receives the path template and its associated value.
 // If the function returns false, iteration stops.
 func (t *Tree[T]) Walk(fn func(path string, value T) bool) {
-	if t.root == nil {
+	if t == nil || t.root == nil {
 		return
 	}
 	t.walkRecursive(t.root, fn)

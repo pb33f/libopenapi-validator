@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/pb33f/testify/require"
 )
 
 // Helper function to create a mock ValidationError
