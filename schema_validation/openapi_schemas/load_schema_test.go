@@ -47,10 +47,11 @@ func TestLoadSchema3_0_RemoteDifferent(t *testing.T) {
 	remoteSchema := `{"title": "OpenAPI 3.0"}`
 	server := mockServer(remoteSchema, http.StatusOK)
 	defer server.Close()
+	schema30URL = server.URL
+	t.Cleanup(func() { schema30URL = defaultSchema30URL })
 
-	// Override the remote spec URL in extractSchema function
 	result := LoadSchema3_0(`{"title": "Local Schema 3.0"}`)
-	require.NotEqual(t, remoteSchema, result)
+	require.Equal(t, remoteSchema, result)
 }
 
 // Test LoadSchema3_0 when the remote schema is the same as the local schema
@@ -64,9 +65,11 @@ func TestLoadSchema3_0_RemoteSame(t *testing.T) {
 
 	server := mockServer(remoteSchema, http.StatusOK)
 	defer server.Close()
+	schema30URL = server.URL
+	t.Cleanup(func() { schema30URL = defaultSchema30URL })
 
 	result := LoadSchema3_0(localSchema)
-	require.NotEqual(t, localSchema, result)
+	require.Equal(t, localSchema, result)
 }
 
 // Test LoadSchema3_1 when the remote schema is different from the local schema
@@ -78,10 +81,12 @@ func TestLoadSchema3_1_RemoteDifferent(t *testing.T) {
 	remoteSchema := `{"title": "OpenAPI 3.1"}`
 	server := mockServer(remoteSchema, http.StatusOK)
 	defer server.Close()
+	schema31URL = server.URL
+	t.Cleanup(func() { schema31URL = defaultSchema31URL })
 
 	// The result should be the remote schema because it differs from the local schema
 	result := LoadSchema3_1(`{"title": "Local Schema 3.1"}`)
-	require.NotEqual(t, remoteSchema, result)
+	require.Equal(t, remoteSchema, result)
 }
 
 // Test LoadSchema3_1 when the remote schema is the same as the local schema
@@ -95,10 +100,12 @@ func TestLoadSchema3_1_RemoteSame(t *testing.T) {
 
 	server := mockServer(remoteSchema, http.StatusOK)
 	defer server.Close()
+	schema31URL = server.URL
+	t.Cleanup(func() { schema31URL = defaultSchema31URL })
 
 	// The result should be the local schema since the MD5 hashes are the same
 	result := LoadSchema3_1(localSchema)
-	require.NotEqual(t, localSchema, result)
+	require.Equal(t, localSchema, result)
 }
 
 // Test extractSchema when the remote schema differs from the local schema
