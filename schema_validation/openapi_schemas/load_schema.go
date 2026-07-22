@@ -16,7 +16,15 @@ import (
 	_ "embed"
 )
 
-var schema30, schema31 string
+const (
+	defaultSchema30URL = "https://raw.githubusercontent.com/pb33f/openapi-specification/main/schemas/v3.0/schema.json"
+	defaultSchema31URL = "https://raw.githubusercontent.com/pb33f/openapi-specification/main/schemas/v3.1/schema.json"
+)
+
+var (
+	schema30, schema31       string
+	schema30URL, schema31URL = defaultSchema30URL, defaultSchema31URL
+)
 
 // LoadSchema3_0 loads the latest OpenAPI 3.0 specification. The latest version is fetched from the OpenAPI repo.
 // and if there is no change in the schema, the local version is returned, otherwise the remote version is returned.
@@ -24,8 +32,7 @@ func LoadSchema3_0(schema string) string {
 	if schema30 != "" {
 		return schema30
 	}
-	remoteSpec := "https://raw.githubusercontent.com/pb33f/openapi-specification/main/schemas/v3.0/schema.json"
-	schema30 = extractSchema(remoteSpec, schema)
+	schema30 = extractSchema(schema30URL, schema)
 	return schema30
 }
 
@@ -35,8 +42,7 @@ func LoadSchema3_1(schema string) string {
 	if schema31 != "" {
 		return schema31
 	}
-	remoteSpec := "https://raw.githubusercontent.com/pb33f/openapi-specification/main/schemas/v3.1/schema.json"
-	schema31 = extractSchema(remoteSpec, schema)
+	schema31 = extractSchema(schema31URL, schema)
 	return schema31
 }
 
