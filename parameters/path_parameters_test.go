@@ -2465,3 +2465,13 @@ paths:
 			"slug is present (foo) and must not be flagged missing")
 	}
 }
+
+func TestSegmentReferencesParam(t *testing.T) {
+	assert.True(t, segmentReferencesParam("{id:[0-9]+}", "id"))
+	assert.True(t, segmentReferencesParam("{tags*}", "tags"))
+	assert.True(t, segmentReferencesParam("{.version}", "version"))
+	assert.True(t, segmentReferencesParam("{;filter}", "filter"))
+	assert.False(t, segmentReferencesParam("{id}", "slug"))
+	assert.False(t, segmentReferencesParam("static", "id"))
+	assert.False(t, segmentReferencesParam("{unbalanced", "unbalanced"))
+}
