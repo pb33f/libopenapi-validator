@@ -244,6 +244,7 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 				_ = yaml.Unmarshal(renderedSchema, renderedNode)
 			}
 
+			var fallbackReferenceObject string
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
 
@@ -276,7 +277,10 @@ func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberr
 						}
 					}
 					if referenceObject == "" {
-						referenceObject = string(responseBody)
+						if fallbackReferenceObject == "" {
+							fallbackReferenceObject = string(responseBody)
+						}
+						referenceObject = fallbackReferenceObject
 					}
 
 					violation := &liberrors.SchemaValidationFailure{

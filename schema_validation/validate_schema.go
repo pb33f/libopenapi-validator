@@ -258,6 +258,8 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 	propertyInfo := extractPropertyNameFromError(jk)
 
 	rootNode, resourceNodes := DiagnosticLocationNodes(renderedSchema, renderedNode, resourceNodes)
+	var fallbackReferenceObject string
+	referenceSchema := string(renderedSchema)
 
 	for q := range schFlatErrs {
 		er := schFlatErrs[q]
@@ -292,7 +294,10 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 				}
 			}
 			if referenceObject == "" {
-				referenceObject = string(payload)
+				if fallbackReferenceObject == "" {
+					fallbackReferenceObject = string(payload)
+				}
+				referenceObject = fallbackReferenceObject
 			}
 
 			violation := &liberrors.SchemaValidationFailure{
@@ -301,7 +306,7 @@ func extractBasicErrors(schFlatErrs []jsonschema.OutputUnit,
 				FieldPath:               helpers.ExtractJSONPathFromStringLocation(er.InstanceLocation),
 				InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
 				KeywordLocation:         er.KeywordLocation,
-				ReferenceSchema:         string(renderedSchema),
+				ReferenceSchema:         referenceSchema,
 				ReferenceObject:         referenceObject,
 				OriginalJsonSchemaError: jk,
 			}
