@@ -206,6 +206,7 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 			schFlatErrs := helpers.FlattenSchemaOutputErrors(jk.DetailedOutput())
 
 			renderedNode, resourceNodes := schema_validation.DiagnosticLocationNodes(renderedSchema, cachedNode, resourceNodes)
+			var fallbackReferenceObject string
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
 
@@ -240,7 +241,10 @@ func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberror
 						}
 					}
 					if referenceObject == "" {
-						referenceObject = string(requestBody)
+						if fallbackReferenceObject == "" {
+							fallbackReferenceObject = string(requestBody)
+						}
+						referenceObject = fallbackReferenceObject
 					}
 
 					errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
