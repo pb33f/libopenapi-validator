@@ -945,6 +945,153 @@ paths:
 	assert.Len(t, errors, 0)
 }
 
+func TestValidateBody_ValidBasicSchema_WithContentTypeWildcards(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            "*/*":
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
+
+			require.NoError(t, err, "failed to marshal body")
+
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
+
+	// validate!
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchema_WithContentTypeWildcardEnd(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            "application/*":
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
+
+			require.NoError(t, err, "failed to marshal body")
+
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
+
+	// validate!
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchema_WithContentTypeWildcardStart(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        '200':
+          content:
+            "*/json":
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
+
+			require.NoError(t, err, "failed to marshal body")
+
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
+
+	// validate!
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
 func TestValidateBody_ValidBasicSchemaUsingDefault(t *testing.T) {
 	tb := newvalidateResponseTestBed(
 		t,
@@ -956,6 +1103,153 @@ paths:
         default:
           content:
             application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
+
+			require.NoError(t, err, "failed to marshal body")
+
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
+
+	// validate!
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchemaUsingDefault_WithContentTypeWildcards(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            "*/*":
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
+
+			require.NoError(t, err, "failed to marshal body")
+
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
+
+	// validate!
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchemaUsingDefault_WithContentTypeWildcardEnd(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            "application/*":
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  patties:
+                    type: integer
+                  vegetarian:
+                    type: boolean`,
+		),
+	)
+
+	req, res := tb.makeRequestWithReponse(
+		t,
+		http.MethodPost,
+		"/burgers/createBurger",
+		func(w http.ResponseWriter, r *http.Request) {
+			bodyBytes, err := json.Marshal(map[string]interface{}{
+				"name":       "Big Mac",
+				"patties":    2,
+				"vegetarian": false,
+			})
+
+			require.NoError(t, err, "failed to marshal body")
+
+			w.Header().Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(bodyBytes)
+		},
+	)
+
+	// validate!
+	valid, errors := tb.responseBodyValidator.ValidateResponseBody(req, res)
+
+	assert.True(t, valid)
+	assert.Len(t, errors, 0)
+}
+
+func TestValidateBody_ValidBasicSchemaUsingDefault_WithContentTypeWildcardStart(t *testing.T) {
+	tb := newvalidateResponseTestBed(
+		t,
+		[]byte(`openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      responses:
+        default:
+          content:
+            "*/json":
               schema:
                 type: object
                 properties:
