@@ -80,7 +80,7 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 	if foundResponse != nil {
 		if v.options.ValidateResponseBody && foundResponse.Content != nil { // only validate if we have content types.
 			// check content type has been defined in the contract
-			if mediaType, ok := foundResponse.Content.Get(mediaTypeSting); ok {
+			if mediaType, ok := v.extractContentType(mediaTypeSting, foundResponse); ok {
 				validationErrors = append(validationErrors,
 					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
 			} else {
@@ -98,7 +98,7 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 			// check content type has been defined in the contract
 			if !v.options.ValidateResponseBody {
 				foundResponse = operation.Responses.Default
-			} else if mediaType, ok := operation.Responses.Default.Content.Get(mediaTypeSting); ok {
+			} else if mediaType, ok := v.extractContentType(mediaTypeSting, operation.Responses.Default); ok {
 				foundResponse = operation.Responses.Default
 				validationErrors = append(validationErrors,
 					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
@@ -238,4 +238,22 @@ func (v *responseBodyValidator) checkResponseSchema(
 	}
 
 	return validationErrors
+}
+
+func (v *responseBodyValidator) extractContentType(contentType string, response *v3.Response) (*v3.MediaType, bool) {
+	mediaType, ok := response.Content.Get(contentType)
+	if ok {
+		return mediaType, true
+	}
+	ctMediaRange := strings.SplitN(contentType, "/", 2)
+	for contentPair := response.Content.First(); contentPair != nil; contentPair = contentPair.Next() {
+		s := contentPair.Key()
+		mediaTypeValue := contentPair.Value()
+		opMediaRange := strings.SplitN(s, "/", 2)
+		if (opMediaRange[0] == "*" || opMediaRange[0] == ctMediaRange[0]) &&
+			(opMediaRange[1] == "*" || opMediaRange[1] == ctMediaRange[1]) {
+			return mediaTypeValue, true
+		}
+	}
+	return nil, false
 }
