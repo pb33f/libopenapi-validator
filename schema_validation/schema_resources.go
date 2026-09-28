@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"go.yaml.in/yaml/v4"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -290,15 +290,14 @@ func buildSchemaDocumentResources(
 		return nil, nil
 	}
 
-	schemaIndex := schema.GoLow().GetIndex()
-	if schemaIndex == nil || schemaIndex.GetRootNode() == nil {
+	if schema.GoLow().GetIndex() == nil || schema.GoLow().GetIndex().GetRootNode() == nil {
 		return nil, nil
 	}
 	if !schemaHasReachableRefs(schema) {
 		return nil, nil
 	}
 
-	schemaPointer, ok := jsonPointerForNode(schemaIndex.GetRootNode(), schema.GoLow().GetRootNode())
+	schemaIndex, schemaPointer, ok := locateSchemaRootNodeIndex(schema)
 	if !ok {
 		return nil, fmt.Errorf("schema node was not found in its root document")
 	}
@@ -398,6 +397,32 @@ func addReachableSchemaResources(
 		}
 	}
 	return nil
+}
+
+// locateSchemaRootNodeIndex returns the index whose document contains the schema root node and its pointer.
+//
+// A component schema built from a $ref node reports the resolved file's index while its
+// root node stays in the referring file, so other rolodex indexes are searched as a fallback.
+func locateSchemaRootNodeIndex(schema *base.Schema) (*index.SpecIndex, string, bool) {
+	schemaIndex := schema.GoLow().GetIndex()
+	rootNode := schema.GoLow().GetRootNode()
+	if pointer, ok := jsonPointerForNode(schemaIndex.GetRootNode(), rootNode); ok {
+		return schemaIndex, pointer, true
+	}
+
+	rolodex := schemaIndex.GetRolodex()
+	if rolodex == nil {
+		return nil, "", false
+	}
+	for _, candidate := range append([]*index.SpecIndex{rolodex.GetRootIndex()}, rolodex.GetIndexes()...) {
+		if candidate == nil || candidate == schemaIndex {
+			continue
+		}
+		if pointer, ok := jsonPointerForNode(candidate.GetRootNode(), rootNode); ok {
+			return candidate, pointer, true
+		}
+	}
+	return nil, "", false
 }
 
 func schemaResourceIndex(foundRef *index.Reference, foundIndex *index.SpecIndex) *index.SpecIndex {

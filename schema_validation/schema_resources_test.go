@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
-	"go.yaml.in/yaml/v4"
 
 	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 
@@ -184,6 +184,32 @@ components:
 		var detached yaml.Node
 		require.NoError(t, yaml.Unmarshal([]byte(`$ref: '#/components/schemas/Name'`), &detached))
 		schema.GoLow().RootNode = detached.Content[0]
+
+		resourceSet, err := buildSchemaDocumentResources(
+			schema,
+			SchemaValidationPurposeGeneric,
+			nil,
+		)
+
+		assert.Nil(t, resourceSet)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "schema node was not found")
+	})
+
+	t.Run("schema root not found and index has no rolodex", func(t *testing.T) {
+		var root yaml.Node
+		require.NoError(t, yaml.Unmarshal([]byte(`components:
+  schemas:
+    Name:
+      type: string`), &root))
+
+		var detached yaml.Node
+		require.NoError(t, yaml.Unmarshal([]byte(`$ref: '#/components/schemas/Name'`), &detached))
+
+		lowSchema := &lowbase.Schema{}
+		require.NoError(t, lowSchema.Build(t.Context(), detached.Content[0], index.NewSpecIndex(&root)))
+		schema := base.NewSchema(lowSchema)
+		require.Nil(t, schema.GoLow().GetIndex().GetRolodex())
 
 		resourceSet, err := buildSchemaDocumentResources(
 			schema,
