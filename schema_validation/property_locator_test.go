@@ -6,9 +6,9 @@ package schema_validation
 import (
 	"testing"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/testify/assert"
-	"go.yaml.in/yaml/v4"
 )
 
 func TestExtractPropertyNameFromError_InvalidPropertyName(t *testing.T) {

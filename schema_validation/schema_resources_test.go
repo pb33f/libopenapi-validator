@@ -4,18 +4,19 @@
 package schema_validation
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
-	"go.yaml.in/yaml/v4"
 
 	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 
@@ -1306,4 +1307,36 @@ components:
 	assert.Error(t, responseCompiled.CompiledSchema.Validate(map[string]any{
 		"name": "Desk",
 	}))
+}
+
+func TestSchemaRootLocation(t *testing.T) {
+	doc, err := libopenapi.NewDocument([]byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Pet:
+      type: object`))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	// a schema whose root node is in its own index's document.
+	pet := model.Model.Components.Schemas.GetOrZero("Pet").Schema().GoLow()
+	idx, pointer, ok := schemaRootLocation(pet)
+	require.True(t, ok)
+	assert.Same(t, pet.GetIndex(), idx)
+	assert.Equal(t, "/components/schemas/Pet", pointer)
+
+	// a root node in no candidate document, with a parent proxy that has no index.
+	var detached yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("type: string"), &detached))
+	orphan := new(lowbase.Schema)
+	require.NoError(t, orphan.Build(context.Background(), detached.Content[0], pet.GetIndex()))
+	orphan.ParentProxy = new(lowbase.SchemaProxy)
+	idx, pointer, ok = schemaRootLocation(orphan)
+	assert.False(t, ok)
+	assert.Nil(t, idx)
+	assert.Empty(t, pointer)
 }

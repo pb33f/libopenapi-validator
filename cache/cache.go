@@ -4,9 +4,9 @@
 package cache
 
 import (
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"go.yaml.in/yaml/v4"
 )
 
 // SchemaCacheEntry holds a compiled schema and its intermediate representations.

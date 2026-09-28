@@ -7,10 +7,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/jsonpath/pkg/jsonpath"
 	"github.com/pb33f/jsonpath/pkg/jsonpath/config"
 	"github.com/pb33f/libopenapi/utils"
-	"go.yaml.in/yaml/v4"
 )
 
 // LocateSchemaPropertyNodeByJSONPath will locate a schema property node by a JSONPath. It converts something like
