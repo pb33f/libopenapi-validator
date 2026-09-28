@@ -10,11 +10,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
+	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 	"github.com/pb33f/libopenapi/index"
 	"github.com/pb33f/libopenapi/utils"
 	"github.com/santhosh-tekuri/jsonschema/v6"
-	"go.yaml.in/yaml/v4"
 
 	"github.com/pb33f/libopenapi-validator/cache"
 	"github.com/pb33f/libopenapi-validator/config"
@@ -298,7 +299,7 @@ func buildSchemaDocumentResources(
 		return nil, nil
 	}
 
-	schemaPointer, ok := jsonPointerForNode(schemaIndex.GetRootNode(), schema.GoLow().GetRootNode())
+	schemaIndex, schemaPointer, ok := schemaRootLocation(schema.GoLow())
 	if !ok {
 		return nil, fmt.Errorf("schema node was not found in its root document")
 	}
@@ -663,6 +664,26 @@ func pruneDirectionalRequiredEverywhere(node *yaml.Node, purpose SchemaValidatio
 	for _, child := range node.Content {
 		pruneDirectionalRequiredEverywhere(child, purpose)
 	}
+}
+
+// schemaRootLocation returns the index whose document holds the schema's root node, and the node's JSON pointer
+// in that document. A schema built from a $ref reports the index of the file its content came from (libopenapi
+// v0.39 and later), while its root node stays the authored $ref node, in the file of its parent proxy.
+func schemaRootLocation(lowSchema *lowbase.Schema) (*index.SpecIndex, string, bool) {
+	rootNode := lowSchema.GetRootNode()
+	candidates := []*index.SpecIndex{lowSchema.GetIndex()}
+	if lowSchema.ParentProxy != nil {
+		candidates = append(candidates, lowSchema.ParentProxy.GetIndex())
+	}
+	for _, idx := range candidates {
+		if idx == nil {
+			continue
+		}
+		if pointer, ok := jsonPointerForNode(idx.GetRootNode(), rootNode); ok {
+			return idx, pointer, true
+		}
+	}
+	return nil, "", false
 }
 
 // jsonPointerForNode returns the RFC 6901 pointer to targetNode relative to rootNode.
