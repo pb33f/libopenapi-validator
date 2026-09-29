@@ -205,13 +205,11 @@ func cast(v string) any {
 		b, _ := strconv.ParseBool(v)
 		return b
 	}
-	if i, err := strconv.ParseFloat(v, 64); err == nil {
-		// check if this is an int or not
-		if !strings.Contains(v, Period) {
-			iv, _ := strconv.ParseInt(v, 10, 64)
-			return iv
-		}
+	if i, err := strconv.ParseInt(v, 10, 64); err == nil {
 		return i
+	}
+	if f, err := ParseNumber(v); err == nil {
+		return f
 	}
 	return v
 }

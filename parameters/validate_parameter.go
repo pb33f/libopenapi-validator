@@ -23,7 +23,17 @@ import (
 	"github.com/pb33f/libopenapi-validator/schema_validation"
 )
 
-const parameterSchemaVersion = 3.1
+// parameterSchemaVersion returns the OpenAPI version of the document a parameter or header
+// schema belongs to, so it compiles with the keywords it was written with (3.0's nullable, for
+// example). It is 3.1 when no version can be found.
+func parameterSchemaVersion(schema *base.Schema) float32 {
+	if schema != nil && schema.GoLow() != nil {
+		if version, ok := schema.GoLow().GetIndex().ResolveDocumentVersion(); ok {
+			return version
+		}
+	}
+	return 3.1
+}
 
 func ValidateSingleParameterSchema(
 	schema *base.Schema,
@@ -211,10 +221,11 @@ func compileParameterValidationSchema(
 	validationType string,
 	subValType string,
 ) (*jsonschema.Schema, string, []*errors.ValidationError) {
+	version := parameterSchemaVersion(schema)
 	if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
 		hash := schema_validation.SchemaCacheKey(
 			schema.GoLow().Hash(),
-			parameterSchemaVersion,
+			version,
 			schema_validation.SchemaValidationPurposeGeneric,
 		)
 		if cached, ok := validationOptions.SchemaCache.Load(hash); ok && cached != nil && cached.CompiledSchema != nil {
@@ -226,7 +237,7 @@ func compileParameterValidationSchema(
 		schema,
 		schema_validation.SchemaValidationPurposeGeneric,
 		validationOptions,
-		parameterSchemaVersion,
+		version,
 	)
 	if err != nil {
 		return nil, "", []*errors.ValidationError{
@@ -240,7 +251,7 @@ func compileParameterValidationSchema(
 	if validationOptions != nil && validationOptions.SchemaCache != nil && schema != nil && schema.GoLow() != nil {
 		hash := schema_validation.SchemaCacheKey(
 			schema.GoLow().Hash(),
-			parameterSchemaVersion,
+			version,
 			schema_validation.SchemaValidationPurposeGeneric,
 		)
 		validationOptions.SchemaCache.Store(hash, compiled.ToCacheEntry(schema))

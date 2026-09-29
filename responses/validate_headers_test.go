@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
 )
@@ -219,4 +221,232 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
+}
+
+func TestValidateResponseHeaders_OptionalHeaderIsValidatedWhenPresent(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Headers
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          headers:
+            X-Rate-Limit:
+              schema:
+                type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	headers := m.Model.Paths.PathItems.GetOrZero("/things").Get.Responses.Codes.GetOrZero("200").Headers
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+
+	response := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"X-Rate-Limit": {"abc"}}}
+	valid, errors := ValidateResponseHeaders(request, response, headers, "/things", "200")
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	assert.Equal(t, "header 'x-rate-limit' failed to validate", errors[0].Message)
+
+	response = &http.Response{StatusCode: http.StatusOK, Header: http.Header{}}
+	valid, errors = ValidateResponseHeaders(request, response, headers, "/things", "200")
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateResponseHeaders_ContentHeaderIsNotSchemaValidated(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Headers
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          headers:
+            X-Payload:
+              content:
+                application/json:
+                  schema:
+                    type: integer`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	headers := m.Model.Paths.PathItems.GetOrZero("/things").Get.Responses.Codes.GetOrZero("200").Headers
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+
+	response := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"X-Payload": {`{"a":1}`}}}
+	valid, errors := ValidateResponseHeaders(request, response, headers, "/things", "200")
+	assert.True(t, valid)
+	assert.Empty(t, errors)
+}
+
+func TestValidateResponseHeaders_ValuesDecodeBySchemaType(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Headers
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          headers:
+            X-String:
+              schema: {type: string, maxLength: 5}
+            X-Integer:
+              schema: {type: integer, maximum: 10}
+            X-Number:
+              schema: {type: number, minimum: 1.5}
+            X-Boolean:
+              schema: {type: boolean}
+            X-Array:
+              schema: {type: array, items: {type: integer}, maxItems: 3}
+            X-Object:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+            X-Exploded:
+              explode: true
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+            X-Enum:
+              schema: {enum: [1, 2]}
+            X-NaN:
+              schema: {type: number, maximum: 10}
+            X-Either:
+              schema: {type: [number, boolean]}
+            X-Nullable:
+              schema: {type: [integer, "null"]}
+            X-Short:
+              schema: {type: [string, integer], maxLength: 2}
+            X-StringEnum:
+              schema: {enum: ["1", "2"]}
+            X-Wrapped:
+              schema:
+                allOf:
+                  - type: string`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	headers := m.Model.Paths.PathItems.GetOrZero("/things").Get.Responses.Codes.GetOrZero("200").Headers
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+
+	for _, test := range []struct {
+		header string
+		value  string
+		valid  bool
+	}{
+		{"X-String", "123", true},
+		{"X-String", "true", true},
+		{"X-String", "null", true},
+		{"X-String", "too long", false},
+		{"X-Integer", "7", true},
+		{"X-Integer", "7.0", true},
+		{"X-Integer", "11", false},
+		{"X-Integer", "seven", false},
+		{"X-Number", "2.5", true},
+		{"X-Number", "1", false},
+		{"X-Boolean", "false", true},
+		{"X-Boolean", "maybe", false},
+		{"X-Array", "1", true},
+		{"X-Array", "1, 2,3", true},
+		{"X-Array", "1,two", false},
+		{"X-Array", "1,2,3,4", false},
+		{"X-Object", "id,5", true},
+		{"X-Object", "id,five", false},
+		{"X-Exploded", "id=5", true},
+		{"X-Exploded", "id=five", false},
+		{"X-Enum", "2", true},
+		{"X-Enum", "3", false},
+		{"X-NaN", "NaN", false},
+		{"X-Either", "1.5", true},
+		{"X-Either", "true", true},
+		{"X-Either", "maybe", false},
+		{"X-Nullable", "null", true},
+		{"X-Nullable", "7", true},
+		{"X-Short", "12345", true},
+		{"X-StringEnum", "1", true},
+		{"X-Wrapped", "123", true},
+		{"X-Array", "[1,2]", true},
+	} {
+		t.Run(test.header+"="+test.value, func(t *testing.T) {
+			response := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}}
+			response.Header.Set(test.header, test.value)
+
+			valid, errors := ValidateResponseHeaders(request, response, headers, "/things", "200")
+			assert.Equal(t, test.valid, valid, errors)
+		})
+	}
+}
+
+func TestHeaderValueReadings(t *testing.T) {
+	assert.Equal(t, []any{"5", float64(5)}, headerValueReadings("5", &base.Schema{Type: []string{"string"}}, false))
+	assert.Equal(t, []any{int64(5), 5.0, float64(5), "5"},
+		headerValueReadings("5", &base.Schema{Type: []string{"integer", "number"}}, false))
+	assert.Equal(t, []any{[]any{"a", "b"}, "a,b"}, headerValueReadings("a,b", &base.Schema{Type: []string{"array"}}, false))
+	assert.Equal(t, []any{"not-json"}, headerValueReadings("not-json", &base.Schema{}, false))
+	assert.Equal(t, []any{map[string]any{"a": float64(1)}, `{"a":1}`}, headerValueReadings(`{"a":1}`, &base.Schema{}, false))
+}
+
+func TestValidateResponseHeaders_ContentTypeIsIgnored(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Headers
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          headers:
+            Content-Type:
+              required: true
+              schema: {type: string, enum: [application/json]}`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	headers := m.Model.Paths.PathItems.GetOrZero("/things").Get.Responses.Codes.GetOrZero("200").Headers
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+
+	for _, header := range []http.Header{{"Content-Type": {"application/json; charset=utf-8"}}, {}} {
+		valid, errors := ValidateResponseHeaders(request, &http.Response{StatusCode: http.StatusOK, Header: header}, headers, "/things", "200")
+		assert.True(t, valid, errors)
+	}
+}
+
+func TestValidateResponseHeaders_OpenAPI30Keywords(t *testing.T) {
+	spec := `openapi: 3.0.3
+info:
+  title: Headers
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          headers:
+            X-Rate:
+              schema: {type: integer, nullable: true, minimum: 1, exclusiveMinimum: true}`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	headers := m.Model.Paths.PathItems.GetOrZero("/things").Get.Responses.Codes.GetOrZero("200").Headers
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+
+	for value, valid := range map[string]bool{"5": true, "null": true, "1": false, "abc": false} {
+		response := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"X-Rate": {value}}}
+		ok, errors := ValidateResponseHeaders(request, response, headers, "/things", "200")
+		assert.Equal(t, valid, ok, "%s: %v", value, errors)
+	}
 }

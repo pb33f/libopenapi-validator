@@ -359,12 +359,11 @@ paths:
 	// 6. Create a new *http.Request (normally, this would be where the host application will pass in the request)
 	request, _ := http.NewRequest(http.MethodGet, "/health", nil)
 
-	// 7. Simulate a request/response, in this case the contract returns a 200 with an array of pets.
+	// 7. Simulate a request/response, in this case the contract returns a 200 without the optional header.
 	// Normally, this would be where the host application would pass in the response.
+	// A header that is sent is still validated against its schema, required or not.
 	recorder := httptest.NewRecorder()
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		// set return content type.
-		w.Header().Set("Chicken-Nuggets", "I am a chicken nugget, and not an integer")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(nil)
 	}

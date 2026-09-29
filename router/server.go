@@ -12,6 +12,8 @@ import (
 	"github.com/pb33f/libopenapi/orderedmap"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+
+	"github.com/pb33f/libopenapi-validator/internal/serverurl"
 )
 
 type compiledServer struct {
@@ -192,20 +194,37 @@ func contains(values []string, target string) bool {
 	return false
 }
 
-func compatibilityPath(request *http.Request, document *v3.Document) string {
+// compatibilityCandidate is a request path, and the server whose base path was removed from it.
+type compatibilityCandidate struct {
+	path   string
+	server *v3.Server
+}
+
+// compatibilityCandidates returns the paths path-only matching tries for a request: the request path
+// with the base path of each document server that prefixes it removed, in document order, or the
+// request path as sent when no server does. Trying every server lets a later, more specific server
+// match when an earlier one leaves a path the document does not declare.
+func compatibilityCandidates(request *http.Request, document *v3.Document) []compatibilityCandidate {
 	path := request.URL.EscapedPath()
+	var candidates []compatibilityCandidate
 	if document != nil {
 		for _, server := range document.Servers {
 			if server == nil {
 				continue
 			}
-			parsed, err := url.Parse(server.URL)
-			if err == nil && parsed.Path != "" && strings.HasPrefix(path, parsed.Path) {
-				path = strings.TrimPrefix(path, parsed.Path)
-				break
+			if base := serverurl.BasePath(server.URL); base != "" && strings.HasPrefix(path, base) {
+				candidates = append(candidates, compatibilityCandidate{compatibilityPath(request, strings.TrimPrefix(path, base)), server})
 			}
 		}
 	}
+	if len(candidates) == 0 {
+		candidates = append(candidates, compatibilityCandidate{compatibilityPath(request, path), nil})
+	}
+	return candidates
+}
+
+// compatibilityPath appends the request fragment to path, and makes it absolute.
+func compatibilityPath(request *http.Request, path string) string {
 	if request.URL.Fragment != "" {
 		path += "#" + request.URL.Fragment
 	}
@@ -213,21 +232,4 @@ func compatibilityPath(request *http.Request, document *v3.Document) string {
 		path = "/" + path
 	}
 	return path
-}
-
-func compatibilityServer(request *http.Request, document *v3.Document) *v3.Server {
-	if request == nil || request.URL == nil || document == nil {
-		return nil
-	}
-	path := request.URL.EscapedPath()
-	for _, server := range document.Servers {
-		if server == nil {
-			continue
-		}
-		parsed, err := url.Parse(server.URL)
-		if err == nil && parsed.Path != "" && strings.HasPrefix(path, parsed.Path) {
-			return server
-		}
-	}
-	return nil
 }

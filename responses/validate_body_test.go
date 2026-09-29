@@ -1982,3 +1982,115 @@ func (er *errorReader) Read(p []byte) (n int, err error) {
 func (er *errorReader) Close() error {
 	return nil
 }
+
+func newResponseBodyValidatorForSpec(t *testing.T, spec string) ResponseBodyValidator {
+	t.Helper()
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+	return NewResponseBodyValidator(&m.Model)
+}
+
+func jsonResponse(statusCode int, contentType, body string) *http.Response {
+	return &http.Response{
+		StatusCode: statusCode,
+		Header:     http.Header{helpers.ContentTypeHeader: {contentType}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+}
+
+func TestValidateBody_MediaTypeRanges(t *testing.T) {
+	// each range declares a different "kind" so the test can see which one validated the body
+	v := newResponseBodyValidatorForSpec(t, `openapi: 3.1.0
+info: {title: ranges, version: 1.0.0}
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          content:
+            "*/*":
+              schema: {type: object, properties: {kind: {const: any}}}
+            "application/*":
+              schema: {type: object, properties: {kind: {const: application}}}
+            "application/*+json":
+              schema: {type: object, properties: {kind: {const: suffix}}}
+            "application/json":
+              schema: {type: object, properties: {kind: {const: exact}}}`)
+
+	for _, test := range []struct {
+		contentType string
+		kind        string
+	}{
+		{"application/json; charset=utf-8", "exact"},
+		{"application/problem+json", "suffix"},
+		{"application/x-custom-json", "application"},
+		{"text/x-json", "any"},
+	} {
+		t.Run(test.contentType, func(t *testing.T) {
+			request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+			valid, errs := v.ValidateResponseBody(request,
+				jsonResponse(http.StatusOK, test.contentType, fmt.Sprintf(`{"kind":%q}`, test.kind)))
+			assert.True(t, valid, errs)
+
+			request, _ = http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+			valid, _ = v.ValidateResponseBody(request,
+				jsonResponse(http.StatusOK, test.contentType, `{"kind":"wrong"}`))
+			assert.False(t, valid)
+		})
+	}
+}
+
+func TestValidateBody_ContentTypeWithoutSubtype(t *testing.T) {
+	v := newResponseBodyValidatorForSpec(t, `openapi: 3.1.0
+info: {title: ranges, version: 1.0.0}
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: {type: object}`)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+	valid, errs := v.ValidateResponseBody(request, jsonResponse(http.StatusOK, "application", `{}`))
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "content type 'application' does not exist")
+}
+
+func TestValidateBody_DefaultResponseWithoutContent(t *testing.T) {
+	v := newResponseBodyValidatorForSpec(t, `openapi: 3.1.0
+info: {title: default, version: 1.0.0}
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+        default:
+          description: an error, described by headers only
+          headers:
+            X-Error-Code:
+              required: true
+              schema: {type: integer}`)
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+	response := &http.Response{StatusCode: http.StatusInternalServerError, Header: http.Header{"X-Error-Code": {"42"}}}
+	valid, errs := v.ValidateResponseBody(request, response)
+	assert.True(t, valid, errs)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://things.com/things", nil)
+	response = &http.Response{StatusCode: http.StatusInternalServerError, Header: http.Header{}}
+	valid, errs = v.ValidateResponseBody(request, response)
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Equal(t, "Missing required header", errs[0].Message)
+	require.Len(t, errs[0].SchemaValidationErrors, 1)
+	assert.Equal(t, "/paths/things/get/responses/default/headers/X-Error-Code/required",
+		errs[0].SchemaValidationErrors[0].KeywordLocation)
+}

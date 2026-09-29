@@ -763,6 +763,99 @@ paths:
 	strict.Release()
 }
 
+func TestRequestDefaultsUseTheMediaTypeValidationUses(t *testing.T) {
+	spec := `openapi: 3.1.0
+info: {title: ranges, version: 1.0.0}
+paths:
+  /items:
+    post:
+      requestBody:
+        content:
+          "*/*":
+            schema:
+              type: object
+              properties:
+                kind: {type: string, default: any}
+          application/*:
+            schema:
+              type: object
+              properties:
+                kind: {type: string, enum: [app], default: app}
+          application/*+json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: {type: string, enum: [suffix], default: suffix}
+      responses: {"204": {description: ok}}`
+	v := parityValidator(t, spec, config.WithRequestDefaults())
+	t.Cleanup(v.Release)
+
+	for contentType, kind := range map[string]string{"application/json": "app", "application/problem+json": "suffix"} {
+		request, _ := http.NewRequest(http.MethodPost, "http://example.com/items", strings.NewReader(`{}`))
+		request.Header.Set("Content-Type", contentType)
+		valid, validationErrors := v.ValidateHttpRequestSync(request)
+		require.True(t, valid, validationErrors)
+		body, readErr := io.ReadAll(request.Body)
+		require.NoError(t, readErr)
+		assert.JSONEq(t, `{"kind":"`+kind+`"}`, string(body), contentType)
+	}
+}
+
+func TestHighLevelPathOnlyTemplatedServerHost(t *testing.T) {
+	// url.Parse rejects a variable in the server host; the base path must still be stripped
+	spec := `openapi: 3.1.0
+info: {title: templated, version: 1.0.0}
+servers:
+  - url: https://{host}/api/v1
+    variables:
+      host: {default: api.example.com}
+paths:
+  /widgets/{id}:
+    get:
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}}
+      responses: {"204": {description: ok}}`
+	v := parityValidator(t, spec)
+	request, _ := http.NewRequest(http.MethodGet, "https://api.example.com/api/v1/widgets/5", nil)
+	valid, validationErrors := v.ValidateHttpRequest(request)
+	require.True(t, valid, validationErrors)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://api.example.com/api/v1/widgets/five", nil)
+	valid, validationErrors = v.ValidateHttpRequest(request)
+	assert.False(t, valid)
+	require.Len(t, validationErrors, 1)
+	assert.Equal(t, "Path parameter 'id' is not a valid integer", validationErrors[0].Message)
+	v.Release()
+}
+
+func TestHighLevelStrictServerVariableInBasePath(t *testing.T) {
+	// path parameters must be read from the path the router matched, after the server's variables
+	spec := `openapi: 3.1.0
+info: {title: strict, version: 1.0.0}
+servers:
+  - url: https://api.example.com/{version}/api
+    variables:
+      version: {default: v1}
+paths:
+  /widgets/{id}:
+    get:
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer}}
+      responses: {"204": {description: ok}}`
+	v := parityValidator(t, spec, config.WithStrictServerMatching())
+	request, _ := http.NewRequest(http.MethodGet, "https://api.example.com/v2/api/widgets/5", nil)
+	valid, validationErrors := v.ValidateHttpRequest(request)
+	require.True(t, valid, validationErrors)
+
+	request, _ = http.NewRequest(http.MethodGet, "https://api.example.com/v2/api/widgets/five", nil)
+	valid, validationErrors = v.ValidateHttpRequest(request)
+	assert.False(t, valid)
+	require.Len(t, validationErrors, 1)
+	assert.Equal(t, "Path parameter 'id' is not a valid integer", validationErrors[0].Message)
+	v.Release()
+}
+
 func mustURL(t *testing.T, value string) *url.URL {
 	t.Helper()
 	parsed, err := url.Parse(value)

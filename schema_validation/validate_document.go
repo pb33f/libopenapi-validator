@@ -378,7 +378,9 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 						// location of the violation within the rendered schema.
 						violation.Line = line
 						violation.Column = located.Column
-						if source, err := yaml.Marshal(located); err == nil {
+						// located belongs to the caller's document, and yaml.Marshal strips
+						// resolved tags from the nodes it encodes, so render a copy.
+						if source, err := yaml.Marshal(cloneYAMLNode(located)); err == nil {
 							violation.ReferenceObject = strings.TrimSpace(string(source))
 						}
 					} else {

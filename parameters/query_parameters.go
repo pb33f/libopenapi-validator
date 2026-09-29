@@ -155,7 +155,7 @@ doneLooking:
 							case helpers.String:
 								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, ef, params[p], pathValue, operation, renderedSchema)...)
 							case helpers.Integer:
-								efF, err := strconv.ParseInt(ef, 10, 64)
+								efF, err := helpers.ParseInteger(ef)
 								if err != nil {
 									validationErrors = append(validationErrors,
 										errors.InvalidQueryParamInteger(params[p], ef, sch, pathValue, operation, renderedSchema))
@@ -163,7 +163,7 @@ doneLooking:
 								}
 								validationErrors = append(validationErrors, v.validateSimpleParam(sch, ef, efF, params[p], pathValue, operation, renderedSchema)...)
 							case helpers.Number:
-								efF, err := strconv.ParseFloat(ef, 64)
+								efF, err := helpers.ParseNumber(ef)
 								if err != nil {
 									validationErrors = append(validationErrors,
 										errors.InvalidQueryParamNumber(params[p], ef, sch, pathValue, operation, renderedSchema))
@@ -309,7 +309,7 @@ func (v *paramValidator) validateSimpleParam(sch *base.Schema, rawParam string, 
 	if sch.Enum != nil {
 		matchFound := false
 		for _, enumVal := range sch.Enum {
-			if strings.TrimSpace(rawParam) == fmt.Sprint(enumVal.Value) {
+			if enumValueMatches(rawParam, parsedParam, enumVal.Value) {
 				matchFound = true
 				break
 			}

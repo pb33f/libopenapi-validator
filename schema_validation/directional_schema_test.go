@@ -103,6 +103,43 @@ components:
 	require.NotNil(t, rendered)
 }
 
+func TestRenderSchemaForValidation_DoesNotMutateDocumentNodes(t *testing.T) {
+	// circular refs render as the authored $ref node, which belongs to the document
+	doc, err := libopenapi.NewDocument([]byte(`openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Tree:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          readOnly: true
+        child:
+          $ref: '#/components/schemas/Tree'`))
+	require.NoError(t, err)
+	model, errs := doc.BuildV3Model()
+	require.Empty(t, errs)
+
+	root := doc.GetSpecInfo().RootNode
+	before := yamlNodeStates(root)
+
+	schema := model.Model.Components.Schemas.GetOrZero("Tree").Schema()
+	for _, purpose := range []SchemaValidationPurpose{
+		SchemaValidationPurposeGeneric,
+		SchemaValidationPurposeRequestBody,
+		SchemaValidationPurposeResponseBody,
+	} {
+		_, _ = RenderSchemaForValidation(schema, purpose)
+	}
+
+	assert.Equal(t, before, yamlNodeStates(root))
+}
+
 func TestRenderSchemaBytesForValidation_Errors(t *testing.T) {
 	rendered, err := renderSchemaBytesForValidation([]byte(":\n"), SchemaValidationPurposeRequestBody)
 	require.Error(t, err)
@@ -211,6 +248,28 @@ func TestDirectionalSchemaHelpers_EdgeCases(t *testing.T) {
 	}
 	removeMappingPair(node, 0)
 	assert.Empty(t, node.Content)
+}
+
+// yamlNodeStates records the tag, style and child count of every node reachable from root,
+// so tests can prove an operation left a caller's YAML tree untouched.
+func yamlNodeStates(root *yaml.Node) map[*yaml.Node]string {
+	states := make(map[*yaml.Node]string)
+	var walk func(*yaml.Node)
+	walk = func(node *yaml.Node) {
+		if node == nil {
+			return
+		}
+		if _, seen := states[node]; seen {
+			return
+		}
+		states[node] = fmt.Sprintf("%s|%d|%d", node.Tag, node.Style, len(node.Content))
+		for _, child := range node.Content {
+			walk(child)
+		}
+		walk(node.Alias)
+	}
+	walk(root)
+	return states
 }
 
 func renderedRequired(t *testing.T, renderedJSON []byte) []string {

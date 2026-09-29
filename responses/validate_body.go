@@ -15,6 +15,7 @@ import (
 	"github.com/pb33f/libopenapi/orderedmap"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
+	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/content"
@@ -59,9 +60,6 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 	contentType := response.Header.Get(helpers.ContentTypeHeader)
 	codeStr := strconv.Itoa(httpCode)
 
-	// extract the media type from the content type header.
-	mediaTypeSting, _, _ := helpers.ExtractContentType(contentType)
-
 	// check if operation has responses defined
 	if operation.Responses == nil || operation.Responses.Codes == nil {
 		return true, nil
@@ -77,51 +75,39 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 		}
 	}
 
-	if foundResponse != nil {
-		if v.options.ValidateResponseBody && foundResponse.Content != nil { // only validate if we have content types.
-			// check content type has been defined in the contract
-			if mediaType, ok := foundResponse.Content.Get(mediaTypeSting); ok {
-				validationErrors = append(validationErrors,
-					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
-			} else {
-				// check that the operation *actually* returns a body. (i.e. a 204 response)
-				if foundResponse.Content != nil && orderedmap.Len(foundResponse.Content) > 0 {
-					// content type not found in the contract
-					validationErrors = append(validationErrors,
-						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, false))
-				}
-			}
-		}
-	} else {
-		// no code match, check for default response
-		if operation.Responses.Default != nil && operation.Responses.Default.Content != nil {
-			// check content type has been defined in the contract
-			if !v.options.ValidateResponseBody {
-				foundResponse = operation.Responses.Default
-			} else if mediaType, ok := operation.Responses.Default.Content.Get(mediaTypeSting); ok {
-				foundResponse = operation.Responses.Default
-				validationErrors = append(validationErrors,
-					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
-			} else {
-				// check that the operation *actually* returns a body. (i.e. a 204 response)
-				if operation.Responses.Default.Content != nil && orderedmap.Len(operation.Responses.Default.Content) > 0 {
-					// content type not found in the contract
-					validationErrors = append(validationErrors,
-						errors.ResponseContentTypeNotFound(operation, request, response, codeStr, true))
-				}
-			}
-		} else if v.options.ValidateResponseStatus {
-			// TODO: add support for '2XX' and '3XX' responses in the contract
+	// the default response covers every code without a match, whether or not it declares content.
+	isDefault := false
+	if foundResponse == nil && operation.Responses.Default != nil {
+		foundResponse = operation.Responses.Default
+		isDefault = true
+	}
+
+	if foundResponse == nil {
+		if v.options.ValidateResponseStatus {
 			// no default, no code match, nothing!
 			validationErrors = append(validationErrors,
 				errors.ResponseCodeNotFound(operation, request, httpCode))
 		}
-	}
+	} else {
+		// only validate if the response declares content (a 204 response does not).
+		if v.options.ValidateResponseBody && orderedmap.Len(foundResponse.Content) > 0 {
+			// check content type has been defined in the contract
+			if mediaType, ok := helpers.FindMediaType(foundResponse.Content, contentType); ok {
+				validationErrors = append(validationErrors,
+					v.checkResponseSchema(request, response, contentType, mediaType, operation)...)
+			} else {
+				validationErrors = append(validationErrors,
+					errors.ResponseContentTypeNotFound(operation, request, response, codeStr, isDefault))
+			}
+		}
 
-	if foundResponse != nil {
 		// check for headers in the response
 		if foundResponse.Headers != nil {
-			if ok, hErrs := ValidateResponseHeaders(request, response, foundResponse.Headers, pathFound, codeStr, config.WithExistingOpts(v.options)); !ok {
+			headerCode := codeStr
+			if isDefault {
+				headerCode = lowv3.DefaultLabel
+			}
+			if ok, hErrs := ValidateResponseHeaders(request, response, foundResponse.Headers, pathFound, headerCode, config.WithExistingOpts(v.options)); !ok {
 				validationErrors = append(validationErrors, hErrs...)
 			}
 		}

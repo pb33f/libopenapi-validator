@@ -36,3 +36,13 @@ func TestAttachRouteScopesAndRestoresRequestContext(t *testing.T) {
 	AttachRoute(request, nil)()
 	assert.Nil(t, Route(nil))
 }
+
+func TestWithRouteLeavesRequestUnchanged(t *testing.T) {
+	request, _ := http.NewRequest(http.MethodGet, "http://example.com/items", nil)
+	route := &router.Route{Path: "/items"}
+
+	routed := WithRoute(request, route)
+	assert.Same(t, route, Route(routed))
+	assert.Nil(t, Route(request))
+	assert.Same(t, request.URL, routed.URL)
+}

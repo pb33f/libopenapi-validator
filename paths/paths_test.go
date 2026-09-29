@@ -13,8 +13,12 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
+	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/radix"
+	"github.com/pb33f/libopenapi-validator/router"
 	"github.com/pb33f/testify/assert"
+
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
 func TestNewValidator_BadParam(t *testing.T) {
@@ -769,6 +773,29 @@ paths:
 	}
 
 	assert.Equal(t, expectedPaths, basePaths)
+}
+
+func TestStripRequestPath_UsesAttachedRoute(t *testing.T) {
+	doc := &v3.Document{Servers: []*v3.Server{{URL: "https://api.example.com/{version}/api"}}}
+	request, _ := http.NewRequest(http.MethodGet, "https://api.example.com/v2/api/widgets/5", nil)
+
+	// a variable in the server path cannot be stripped without the router's match
+	assert.Equal(t, "/v2/api/widgets/5", StripRequestPath(request, doc))
+
+	restore := requeststate.AttachRoute(request, &router.Route{Document: doc, RequestPath: "/widgets/5"})
+	defer restore()
+	assert.Equal(t, "/widgets/5", StripRequestPath(request, doc))
+
+	// a route matched against another document is ignored
+	assert.Equal(t, "/v2/api/widgets/5", StripRequestPath(request, &v3.Document{}))
+
+	// the fragment is kept, whether or not the router matched with it
+	fragment, _ := http.NewRequest(http.MethodGet, "https://api.example.com/v2/api/pages/5#section", nil)
+	for _, requestPath := range []string{"/pages/5", "/pages/5#section"} {
+		restoreFragment := requeststate.AttachRoute(fragment, &router.Route{Document: doc, RequestPath: requestPath})
+		assert.Equal(t, "/pages/5#section", StripRequestPath(fragment, doc))
+		restoreFragment()
+	}
 }
 
 func TestNewValidator_FindPathWithEncodedArg(t *testing.T) {

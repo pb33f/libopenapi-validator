@@ -54,6 +54,10 @@ func RenderSchemaForValidation(schema *base.Schema, purpose SchemaValidationPurp
 	renderCtx := base.NewInlineRenderContextForValidation()
 	nodeIface, err := schema.MarshalYAMLInlineWithContext(renderCtx)
 	renderedNode, _ := nodeIface.(*yaml.Node)
+	// the inline renderer can hand back nodes owned by the source document (a circular $ref
+	// keeps its authored node), and both directional pruning and yaml.Marshal, which strips
+	// resolved tags from the nodes it encodes, edit the tree in place. Work on a copy.
+	renderedNode = cloneYAMLNode(renderedNode)
 	if err != nil {
 		renderedInline, _ := yaml.Marshal(renderedNode)
 		return &RenderedValidationSchema{

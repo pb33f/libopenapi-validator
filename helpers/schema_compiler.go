@@ -3,8 +3,11 @@ package helpers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"sort"
+	"strconv"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
@@ -24,18 +27,64 @@ func ConfigureCompiler(c *jsonschema.Compiler, o *config.ValidationOptions) {
 
 	if o.FormatAssertions {
 		c.AssertFormat()
+		for _, format := range openAPIFormats {
+			c.RegisterFormat(format)
+		}
 	}
 
 	if o.ContentAssertions {
 		c.AssertContent()
 	}
 
+	// custom formats are registered last, so they replace built-in formats of the same name.
 	for n, v := range o.Formats {
 		c.RegisterFormat(&jsonschema.Format{
 			Name:     n,
 			Validate: v,
 		})
 	}
+}
+
+// openAPIFormats are the integer formats in the OpenAPI format registry, which JSON Schema
+// does not define. See https://spec.openapis.org/registry/format/
+var openAPIFormats = []*jsonschema.Format{
+	{Name: "int32", Validate: integerFormat(math.MinInt32, math.MaxInt32)},
+	{Name: "int64", Validate: integerFormat(math.MinInt64, math.MaxInt64)},
+}
+
+// integerFormat returns a format validator that requires numbers to be whole and within the
+// given bounds. Values of other types are left to the rest of the schema.
+func integerFormat(minimum, maximum int64) func(any) error {
+	return func(v any) error {
+		var valid bool
+		switch n := v.(type) {
+		case int64:
+			valid = n >= minimum && n <= maximum
+		case float64:
+			valid = wholeNumberInRange(n, minimum, maximum)
+		case json.Number:
+			i, err := n.Int64()
+			if err == nil {
+				valid = i >= minimum && i <= maximum
+			} else if !errors.Is(err, strconv.ErrRange) {
+				// not an integer literal, but "1.0" and "1e3" are whole numbers
+				f, floatErr := n.Float64()
+				valid = floatErr == nil && wholeNumberInRange(f, minimum, maximum)
+			}
+		default:
+			return nil
+		}
+		if !valid {
+			return fmt.Errorf("must be a whole number from %d to %d", minimum, maximum)
+		}
+		return nil
+	}
+}
+
+// wholeNumberInRange reports whether f is a whole number from minimum to maximum. The upper bound
+// is compared as maximum+1, exclusive, which stays exact when float64(maximum) rounds up (int64).
+func wholeNumberInRange(f float64, minimum, maximum int64) bool {
+	return f == math.Trunc(f) && f >= float64(minimum) && f < float64(maximum)+1
 }
 
 // NewCompilerWithOptions mints a new JSON schema compiler with custom configuration.

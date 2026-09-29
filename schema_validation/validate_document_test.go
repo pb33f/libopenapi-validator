@@ -12,6 +12,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/testify/assert"
+	"github.com/pb33f/testify/require"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
@@ -181,19 +182,48 @@ x-values:
 	assert.Empty(t, errors[0].SchemaValidationErrors)
 }
 
+// unmarshalableJSONValue is a value encoding/json rejects on every supported Go version. Maps with
+// non-string keys are not: Go 1.27 marshals map[interface{}]interface{}{1: "one"} as {"1":"one"}.
+func unmarshalableJSONValue() chan int {
+	return make(chan int)
+}
+
 func TestNormalizeJSON_ReturnsMarshalError(t *testing.T) {
 	payload := map[string]interface{}{
 		"openapi": "3.1.0",
-		"invalid": map[interface{}]interface{}{
-			1: "one",
-		},
+		"invalid": unmarshalableJSONValue(),
 	}
 
 	normalized, err := normalizeJSON(payload)
 
 	assert.Nil(t, normalized)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "unsupported type: map[interface {}]interface {}")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported type: chan int")
+}
+
+func TestValidateDocument_ViolationDoesNotMutateDocumentNodes(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      responses:
+        '200':
+          description: ok
+      badProperty: 12`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	root := doc.GetSpecInfo().RootNode
+	before := yamlNodeStates(root)
+
+	valid, errors := ValidateOpenAPIDocument(doc)
+
+	assert.False(t, valid)
+	require.Len(t, errors, 1)
+	require.NotEmpty(t, errors[0].SchemaValidationErrors)
+	assert.Equal(t, before, yamlNodeStates(root))
 }
 
 func TestValidateDocument_NormalizationErrorDoesNotValidateNil(t *testing.T) {
@@ -206,9 +236,7 @@ paths: {}`
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	badSpecJSON := map[string]interface{}{
 		"openapi": "3.1.0",
-		"invalid": map[interface{}]interface{}{
-			1: "one",
-		},
+		"invalid": unmarshalableJSONValue(),
 	}
 	info := doc.GetSpecInfo()
 	// the JSON view is built lazily behind a sync.Once; latch it before
@@ -224,7 +252,7 @@ paths: {}`
 	assert.Len(t, errors, 1)
 	assert.Equal(t, "OpenAPI document validation failed", errors[0].Message)
 	assert.Contains(t, errors[0].Reason, "cannot be converted to JSON")
-	assert.Contains(t, errors[0].Reason, "unsupported type: map[interface {}]interface {}")
+	assert.Contains(t, errors[0].Reason, "unsupported type: chan int")
 	assert.NotContains(t, errors[0].Reason, "got null, want object")
 	assert.Empty(t, errors[0].SchemaValidationErrors)
 }
@@ -239,9 +267,7 @@ paths: {}`
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 	badSpecJSON := map[string]interface{}{
 		"openapi": "3.1.0",
-		"invalid": map[interface{}]interface{}{
-			1: "one",
-		},
+		"invalid": unmarshalableJSONValue(),
 	}
 	corrupt := []byte(`{not valid json!!!}`)
 	info := doc.GetSpecInfo()
