@@ -21,6 +21,11 @@ func Route(request *http.Request) *router.Route {
 	return route
 }
 
+// WithRoute returns a shallow copy of request that carries route. The request itself is not changed.
+func WithRoute(request *http.Request, route *router.Route) *http.Request {
+	return request.WithContext(context.WithValue(request.Context(), routeContextKey{}, route))
+}
+
 // AttachRoute scopes a resolved route to a request and returns an idempotent restoration function.
 func AttachRoute(request *http.Request, route *router.Route) func() {
 	if request == nil || route == nil {

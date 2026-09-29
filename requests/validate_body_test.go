@@ -2117,3 +2117,54 @@ paths:
 	assert.True(t, valid)
 	assert.Len(t, errors, 0)
 }
+
+func TestValidateBody_ContentTypeWithoutSubtype(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBufferString(`{}`))
+	request.Header.Set(helpers.ContentTypeHeader, "application")
+
+	valid, errs := v.ValidateRequestBody(request)
+	assert.False(t, valid)
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Message, "content type 'application' does not exist")
+}
+
+func TestValidateBody_MostSpecificMediaRangeApplies(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/createBurger:
+    post:
+      requestBody:
+        content:
+          "*/*":
+            schema:
+              type: string
+          application/*:
+            schema:
+              type: object`
+
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+	v := NewRequestBodyValidator(&m.Model)
+
+	request, _ := http.NewRequest(http.MethodPost, "https://things.com/burgers/createBurger",
+		bytes.NewBufferString(`{"name":"Big Mac"}`))
+	request.Header.Set(helpers.ContentTypeHeader, helpers.JSONContentType)
+
+	valid, errs := v.ValidateRequestBody(request)
+	assert.True(t, valid, errs)
+}

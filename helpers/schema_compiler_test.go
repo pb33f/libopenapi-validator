@@ -6,6 +6,7 @@ package helpers
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"testing"
 	"unicode"
 
@@ -980,4 +981,52 @@ func TestTransformNullableSchema_EnumWithNull(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, nullCount, "enum should contain exactly one null value")
+}
+
+func TestNewCompiledSchema_OpenAPIIntegerFormats(t *testing.T) {
+	schema := []byte(`{"type": "object", "properties": {"small": {"format": "int32"}, "large": {"format": "int64"}}}`)
+
+	asserting, err := NewCompiledSchema("formats", schema, config.NewValidationOptions(config.WithFormatAssertions()))
+	require.NoError(t, err)
+	annotating, err := NewCompiledSchema("formats", schema, config.NewValidationOptions())
+	require.NoError(t, err)
+
+	for _, test := range []struct {
+		property string
+		value    any
+		valid    bool
+	}{
+		{"small", int64(math.MaxInt32), true},
+		{"small", int64(math.MaxInt32) + 1, false},
+		{"small", float64(math.MinInt32), true},
+		{"small", float64(math.MinInt32) - 1, false},
+		{"small", 1.5, false},
+		{"small", json.Number("7.0"), true},
+		{"small", json.Number("2147483648"), false},
+		{"small", "not a number", true},
+		{"large", int64(math.MaxInt64), true},
+		{"large", json.Number("9223372036854775807"), true},
+		{"large", json.Number("9223372036854775808"), false},
+		{"large", json.Number("9223372036854775808.0"), false},
+		{"large", float64(1 << 63), false},
+		{"large", float64(math.MinInt64), true},
+		{"large", json.Number("1e19"), false},
+		{"large", json.Number("not-a-number"), false},
+	} {
+		t.Run(fmt.Sprintf("%s=%v", test.property, test.value), func(t *testing.T) {
+			instance := map[string]any{test.property: test.value}
+			assert.Equal(t, test.valid, asserting.Validate(instance) == nil)
+			assert.NoError(t, annotating.Validate(instance), "formats are annotations unless asserted")
+		})
+	}
+}
+
+func TestNewCompiledSchema_CustomFormatReplacesOpenAPIFormat(t *testing.T) {
+	schema := []byte(`{"format": "int32"}`)
+	options := config.NewValidationOptions(config.WithFormatAssertions(),
+		config.WithCustomFormat("int32", func(any) error { return nil }))
+
+	compiled, err := NewCompiledSchema("custom", schema, options)
+	require.NoError(t, err)
+	assert.NoError(t, compiled.Validate(int64(math.MaxInt64)))
 }

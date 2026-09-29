@@ -5,7 +5,6 @@ package parameters
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -40,7 +39,7 @@ func ValidateCookieArray(
 		for _, itemType := range itemsSchema.Type {
 			switch itemType {
 			case helpers.Integer, helpers.Number:
-				if _, err := strconv.ParseFloat(item, 64); err != nil {
+				if _, err := helpers.ParseNumber(item); err != nil {
 					validationErrors = append(validationErrors,
 						errors.IncorrectCookieParamArrayNumber(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
@@ -87,7 +86,7 @@ func ValidateHeaderArray(
 		for _, itemType := range itemsSchema.Type {
 			switch itemType {
 			case helpers.Integer, helpers.Number:
-				if _, err := strconv.ParseFloat(item, 64); err != nil {
+				if _, err := helpers.ParseNumber(item); err != nil {
 					validationErrors = append(validationErrors,
 						errors.IncorrectHeaderParamArrayNumber(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 				}
@@ -144,14 +143,14 @@ func ValidateQueryArray(
 	}
 
 	// check if the param is within an enum
-	checkEnum := func(item string) {
+	checkEnum := func(item string, parsed any) {
 		// check if the array param is within an enum
 		if sch.Items.IsA() {
 			itemsSch := sch.Items.A.Schema()
 			if itemsSch.Enum != nil {
 				matchFound := false
 				for _, enumVal := range itemsSch.Enum {
-					if strings.TrimSpace(item) == fmt.Sprint(enumVal.Value) {
+					if enumValueMatches(item, parsed, enumVal.Value) {
 						matchFound = true
 						break
 					}
@@ -180,21 +179,22 @@ func ValidateQueryArray(
 		for _, itemType := range itemsSchema.Type {
 			switch itemType {
 			case helpers.Integer:
-				if _, err := strconv.ParseInt(item, 10, 64); err != nil {
+				parsed, err := helpers.ParseInteger(item)
+				if err != nil {
 					validationErrors = append(validationErrors,
 						errors.IncorrectQueryParamArrayInteger(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 					break
 				}
 				// will it blend?
-				checkEnum(item)
+				checkEnum(item, parsed)
 			case helpers.Number:
-				if _, err := strconv.ParseFloat(item, 64); err != nil {
+				if _, err := helpers.ParseNumber(item); err != nil {
 					validationErrors = append(validationErrors,
 						errors.IncorrectQueryParamArrayNumber(param, item, sch, itemsSchema, pathTemplate, operation, renderedItemsSchema))
 					break
 				}
 				// will it blend?
-				checkEnum(item)
+				checkEnum(item, nil)
 
 			case helpers.Boolean:
 				if _, err := strconv.ParseBool(item); err != nil {
@@ -215,7 +215,7 @@ func ValidateQueryArray(
 			case helpers.String:
 
 				// will it float?
-				checkEnum(item)
+				checkEnum(item, nil)
 			}
 		}
 	}

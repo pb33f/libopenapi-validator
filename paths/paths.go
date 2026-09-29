@@ -7,7 +7,6 @@ import (
 	stderrors "errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -18,6 +17,8 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/requeststate"
+	"github.com/pb33f/libopenapi-validator/internal/serverurl"
 	"github.com/pb33f/libopenapi-validator/router"
 )
 
@@ -176,29 +177,25 @@ func getBasePaths(document *v3.Document) []string {
 	// extract base path from document to check against paths.
 	var basePaths []string
 	for _, s := range document.Servers {
-		u, err := url.Parse(s.URL)
-		// if the host contains special characters, we should attempt to split and parse only the relative path
-		if err != nil {
-			// split at first occurrence
-			_, serverPath, _ := strings.Cut(strings.Replace(s.URL, "//", "", 1), "/")
-
-			if !strings.HasPrefix(serverPath, "/") {
-				serverPath = "/" + serverPath
-			}
-
-			u, _ = url.Parse(serverPath)
-		}
-
-		if u != nil && u.Path != "" {
-			basePaths = append(basePaths, u.Path)
+		if basePath := serverurl.BasePath(s.URL); basePath != "" {
+			basePaths = append(basePaths, basePath)
 		}
 	}
 
 	return basePaths
 }
 
-// StripRequestPath strips the base path from the request path, based on the server paths provided in the specification
+// StripRequestPath strips the base path from the request path, based on the server paths provided in the specification.
+// During high-level validation it returns the path the router matched, which accounts for server variables.
 func StripRequestPath(request *http.Request, document *v3.Document) string {
+	if route := requeststate.Route(request); route != nil && route.Document == document && route.RequestPath != "" {
+		// strict server matching ignores the fragment, path-only matching keeps it; always keep it here
+		stripped, _, _ := strings.Cut(route.RequestPath, "#")
+		if request.URL.Fragment != "" {
+			stripped += "#" + request.URL.Fragment
+		}
+		return stripped
+	}
 	basePaths := getBasePaths(document)
 
 	// strip any base path

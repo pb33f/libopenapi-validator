@@ -70,6 +70,9 @@ type Route struct {
 	PathItem  *v3.PathItem  // PathItem is the matched OpenAPI path item.
 	Method    string        // Method is the request method, including additional methods.
 	Operation *v3.Operation // Operation is nil on a method mismatch.
+	// RequestPath is the escaped request path, relative to Server, that matched Path. Path-only
+	// matching includes the request fragment ("/pets/1#top"); strict server matching does not.
+	RequestPath string
 	// RawPathParams contains escaped parameter values exactly as matched in the URL path.
 	RawPathParams map[string]string
 	// PathParams contains URL-decoded operation path parameter values.
@@ -174,7 +177,7 @@ func (r *routeFinder) FindRoute(request *http.Request) (*Route, error) {
 	}
 
 	if r.pathOnly {
-		return r.find(request, compatibilityPath(request, r.document), compatibilityServer(request, r.document), nil)
+		return r.findPathOnly(request)
 	}
 
 	if len(r.servers) == 0 {
@@ -214,6 +217,26 @@ func (r *routeFinder) FindRoute(request *http.Request) (*Route, error) {
 	return nil, &RouteError{Kind: ErrPathNotFound}
 }
 
+// findPathOnly matches the request path, without its server base path, against the document paths.
+// Each candidate path is tried in order; a method mismatch is returned only when no candidate matches.
+func (r *routeFinder) findPathOnly(request *http.Request) (*Route, error) {
+	var partial *Route
+	var partialErr error
+	for _, candidate := range compatibilityCandidates(request, r.document) {
+		route, err := r.find(request, candidate.path, candidate.server, nil)
+		if err == nil {
+			return route, nil
+		}
+		if route != nil && partial == nil {
+			partial, partialErr = route, err
+		}
+	}
+	if partial != nil {
+		return partial, partialErr
+	}
+	return nil, &RouteError{Kind: ErrPathNotFound}
+}
+
 func usesImplicitServer(operation *v3.Operation, item *v3.PathItem, document *v3.Document) bool {
 	return (operation == nil || len(operation.Servers) == 0) &&
 		(item == nil || len(item.Servers) == 0) &&
@@ -246,6 +269,7 @@ func (r *routeFinder) find(request *http.Request, requestPath string, server *v3
 		Document:      r.document,
 		Server:        server,
 		Path:          path,
+		RequestPath:   requestPath,
 		PathItem:      pathItem,
 		Method:        request.Method,
 		Operation:     operation,

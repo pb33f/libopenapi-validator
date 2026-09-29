@@ -17,6 +17,7 @@ import (
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/paths"
 )
 
@@ -29,6 +30,7 @@ func (v *paramValidator) ValidatePathParams(request *http.Request) (bool, []*err
 }
 
 func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, pathItem *v3.PathItem, pathValue string) (bool, []*errors.ValidationError) {
+	request = v.withRoute(request, pathItem)
 	if pathItem == nil {
 		return false, []*errors.ValidationError{{
 			ValidationType:    helpers.PathValidation,
@@ -45,8 +47,14 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 	// split the path into segments, dropping empty segments so that a request
 	// path containing a double slash (e.g. //test/path) does not shift the
 	// index alignment between submitted and template segments.
-	submittedSegments := nonEmptyPathSegments(paths.StripRequestPath(request, v.document))
-	pathSegments := nonEmptyPathSegments(pathValue)
+	submittedPath := paths.StripRequestPath(request, v.document)
+	templatePath := pathValue
+	if !strings.Contains(submittedPath, "#") {
+		// like the router, ignore a template's fragment when the request has none; servers never receive one.
+		templatePath, _, _ = strings.Cut(pathValue, "#")
+	}
+	submittedSegments := nonEmptyPathSegments(submittedPath)
+	pathSegments := nonEmptyPathSegments(templatePath)
 
 	// get the operation method for error reporting
 	operation := strings.ToLower(request.Method)
@@ -166,10 +174,10 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 					renderedSchema := GetRenderedSchema(sch, v.options)
 
 					// check enum (if present)
-					enumCheck := func(decodedValue string) {
+					enumCheck := func(decodedValue string, parsedValue any) {
 						matchFound := false
 						for _, enumVal := range sch.Enum {
-							if strings.TrimSpace(decodedValue) == fmt.Sprint(enumVal.Value) {
+							if enumValueMatches(decodedValue, parsedValue, enumVal.Value) {
 								matchFound = true
 								break
 							}
@@ -190,7 +198,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 								// check if the param is within the enum
 								if sch.Enum != nil {
-									enumCheck(decodedParamValue)
+									enumCheck(decodedParamValue, nil)
 									break
 								}
 								validationErrors = append(validationErrors,
@@ -216,7 +224,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 								}
 								// check if the param is within the enum
 								if sch.Enum != nil {
-									enumCheck(rawParamValue)
+									enumCheck(rawParamValue, paramValueParsed)
 									break
 								}
 								validationErrors = append(validationErrors, ValidateSingleParameterSchema(
@@ -241,7 +249,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 								}
 								// check if the param is within the enum
 								if sch.Enum != nil {
-									enumCheck(rawParamValue)
+									enumCheck(rawParamValue, paramValueParsed)
 									break
 								}
 								validationErrors = append(validationErrors, ValidateSingleParameterSchema(
@@ -352,14 +360,14 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 										switch iSch.Type[n] {
 										case helpers.Integer:
 											for pv := range arrayValues {
-												if _, err := strconv.ParseInt(arrayValues[pv], 10, 64); err != nil {
+												if _, err := helpers.ParseInteger(arrayValues[pv]); err != nil {
 													validationErrors = append(validationErrors,
 														errors.IncorrectPathParamArrayInteger(p, arrayValues[pv], sch, iSch, pathValue, renderedItemsSchema))
 												}
 											}
 										case helpers.Number:
 											for pv := range arrayValues {
-												if _, err := strconv.ParseFloat(arrayValues[pv], 64); err != nil {
+												if _, err := helpers.ParseNumber(arrayValues[pv]); err != nil {
 													validationErrors = append(validationErrors,
 														errors.IncorrectPathParamArrayNumber(p, arrayValues[pv], sch, iSch, pathValue, renderedItemsSchema))
 												}
@@ -448,7 +456,7 @@ func nonEmptyPathSegments(path string) []string {
 
 func (v *paramValidator) resolveNumber(sch *base.Schema, p *v3.Parameter, isLabel bool, isMatrix bool, paramValue string, pathValue string, renderedSchema string) (string, float64, []*errors.ValidationError) {
 	if isLabel && p.Style == helpers.LabelStyle {
-		paramValueParsed, err := strconv.ParseFloat(paramValue[1:], 64)
+		paramValueParsed, err := helpers.ParseNumber(paramValue[1:])
 		if err != nil {
 			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue[1:], sch, pathValue, renderedSchema)}
 		}
@@ -457,13 +465,13 @@ func (v *paramValidator) resolveNumber(sch *base.Schema, p *v3.Parameter, isLabe
 	if isMatrix && p.Style == helpers.MatrixStyle {
 		// strip off the colon and the parameter name
 		paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-		paramValueParsed, err := strconv.ParseFloat(paramValue, 64)
+		paramValueParsed, err := helpers.ParseNumber(paramValue)
 		if err != nil {
-			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue[1:], sch, pathValue, renderedSchema)}
+			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue, sch, pathValue, renderedSchema)}
 		}
 		return paramValue, paramValueParsed, nil
 	}
-	paramValueParsed, err := strconv.ParseFloat(paramValue, 64)
+	paramValueParsed, err := helpers.ParseNumber(paramValue)
 	if err != nil {
 		return "", 0, []*errors.ValidationError{errors.IncorrectPathParamNumber(p, paramValue, sch, pathValue, renderedSchema)}
 	}
@@ -472,7 +480,7 @@ func (v *paramValidator) resolveNumber(sch *base.Schema, p *v3.Parameter, isLabe
 
 func (v *paramValidator) resolveInteger(sch *base.Schema, p *v3.Parameter, isLabel bool, isMatrix bool, paramValue string, pathValue string, renderedSchema string) (string, int64, []*errors.ValidationError) {
 	if isLabel && p.Style == helpers.LabelStyle {
-		paramValueParsed, err := strconv.ParseInt(paramValue[1:], 10, 64)
+		paramValueParsed, err := helpers.ParseInteger(paramValue[1:])
 		if err != nil {
 			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue[1:], sch, pathValue, renderedSchema)}
 		}
@@ -481,15 +489,28 @@ func (v *paramValidator) resolveInteger(sch *base.Schema, p *v3.Parameter, isLab
 	if isMatrix && p.Style == helpers.MatrixStyle {
 		// strip off the colon and the parameter name
 		paramValue = strings.Replace(paramValue[1:], fmt.Sprintf("%s=", p.Name), "", 1)
-		paramValueParsed, err := strconv.ParseInt(paramValue, 10, 64)
+		paramValueParsed, err := helpers.ParseInteger(paramValue)
 		if err != nil {
-			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue[1:], sch, pathValue, renderedSchema)}
+			return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue, sch, pathValue, renderedSchema)}
 		}
 		return paramValue, paramValueParsed, nil
 	}
-	paramValueParsed, err := strconv.ParseInt(paramValue, 10, 64)
+	paramValueParsed, err := helpers.ParseInteger(paramValue)
 	if err != nil {
 		return "", 0, []*errors.ValidationError{errors.IncorrectPathParamInteger(p, paramValue, sch, pathValue, renderedSchema)}
 	}
 	return paramValue, paramValueParsed, nil
+}
+
+// withRoute returns request carrying the route the router matched for it, unless one is attached
+// already, so path parameters are read from the path the router matched after the server base path
+// (and any server variables in it) was removed. The caller's request is not changed.
+func (v *paramValidator) withRoute(request *http.Request, pathItem *v3.PathItem) *http.Request {
+	if pathItem == nil || v.options == nil || v.options.Router == nil || requeststate.Route(request) != nil {
+		return request
+	}
+	if route, err := v.options.Router.FindRoute(request); err == nil && route.PathItem == pathItem {
+		return requeststate.WithRoute(request, route)
+	}
+	return request
 }

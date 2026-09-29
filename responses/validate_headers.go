@@ -4,10 +4,13 @@
 package responses
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/libopenapi/orderedmap"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -45,7 +48,7 @@ func ValidateResponseHeaders(
 		for pair := headers.First(); pair != nil; pair = pair.Next() {
 			k := pair.Key()
 			header := pair.Value()
-			if strings.EqualFold(k, name) {
+			if strings.EqualFold(k, name) && !ignoredResponseHeader(k) {
 				locatedHeaders[strings.ToLower(name)] = headerPair{
 					name:  k,
 					value: v,
@@ -59,7 +62,7 @@ func ValidateResponseHeaders(
 	for pair := headers.First(); pair != nil; pair = pair.Next() {
 		name := pair.Key()
 		header := pair.Value()
-		if header.Required {
+		if header.Required && !ignoredResponseHeader(name) {
 			if _, ok := locatedHeaders[strings.ToLower(name)]; !ok {
 				keywordLocation := helpers.ConstructResponseHeaderJSONPointer(pathTemplate, request.Method, statusCode, name, "required")
 
@@ -90,15 +93,13 @@ func ValidateResponseHeaders(
 		}
 	}
 
-	// validate the model schemas if they are set.
+	// validate every header that is present against its schema, whether it is required or not.
 	for h, header := range locatedHeaders {
 		if header.model.Schema != nil {
-			schema := header.model.Schema.Schema()
-			if schema != nil && header.model.Required {
+			if schema := header.model.Schema.Schema(); schema != nil {
 				for _, headerValue := range header.value {
 					validationErrors = append(validationErrors,
-						parameters.ValidateParameterSchema(schema, nil, headerValue, "header",
-							"response header", h, helpers.ResponseBodyValidation, lowv3.HeadersLabel, options)...)
+						validateHeaderValue(headerValue, schema, header.model.Explode, h, options)...)
 				}
 			}
 		}
@@ -134,4 +135,91 @@ func ValidateResponseHeaders(
 		return false, validationErrors
 	}
 	return true, nil
+}
+
+// ignoredResponseHeader reports whether a declared response header is ignored: OpenAPI says a
+// header named Content-Type SHALL be ignored, because the response's content map describes it.
+func ignoredResponseHeader(name string) bool {
+	return strings.EqualFold(name, helpers.ContentTypeHeader)
+}
+
+// validateHeaderValue validates a header value against its schema. Header values are text that can
+// be read more than one way ("5" is the number 5 and the string "5"), so every reading the schema
+// allows is tried, and the value is valid when any of them is. Otherwise the errors of the first
+// reading are returned.
+func validateHeaderValue(value string, schema *base.Schema, explode bool, name string, options *config.ValidationOptions) []*errors.ValidationError {
+	var firstErrors []*errors.ValidationError
+	for i, reading := range headerValueReadings(value, schema, explode) {
+		readingErrors := parameters.ValidateSingleParameterSchema(schema, reading, "header", "response header",
+			name, helpers.ResponseBodyValidation, lowv3.HeadersLabel, options, "", "")
+		if len(readingErrors) == 0 {
+			return nil
+		}
+		if i == 0 {
+			firstErrors = readingErrors
+		}
+	}
+	return firstErrors
+}
+
+// headerValueReadings returns the ways a header value can be read: as each type the schema declares,
+// in order (an array or object is split as the simple style serializes it), then as JSON, then as the
+// string it was sent as.
+func headerValueReadings(value string, schema *base.Schema, explode bool) []any {
+	var readings []any
+	readAsString := false
+	for _, schemaType := range schema.Type {
+		switch schemaType {
+		case helpers.String:
+			readings = append(readings, value)
+			readAsString = true
+		case helpers.Integer:
+			if parsed, err := helpers.ParseInteger(value); err == nil {
+				readings = append(readings, parsed)
+			}
+		case helpers.Number:
+			if parsed, err := helpers.ParseNumber(value); err == nil {
+				readings = append(readings, parsed)
+			}
+		case helpers.Boolean:
+			if parsed, err := strconv.ParseBool(value); err == nil {
+				readings = append(readings, parsed)
+			}
+		case helpers.Array:
+			readings = append(readings, headerArrayItems(value, schema))
+		case helpers.Object:
+			if explode {
+				readings = append(readings, helpers.ConstructKVFromCSVWithSchema(value, schema))
+			} else {
+				readings = append(readings, helpers.ConstructMapFromCSVWithSchema(value, schema))
+			}
+		}
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(value), &decoded); err == nil {
+		readings = append(readings, decoded)
+	}
+	if !readAsString {
+		readings = append(readings, value)
+	}
+	return readings
+}
+
+// headerArrayItems splits a simple style array header into its items, each read as the first
+// reading its items schema allows.
+func headerArrayItems(value string, schema *base.Schema) []any {
+	var itemSchema *base.Schema
+	if schema.Items != nil && schema.Items.IsA() && schema.Items.A != nil {
+		itemSchema = schema.Items.A.Schema()
+	}
+	items := strings.Split(value, helpers.Comma)
+	decoded := make([]any, len(items))
+	for i, item := range items {
+		item = strings.TrimSpace(item)
+		decoded[i] = item
+		if itemSchema != nil {
+			decoded[i] = headerValueReadings(item, itemSchema, false)[0]
+		}
+	}
+	return decoded
 }

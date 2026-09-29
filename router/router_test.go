@@ -75,6 +75,7 @@ func TestRouterStrictMatchingAndContext(t *testing.T) {
 	assert.Equal(t, "a/b", route.PathParams["id"])
 	assert.Equal(t, "v3", route.ServerParams["version"])
 	assert.Equal(t, "/operation/{version}", route.Server.URL)
+	assert.Equal(t, "/pets/a%2Fb", route.RequestPath)
 	assert.Same(t, route.Document.Paths.PathItems.GetOrZero("/pets/{id}"), route.PathItem)
 }
 
@@ -210,6 +211,28 @@ paths:
 	route, err = compatible.FindRoute(httptestRequest(http.MethodGet, "https://wrong.example/doc/v1/pets/mine"))
 	require.NoError(t, err)
 	assert.Equal(t, "/pets/mine", route.Path)
+	assert.Equal(t, "/pets/mine", route.RequestPath)
+}
+
+func TestRouterPathOnlyStripsTemplatedServerBasePath(t *testing.T) {
+	// url.Parse rejects a variable in the server host, but its base path must still be stripped
+	r := NewRouter(model(t, `openapi: 3.1.0
+info: {title: test, version: 1.0.0}
+servers:
+  - url: https://{host}/api/v1
+    variables:
+      host: {default: api.example.com}
+paths:
+  /widgets/{id}:
+    get: {responses: {"200": {description: ok}}}`), WithPathOnlyMatching())
+	t.Cleanup(r.Release)
+
+	route, err := r.FindRoute(httptestRequest(http.MethodGet, "https://api.example.com/api/v1/widgets/5"))
+	require.NoError(t, err)
+	assert.Equal(t, "/widgets/{id}", route.Path)
+	assert.Equal(t, "/widgets/5", route.RequestPath)
+	assert.Equal(t, "https://{host}/api/v1", route.Server.URL)
+	assert.Equal(t, "5", route.PathParams["id"])
 }
 
 func TestRouterImplicitServerSurvivesUnrelatedOperationOverride(t *testing.T) {
@@ -475,15 +498,57 @@ func TestServerHelperEdges(t *testing.T) {
 
 func TestCompatibilityPathEdges(t *testing.T) {
 	request := &http.Request{URL: &url.URL{Path: "plain", Fragment: "frag"}}
-	assert.Equal(t, "/plain#frag", compatibilityPath(request, nil))
-	doc := &v3.Document{Servers: []*v3.Server{nil, {URL: "http://[::1"}, {URL: "/api"}}}
-	request.URL = &url.URL{Path: "/api/items"}
-	assert.Equal(t, "/items", compatibilityPath(request, doc))
-	assert.Nil(t, compatibilityServer(nil, doc))
-	assert.Nil(t, compatibilityServer(&http.Request{}, doc))
-	assert.Nil(t, compatibilityServer(request, nil))
-	assert.Same(t, doc.Servers[2], compatibilityServer(request, doc))
-	assert.Nil(t, compatibilityServer(httptestRequest(http.MethodGet, "http://example.com/other"), doc))
+	assert.Equal(t, []compatibilityCandidate{{path: "/plain#frag"}}, compatibilityCandidates(request, nil))
+
+	doc := &v3.Document{Servers: []*v3.Server{nil, {URL: "http://[::1"}, {URL: "/api"}, {URL: "/api/v2"}}}
+	request.URL = &url.URL{Path: "/api/v2/items"}
+	assert.Equal(t, []compatibilityCandidate{{"/v2/items", doc.Servers[2]}, {"/items", doc.Servers[3]}},
+		compatibilityCandidates(request, doc))
+
+	request.URL = &url.URL{Path: "/other"}
+	assert.Equal(t, []compatibilityCandidate{{path: "/other"}}, compatibilityCandidates(request, doc))
+}
+
+func TestRouterPathOnlyTriesEveryMatchingServer(t *testing.T) {
+	r := NewRouter(model(t, `openapi: 3.1.0
+info: {title: test, version: 1.0.0}
+servers:
+  - url: http://localhost:{port}/
+    variables:
+      port: {default: "8080"}
+  - url: https://{tenant}.example.com/api
+    variables:
+      tenant: {default: acme}
+  - url: https://example.com/api/v2
+paths:
+  /widgets/{id}:
+    get: {responses: {"200": {description: ok}}}
+  /v2/things:
+    post: {responses: {"200": {description: ok}}}`), WithPathOnlyMatching())
+	t.Cleanup(r.Release)
+
+	// the first two servers leave paths the document does not declare, so the third applies
+	route, err := r.FindRoute(httptestRequest(http.MethodGet, "https://example.com/api/v2/widgets/5"))
+	require.NoError(t, err)
+	assert.Equal(t, "/widgets/{id}", route.Path)
+	assert.Equal(t, "/widgets/5", route.RequestPath)
+	assert.Equal(t, "https://example.com/api/v2", route.Server.URL)
+
+	// an earlier server keeps precedence when the path it leaves is declared
+	route, err = r.FindRoute(httptestRequest(http.MethodPost, "https://acme.example.com/api/v2/things"))
+	require.NoError(t, err)
+	assert.Equal(t, "/v2/things", route.Path)
+	assert.Equal(t, "https://{tenant}.example.com/api", route.Server.URL)
+
+	// a method mismatch is reported when no server leaves a path with the method
+	route, err = r.FindRoute(httptestRequest(http.MethodDelete, "https://example.com/api/v2/widgets/5"))
+	require.ErrorIs(t, err, ErrMethodNotAllowed)
+	require.NotNil(t, route)
+	assert.Equal(t, "/widgets/{id}", route.Path)
+
+	route, err = r.FindRoute(httptestRequest(http.MethodGet, "https://example.com/api/v2/missing"))
+	assert.ErrorIs(t, err, ErrPathNotFound)
+	assert.Nil(t, route)
 }
 
 func TestConcurrentLookupAndRelease(t *testing.T) {

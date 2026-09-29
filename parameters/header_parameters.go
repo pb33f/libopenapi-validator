@@ -6,6 +6,7 @@ package parameters
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -67,10 +68,15 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 
 				pType := sch.Type
 
+				// a number is checked against the schema once; a value that may be a string is
+				// checked as the string it was sent as, below.
+				checkNumber := !slices.Contains(pType, helpers.String)
+
 				for _, ty := range pType {
 					switch ty {
 					case helpers.Integer:
-						if _, err := strconv.ParseInt(param, 10, 64); err != nil {
+						parsed, err := helpers.ParseInteger(param)
+						if err != nil {
 							validationErrors = append(validationErrors,
 								errors.InvalidHeaderParamInteger(p, strings.ToLower(param), sch, pathValue, operation, renderedSchema))
 							break
@@ -79,7 +85,7 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 						if sch.Enum != nil {
 							matchFound := false
 							for _, enumVal := range sch.Enum {
-								if strings.TrimSpace(param) == fmt.Sprint(enumVal.Value) {
+								if enumValueMatches(param, parsed, enumVal.Value) {
 									matchFound = true
 									break
 								}
@@ -87,11 +93,19 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 							if !matchFound {
 								validationErrors = append(validationErrors,
 									errors.IncorrectHeaderParamEnum(p, strings.ToLower(param), sch, pathValue, operation, renderedSchema))
+								break
 							}
+						}
+						if checkNumber {
+							checkNumber = false
+							validationErrors = append(validationErrors, ValidateSingleParameterSchema(sch, parsed,
+								"Header parameter", "The header parameter", p.Name, helpers.ParameterValidation,
+								helpers.ParameterValidationHeader, v.options, pathValue, operation)...)
 						}
 
 					case helpers.Number:
-						if _, err := strconv.ParseFloat(param, 64); err != nil {
+						parsed, err := helpers.ParseNumber(param)
+						if err != nil {
 							validationErrors = append(validationErrors,
 								errors.InvalidHeaderParamNumber(p, strings.ToLower(param), sch, pathValue, operation, renderedSchema))
 							break
@@ -108,7 +122,14 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 							if !matchFound {
 								validationErrors = append(validationErrors,
 									errors.IncorrectHeaderParamEnum(p, strings.ToLower(param), sch, pathValue, operation, renderedSchema))
+								break
 							}
+						}
+						if checkNumber {
+							checkNumber = false
+							validationErrors = append(validationErrors, ValidateSingleParameterSchema(sch, parsed,
+								"Header parameter", "The header parameter", p.Name, helpers.ParameterValidation,
+								helpers.ParameterValidationHeader, v.options, pathValue, operation)...)
 						}
 
 					case helpers.Boolean:

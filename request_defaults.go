@@ -254,24 +254,14 @@ func serializeDefault(value any, separator string) string {
 	return fmt.Sprint(value)
 }
 
+// requestMediaType returns the request body media type that applies to mediaType, the same one
+// request body validation uses.
 func requestMediaType(operation *v3.Operation, mediaType string) *v3.MediaType {
-	if operation == nil || operation.RequestBody == nil || operation.RequestBody.Content == nil {
+	if operation == nil || operation.RequestBody == nil {
 		return nil
 	}
-	if exact := operation.RequestBody.Content.GetOrZero(mediaType); exact != nil {
-		return exact
-	}
-	parts := strings.SplitN(mediaType, "/", 2)
-	if len(parts) != 2 {
-		return nil
-	}
-	for pair := operation.RequestBody.Content.First(); pair != nil; pair = pair.Next() {
-		declared := strings.SplitN(strings.ToLower(pair.Key()), "/", 2)
-		if len(declared) == 2 && (declared[0] == "*" || declared[0] == parts[0]) && (declared[1] == "*" || declared[1] == parts[1]) {
-			return pair.Value()
-		}
-	}
-	return nil
+	found, _ := helpers.FindMediaType(operation.RequestBody.Content, mediaType)
+	return found
 }
 
 func applySchemaDefaults(value any, schema *base.Schema) (bool, error) {

@@ -17,6 +17,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/paths"
 	"github.com/pb33f/libopenapi-validator/radix"
+	"github.com/pb33f/libopenapi-validator/router"
 )
 
 func TestNewValidator_SimpleArrayEncodedPath(t *testing.T) {
@@ -2474,4 +2475,56 @@ func TestSegmentReferencesParam(t *testing.T) {
 	assert.False(t, segmentReferencesParam("{id}", "slug"))
 	assert.False(t, segmentReferencesParam("static", "id"))
 	assert.False(t, segmentReferencesParam("{unbalanced", "unbalanced"))
+}
+
+func TestValidatePathParams_TemplateWithFragment(t *testing.T) {
+	spec := `openapi: 3.1.0
+servers:
+  - url: https://api.example.com
+paths:
+  /pages/{id}#section:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: ok`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+	m, errs := doc.BuildV3Model()
+	require.NoError(t, errs)
+
+	strict := config.NewValidationOptions()
+	strict.Router = router.NewRouter(&m.Model)
+
+	for _, tc := range []struct {
+		mode string
+		v    ParameterValidator
+	}{
+		{"path-only", NewParameterValidator(&m.Model)},
+		{"strict", NewParameterValidator(&m.Model, config.WithExistingOpts(strict))},
+	} {
+		// servers never receive the fragment, so the template's fragment is ignored
+		request, _ := http.NewRequest(http.MethodGet, "https://api.example.com/pages/5", nil)
+		valid, validationErrors := tc.v.ValidatePathParams(request)
+		assert.True(t, valid, tc.mode)
+		assert.Empty(t, validationErrors, tc.mode)
+
+		request, _ = http.NewRequest(http.MethodGet, "https://api.example.com/pages/five", nil)
+		valid, validationErrors = tc.v.ValidatePathParams(request)
+		assert.False(t, valid, tc.mode)
+		require.Len(t, validationErrors, 1, tc.mode)
+		assert.Equal(t, "Path parameter 'id' is not a valid integer", validationErrors[0].Message, tc.mode)
+
+		// a request that carries the fragment is still matched against the whole template
+		request, _ = http.NewRequest(http.MethodGet, "https://api.example.com/pages/5#section", nil)
+		valid, validationErrors = tc.v.ValidatePathParams(request)
+		assert.True(t, valid, tc.mode)
+		assert.Empty(t, validationErrors, tc.mode)
+	}
 }
