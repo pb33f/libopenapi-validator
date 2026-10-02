@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/pb33f/libopenapi"
+	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
 
@@ -277,4 +278,65 @@ paths:
 	assert.Equal(t, 6, errs[0].SpecLine)
 	assert.Equal(t, "/paths/~1pets~1{petId}", errs[0].Context)
 	assert.Contains(t, errs[0].HowToFix, "in: path")
+}
+
+func TestValidatePathParameters_NonPathParameterIgnored(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK`
+
+	valid, reasons := validateDocWithPathParams(t, spec)
+	assert.True(t, valid)
+	assert.Empty(t, reasons)
+}
+
+func TestValidatePathParameters_PathLevelParamsNoOperationsMissing(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}/{toyId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema:
+          type: string`
+
+	valid, reasons := validateDocWithPathParams(t, spec)
+	assert.False(t, valid)
+	require.Len(t, reasons, 1)
+	assert.Contains(t, reasons[0], `template variable "toyId"`)
+	assert.Contains(t, reasons[0], "no corresponding 'path' parameter")
+}
+
+func TestValidatePathParameters_NilModelReturnsNil(t *testing.T) {
+	assert.Nil(t, validatePathParameters(nil))
+	assert.Nil(t, validatePathParameters(&v3.Document{}))
+}
+
+func TestValidatePathItemParameters_NilPathItemReturnsNil(t *testing.T) {
+	assert.Nil(t, validatePathItemParameters("/pets/{petId}", nil, nil))
+}
+
+func TestPathKeyNodes_NilLowReturnsEmpty(t *testing.T) {
+	assert.Empty(t, pathKeyNodes(&v3.Document{}))
 }
