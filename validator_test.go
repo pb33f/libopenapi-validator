@@ -180,6 +180,34 @@ func TestNewValidator_WithRegex(t *testing.T) {
 	assert.Empty(t, valErrs)
 }
 
+func TestNewValidator_WithPathParameterValidation(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      responses:
+        "200":
+          description: OK`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.Nil(t, err, "Failed to load spec")
+
+	v, errs := NewValidator(doc)
+	require.Empty(t, errs)
+	valid, _ := v.ValidateDocument()
+	assert.True(t, valid)
+
+	v, errs = NewValidator(doc, config.WithPathParameterDocumentValidation())
+	require.Empty(t, errs)
+	valid, valErrs := v.ValidateDocument()
+	assert.False(t, valid)
+	require.NotEmpty(t, valErrs)
+	assert.Contains(t, valErrs[0].Reason, `template variable "petId"`)
+}
+
 func TestNewValidator_WithCustomFormat_NoErrors(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
