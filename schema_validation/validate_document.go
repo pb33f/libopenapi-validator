@@ -423,6 +423,13 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 		}
 		validationErrors = append(validationErrors, documentError)
 	}
+
+	if options.ValidateDocumentPathParams {
+		if model, modelErrs := doc.BuildV3Model(); modelErrs == nil && model != nil {
+			validationErrors = append(validationErrors, validatePathParameters(&model.Model)...)
+		}
+	}
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}
