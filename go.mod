@@ -12,7 +12,7 @@ require (
 	github.com/pb33f/libopenapi v0.41.2
 	github.com/pb33f/testify v0.1.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.42.0
 )
 
 require (
