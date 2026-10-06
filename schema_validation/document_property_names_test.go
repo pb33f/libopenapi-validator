@@ -159,3 +159,46 @@ x-items:
 		})
 	}
 }
+
+func TestDocumentPropertyNamesWithNestedContentConstraints(t *testing.T) {
+	for _, rule := range []any{map[string]any{"minLength": 2}, map[string]any{"pattern": "^valid$"}} {
+		t.Run(fmt.Sprint(rule), func(t *testing.T) {
+			doc, err := libopenapi.NewDocument([]byte(`openapi: 3.1.0
+info: {title: Test, version: '1'}
+x-items:
+  - '{"x":true}': true
+  - 42
+`))
+			require.NoError(t, err)
+			compiler := jsonschema.NewCompiler()
+			compiler.AssertContent()
+			require.NoError(t, compiler.AddResource("nested.json", map[string]any{
+				"properties": map[string]any{"x-items": map[string]any{
+					"items": map[string]any{
+						"type": "object",
+						"propertyNames": map[string]any{
+							"contentMediaType": "application/json",
+							"contentSchema":    map[string]any{"propertyNames": rule},
+						},
+					},
+				}},
+			}))
+			schema, err := compiler.Compile("nested.json")
+			require.NoError(t, err)
+			valid, failures := ValidateOpenAPIDocumentWithPrecompiled(doc, schema)
+			require.False(t, valid)
+			require.Len(t, failures, 1)
+			require.Len(t, failures[0].SchemaValidationErrors, 2)
+			name, value := failures[0].SchemaValidationErrors[0], failures[0].SchemaValidationErrors[1]
+			assert.Equal(t, `{"x":true}`, name.FieldName)
+			assert.Equal(t, []string{"x-items", "0", `{"x":true}`}, name.InstancePath)
+			assert.Equal(t, `$['x-items'][0]['{"x":true}']`, name.FieldPath)
+			assert.Equal(t, 4, name.Line)
+			assert.Equal(t, 5, name.Column)
+			assert.Contains(t, name.Reason, "contentSchema")
+			assert.Contains(t, name.Reason, "'x'")
+			assert.Equal(t, "$['x-items'][1]", value.FieldPath)
+			assert.Contains(t, value.Reason, "want object")
+		})
+	}
+}
