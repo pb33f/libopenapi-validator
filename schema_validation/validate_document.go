@@ -425,8 +425,17 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	}
 
 	if options.ValidateDocumentPathParams {
-		if model, modelErrs := doc.BuildV3Model(); modelErrs == nil && model != nil {
+		model, modelErr := doc.BuildV3Model()
+
+		if model != nil {
 			validationErrors = append(validationErrors, validatePathParameters(&model.Model)...)
+		} else {
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
+				ValidationType: helpers.Schema,
+				Message:        "Document does not pass path parameter validation",
+				Reason:         fmt.Sprintf("The document model could not be build: %v", modelErr),
+				HowToFix:       fmt.Sprintf("ensure the document is valid according to the OpenAPI %s spec", doc.GetVersion()),
+			})
 		}
 	}
 
