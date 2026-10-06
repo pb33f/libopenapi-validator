@@ -6,8 +6,8 @@ package helpers
 import (
 	"testing"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/testify/assert"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func TestFlattenSchemaOutputErrors(t *testing.T) {

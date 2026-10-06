@@ -12,13 +12,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"golang.org/x/text/message"
 
 	"github.com/pb33f/libopenapi-validator/cache"

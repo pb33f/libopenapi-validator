@@ -1,4 +1,4 @@
-// Copyright 2023 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package errors
@@ -6,8 +6,8 @@ package errors
 import (
 	"fmt"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi-validator/helpers"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // SchemaValidationFailure describes any failure that occurs when validating data

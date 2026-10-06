@@ -1,10 +1,10 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package openapi_vocabulary
 
 import (
-	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/pb33f/jsonschema/v6"
 )
 
 // OpenAPIVocabularyURL is the vocabulary URL for OpenAPI-specific keywords

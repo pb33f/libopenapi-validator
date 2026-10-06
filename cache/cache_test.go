@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func TestNewDefaultCache(t *testing.T) {

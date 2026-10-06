@@ -9,8 +9,8 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/goccy/go-yaml"
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	validator "github.com/pb33f/libopenapi-validator"
 	"github.com/pb33f/libopenapi-validator/config"

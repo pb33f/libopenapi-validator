@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // https://pb33f.io
 
 package helpers
@@ -6,8 +6,8 @@ package helpers
 import (
 	"testing"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/testify/assert"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func TestDiveIntoValidationError(t *testing.T) {

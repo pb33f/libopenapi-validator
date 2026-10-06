@@ -1,4 +1,4 @@
-// Copyright 2025 Princess B33f Heavy Industries / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package openapi_vocabulary
@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/testify/assert"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"golang.org/x/text/message"
 )
 

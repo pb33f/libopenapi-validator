@@ -1,4 +1,4 @@
-// Copyright 2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // SPDX-License-Identifier: MIT
 
 package schema_validation
@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/pb33f/go-yaml"
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/testify/assert"
 	"github.com/pb33f/testify/require"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"golang.org/x/text/message"
 )
 
