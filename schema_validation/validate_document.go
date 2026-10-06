@@ -348,6 +348,9 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
 				propertyName, isPropertyName := er.Error.Kind.(*kind.PropertyNames)
+				if isPropertyName && propertyErrors[propertyName] == nil {
+					continue // Nested key constraints belong to the outer property-name diagnostic.
+				}
 				if !isPropertyName && propertySchemaLocation != "" && (er.KeywordLocation == propertySchemaLocation || strings.HasPrefix(er.KeywordLocation, propertySchemaLocation+"/")) {
 					continue // The parent diagnostic describes this key's constraint failure.
 				}

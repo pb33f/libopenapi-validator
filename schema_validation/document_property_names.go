@@ -34,6 +34,9 @@ func documentPropertyNameErrors(root *jsonschema.ValidationError) map[*kind.Prop
 }
 
 func documentPropertyNamePattern(err *jsonschema.ValidationError) string {
+	if _, ok := err.ErrorKind.(*kind.ContentSchema); ok {
+		return "" // Patterns in decoded content do not constrain the property name itself.
+	}
 	if pattern, ok := err.ErrorKind.(*kind.Pattern); ok {
 		return pattern.Want
 	}
