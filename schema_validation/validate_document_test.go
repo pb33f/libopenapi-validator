@@ -53,7 +53,13 @@ func TestValidateDocument_Invalid31(t *testing.T) {
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 6)
+	assert.Len(t, errors[0].SchemaValidationErrors, 4)
+	var fields []string
+	for _, failure := range errors[0].SchemaValidationErrors {
+		fields = append(fields, failure.FieldPath)
+		assert.NotEqual(t, "validation failed", failure.Reason)
+	}
+	assert.ElementsMatch(t, []string{"$.info.contact.invalid", "$.info.license", "$.info.license.invalid", "$.info.title"}, fields)
 }
 
 func TestValidateDocument_UnquotedIntegerResponseCodeHelpfulError(t *testing.T) {
@@ -449,7 +455,10 @@ info:
 
 	assert.False(t, valid)
 	assert.Len(t, errors, 1)
-	assert.Len(t, errors[0].SchemaValidationErrors, 6)
+	assert.Len(t, errors[0].SchemaValidationErrors, 5)
+	for _, failure := range errors[0].SchemaValidationErrors {
+		assert.NotEqual(t, "validation failed", failure.Reason)
+	}
 }
 
 func TestValidateDocument_NilSpecJSON(t *testing.T) {
@@ -523,13 +532,13 @@ func TestValidateDocument_WithPrecompiledSchema_Invalid(t *testing.T) {
 	valid, errs := ValidateOpenAPIDocumentWithPrecompiled(doc, compiledSchema)
 	assert.False(t, valid)
 	assert.Len(t, errs, 1)
-	assert.Len(t, errs[0].SchemaValidationErrors, 6)
+	assert.Len(t, errs[0].SchemaValidationErrors, 4)
 
 	// Validate without precompiled schema (should produce identical error count)
 	valid2, errs2 := ValidateOpenAPIDocument(doc)
 	assert.False(t, valid2)
 	assert.Len(t, errs2, 1)
-	assert.Len(t, errs2[0].SchemaValidationErrors, 6)
+	assert.Len(t, errs2[0].SchemaValidationErrors, 4)
 }
 
 func TestValidateDocument_SpecJSONBytesPath(t *testing.T) {

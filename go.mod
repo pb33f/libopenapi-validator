@@ -9,9 +9,9 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/pb33f/go-yaml v0.1.1
 	github.com/pb33f/jsonpath v0.8.4
-	github.com/pb33f/libopenapi v0.41.2
+	github.com/pb33f/jsonschema/v6 v6.0.3
+	github.com/pb33f/libopenapi v0.41.3
 	github.com/pb33f/testify v0.1.1
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	golang.org/x/text v0.42.0
 )
 

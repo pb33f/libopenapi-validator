@@ -12,8 +12,9 @@ import (
 	"strings"
 
 	"github.com/pb33f/go-yaml"
+	"github.com/pb33f/jsonschema/v6"
+	"github.com/pb33f/jsonschema/v6/kind"
 	"github.com/pb33f/libopenapi"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -341,14 +342,23 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 			// flatten the validationErrors
 			schFlatErrs := jk.BasicOutput().Errors
 
-			// Extract property name info once before processing errors (performance optimization)
-			propertyInfo := extractPropertyNameFromError(jk)
+			propertyErrors := documentPropertyNameErrors(jk)
+			var propertySchemaLocation string
 
 			for q := range schFlatErrs {
 				er := schFlatErrs[q]
+				propertyName, isPropertyName := er.Error.Kind.(*kind.PropertyNames)
+				if !isPropertyName && propertySchemaLocation != "" && (er.KeywordLocation == propertySchemaLocation || strings.HasPrefix(er.KeywordLocation, propertySchemaLocation+"/")) {
+					continue // The parent diagnostic describes this key's constraint failure.
+				}
+				propertySchemaLocation = ""
+				if isPropertyName {
+					// Remove the error kind's keyword, retaining the propertyNames schema location.
+					propertySchemaLocation = strings.TrimSuffix(er.KeywordLocation, "/propertyNames")
+				}
 
 				errMsg := er.Error.Kind.LocalizedString(message.NewPrinter(language.Tag{}))
-				if er.KeywordLocation == "" || helpers.IgnorePolyRegex.MatchString(errMsg) {
+				if er.KeywordLocation == "" || helpers.IgnoreRegex.MatchString(errMsg) {
 					continue // ignore this error, it's useless tbh, utter noise.
 				}
 				if errMsg != "" {
@@ -362,6 +372,11 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 						InstancePath:            helpers.ConvertStringLocationToPathSegments(er.InstanceLocation),
 						KeywordLocation:         er.KeywordLocation,
 						OriginalJsonSchemaError: jk,
+					}
+					if isPropertyName {
+						applyDocumentPropertyNameError(info.RootNode.Content[0], propertyErrors[propertyName], propertyName.Property, violation)
+						schemaValidationErrors = append(schemaValidationErrors, violation)
+						continue
 					}
 
 					// if we have a location within the schema, add it to the error
@@ -383,9 +398,6 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 						if source, err := yaml.Marshal(cloneYAMLNode(located)); err == nil {
 							violation.ReferenceObject = strings.TrimSpace(string(source))
 						}
-					} else {
-						// handles property name validation errors that don't provide useful InstanceLocation
-						applyPropertyNameFallback(propertyInfo, info.RootNode.Content[0], violation)
 					}
 					schemaValidationErrors = append(schemaValidationErrors, violation)
 				}

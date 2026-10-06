@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 

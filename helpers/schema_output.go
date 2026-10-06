@@ -3,7 +3,7 @@
 
 package helpers
 
-import "github.com/santhosh-tekuri/jsonschema/v6"
+import "github.com/pb33f/jsonschema/v6"
 
 // FlattenSchemaOutputErrors returns every output unit that carries an actual validation error.
 func FlattenSchemaOutputErrors(output *jsonschema.OutputUnit) []jsonschema.OutputUnit {

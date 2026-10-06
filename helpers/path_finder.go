@@ -1,4 +1,4 @@
-// Copyright 2023-2025 Princess Beef Heavy Industries, LLC / Dave Shanley
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
 // https://pb33f.io
 
 package helpers
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/pb33f/jsonschema/v6"
 )
 
 // ExtractJSONPathFromValidationError traverses and processes a ValidationError to construct a JSONPath string representation of its instance location.

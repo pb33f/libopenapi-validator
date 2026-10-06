@@ -22,6 +22,14 @@ Document validation is explicitly covered for OpenAPI 3.0, 3.1, and 3.2.
 
 👉👉 [Check out the full documentation](https://pb33f.io/libopenapi/validation/) 👈👈
 
+## JSON Schema dependency
+
+The validator uses the maintained [`pb33f/jsonschema/v6`](https://github.com/pb33f/jsonschema) fork.
+If you pass compiled schemas, implement a schema cache, configure a regex engine, or inspect
+`OriginalJsonSchemaError`, update direct imports from `github.com/santhosh-tekuri/jsonschema/v6`
+to `github.com/pb33f/jsonschema/v6` (including `/kind` imports). Types from the two module
+paths have different Go identities. Standard validator calls need no code changes.
+
 ## Runtime validation features
 
 The validator now includes a standalone OpenAPI router, authentication callbacks with route context and replayable bodies, immutable custom body codecs, opt-in request defaults, `Parameter.content` decoding, validation policy switches, and explicit OpenAPI 3.2 document validation.

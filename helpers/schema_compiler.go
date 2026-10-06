@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/pb33f/jsonschema/v6"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/openapi_vocabulary"
