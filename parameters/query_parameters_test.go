@@ -4321,9 +4321,8 @@ paths:
 }
 
 func TestQueryParamObjectContentJSON_InvalidObject(t *testing.T) {
-	// A content-wrapped JSON parameter with an invalid JSON object (wrong type
-	// for a property) should fail schema validation via ValidateParameterSchema,
-	// exercising the full happy path through guards 1-3 and into the validator.
+	// A content-wrapped JSON parameter with a property of the wrong type should
+	// fail schema validation.
 	spec := `openapi: 3.1.0
 paths:
   /test:
@@ -4359,10 +4358,8 @@ paths:
 }
 
 func TestQueryParamObjectFormEncoded_ValidObject(t *testing.T) {
-	// A form-encoded (default style, not content-wrapped) object parameter with
-	// valid comma-separated key-value pairs should pass validation.  This
-	// exercises the ConstructParamMapFromFormEncodingArrayWithSchema path through
-	// all three guards and into ValidateParameterSchema.
+	// A form-encoded object parameter with valid comma-separated key-value pairs
+	// should pass validation.
 	spec := `openapi: 3.1.0
 paths:
   /test:
@@ -4437,10 +4434,8 @@ paths:
 }
 
 func TestQueryParamObjectContentXML_NoPanic(t *testing.T) {
-	// A content-wrapped parameter with an unsupported content type (e.g.
-	// application/xml) hits the encodedObj==nil guard.  This is a different
-	// content type from text/plain in TestQueryParamObjectMissingKey_NoPanic,
-	// confirming the guard fires for any non-JSON content type.
+	// application/xml is not decoded as an object. This is a different content
+	// type from text/plain in TestQueryParamObjectMissingKey_NoPanic.
 	spec := `openapi: 3.1.0
 paths:
   /test:

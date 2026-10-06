@@ -208,19 +208,10 @@ doneLooking:
 									}
 								}
 
-								if encodedObj == nil {
-									validationErrors = append(validationErrors,
-										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
-									break skipValues
-								}
-								objVal, objExists := encodedObj[params[p].Name]
-								if !objExists || objVal == nil {
-									validationErrors = append(validationErrors,
-										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
-									break skipValues
-								}
-								objMap, mapOk := objVal.(map[string]interface{})
-								if !mapOk {
+								// A nil map read is safe. A missing key or a non-map value
+								// makes this assertion false.
+								objMap, ok := encodedObj[params[p].Name].(map[string]interface{})
+								if !ok {
 									validationErrors = append(validationErrors,
 										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
 									break skipValues
