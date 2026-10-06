@@ -340,3 +340,142 @@ func TestValidatePathItemParameters_NilPathItemReturnsNil(t *testing.T) {
 func TestPathKeyNodes_NilLowReturnsEmpty(t *testing.T) {
 	assert.Empty(t, pathKeyNodes(&v3.Document{}))
 }
+
+func TestValidatePathParameters_RunWithModelError(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DoesNotExist'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+
+	assert.Nil(t, err)
+
+	valid, errs := ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+
+	valid, errs = ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+
+	valid, errs = ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+}
+
+func TestValidatePathParameters_NoValidationErrorWithoutConfig(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/DoesNotExist'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+
+	assert.Nil(t, err)
+
+	valid, errs := ValidateOpenAPIDocument(doc)
+
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+
+	valid, errs = ValidateOpenAPIDocument(doc)
+
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+
+	valid, errs = ValidateOpenAPIDocument(doc)
+
+	assert.True(t, valid)
+	assert.Len(t, errs, 0)
+}
+
+func TestValidatePathParameters_ModelCouldNotBeBuilt(t *testing.T) {
+	spec := `swagger: "2.0"
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      responses:
+        "200":
+          description: OK`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	valid, errs := ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+	assert.Contains(t, errs[0].Reason, "The document model could not be build")
+}
+
+func TestValidatePathParameters_CircularReferencesMustAlwaysFail(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+components:
+  schemas:
+    Node:
+      type: object
+      required:
+        - child
+      properties:
+        child:
+          $ref: '#/components/schemas/Node'
+paths:
+  /pets/{petId}:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/Node'`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+
+	assert.Nil(t, err)
+
+	valid, errs := ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+
+	valid, errs = ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+
+	valid, errs = ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+
+	assert.False(t, valid)
+	assert.Len(t, errs, 1)
+}
