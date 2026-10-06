@@ -54,6 +54,25 @@ func createMockParameterWithSchema() *v3.Parameter {
 	return v3.NewParameter(param)
 }
 
+func TestQueryParameterCannotBeDecoded(t *testing.T) {
+	param := createMockParameterWithSchema()
+	sch := base.NewSchema(param.GoLow().Schema.Value.Schema())
+	val := "not_an_object"
+
+	err := QueryParameterCannotBeDecoded(param, val, sch, "/test-path", "get", "{}")
+
+	require.NotNil(t, err)
+	require.Equal(t, helpers.ParameterValidation, err.ValidationType)
+	require.Equal(t, helpers.ParameterValidationQuery, err.ValidationSubType)
+	require.Equal(t, "testParam", err.ParameterName)
+	require.Contains(t, err.Message, "Query parameter 'testParam' cannot be decoded")
+	require.Contains(t, err.Reason, "'not_an_object' cannot be decoded as an object")
+	require.Equal(t, HowToFixInvalidEncoding, err.HowToFix)
+	require.NotNil(t, err.Context)
+	require.Len(t, err.SchemaValidationErrors, 1)
+	require.Contains(t, err.SchemaValidationErrors[0].Reason, "'not_an_object' cannot be decoded as object")
+}
+
 func TestIncorrectFormEncoding(t *testing.T) {
 	param := createMockParameterWithSchema()
 	qp := &helpers.QueryParam{

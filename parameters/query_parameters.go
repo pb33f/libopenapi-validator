@@ -208,9 +208,18 @@ doneLooking:
 									}
 								}
 
+								// A nil map read is safe. A missing key or a non-map value
+								// makes this assertion false.
+								objMap, ok := encodedObj[params[p].Name].(map[string]interface{})
+								if !ok {
+									validationErrors = append(validationErrors,
+										errors.QueryParameterCannotBeDecoded(params[p], ef, sch, pathValue, operation, renderedSchema))
+									break skipValues
+								}
+
 								numErrors := len(validationErrors)
 								validationErrors = append(validationErrors,
-									ValidateParameterSchema(sch, encodedObj[params[p].Name].(map[string]interface{}),
+									ValidateParameterSchema(sch, objMap,
 										ef,
 										"Query parameter",
 										"The query parameter",
