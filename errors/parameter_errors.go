@@ -470,6 +470,7 @@ func IncorrectCookieParamArrayNumber(
 	}
 }
 
+// QueryParameterCannotBeDecoded reports that an object query parameter value could not be decoded into a map.
 func QueryParameterCannotBeDecoded(param *v3.Parameter, val string, sch *base.Schema, pathTemplate string, operation string, renderedSchema string) *ValidationError {
 	keywordLocation := helpers.ConstructParameterJSONPointer(pathTemplate, operation, param.Name, "type")
 	specLine, specCol := paramSchemaTypeLineCol(param)
