@@ -255,3 +255,51 @@ func TestExpressionCappedDiagnosticsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+func TestExpressionHeaderPunctuationInCriteriaAndOutputs(t *testing.T) {
+	for _, version := range []string{"1.0.1", "1.1.0"} {
+		for _, source := range []string{"$request.header.", "$response.header."} {
+			for _, name := range []string{"X!Id", "X&Id", "X|Id", "X&&Id", "X||Id", "X!#$%&'*+-.^_`|~Id", "X!"} {
+				t.Run(version+"/"+source+name, func(t *testing.T) {
+					tail := fmt.Sprintf("        outputs:\n          result: \"%s%s\"\n        successCriteria:\n          - condition: \"%s%s == 'x'\"\n", source, name, source, name)
+					result := expressionValidate(t, version, tail)
+					if !result.Valid() {
+						t.Fatalf("RFC header name rejected in criterion or output: %+v", result.Diagnostics)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestCriterionHeaderOperatorBoundaries(t *testing.T) {
+	for _, version := range []string{"1.0.1", "1.1.0"} {
+		for _, test := range []struct {
+			condition string
+			valid     bool
+		}{
+			{"$response.header.X!Id!='x'", true},
+			{"$response.header.X!=='x'", true},
+			{"$response.header.X&Id=='x'&&$response.header.X|Id=='y'", true},
+			{"$response.header.X!Id||false", true},
+			{"$response.header.X&Id&&true", true},
+			{"$response.header.X!Id = 'x'", false},
+			{"$response.header.X&Id & true", false},
+			{"$response.header.X|Id | true", false},
+			{"$response.header.X!Id &&", false},
+			{"$response.header.X&Id || || true", false},
+			{"$response.header.X|Id !== 'x'", false},
+		} {
+			t.Run(version+"/"+test.condition, func(t *testing.T) {
+				result := expressionValidate(t, version, fmt.Sprintf("        successCriteria:\n          - condition: \"%s\"\n", test.condition))
+				if test.valid {
+					if !result.Valid() {
+						t.Fatalf("operator boundary rejected: %+v", result.Diagnostics)
+					}
+				} else {
+					expressionFinding(t, result, CodeExpression, "/workflows/0/steps/0/successCriteria/0/condition", 15)
+				}
+			})
+		}
+	}
+}
