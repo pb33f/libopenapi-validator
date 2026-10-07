@@ -9,7 +9,6 @@ import (
 	"mime"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/dlclark/regexp2"
 	"github.com/pb33f/jsonpath/pkg/jsonpath"
@@ -59,12 +58,12 @@ func checkExpressions(v *validation) {
 		}
 	}
 	components := object(v.root["components"])
-	for _, name := range semanticKeys(object(components["parameters"])) {
+	for _, name := range sortedKeys(object(components["parameters"])) {
 		raw := object(components["parameters"])[name]
 		v.checkParameterExpressions(object(raw), joinPtr("/components/parameters", name), exprScope{})
 	}
 	for _, kind := range []string{"successActions", "failureActions"} {
-		for _, name := range semanticKeys(object(components[kind])) {
+		for _, name := range sortedKeys(object(components[kind])) {
 			raw := object(components[kind])[name]
 			v.checkActionExpressions(object(raw), joinPtr(joinPtr("/components", kind), name), exprScope{})
 		}
@@ -90,7 +89,7 @@ func (v *validation) checkActions(raw any, path string, scope exprScope) {
 
 func (v *validation) checkOutputs(raw any, path string, scope exprScope) {
 	values := object(raw)
-	for _, name := range semanticKeys(values) {
+	for _, name := range sortedKeys(values) {
 		value := values[name]
 		p := joinPtr(path, name)
 		if s, ok := value.(string); ok {
@@ -141,7 +140,7 @@ func (v *validation) checkValue(value any, path string, scope exprScope) {
 		_, hasContext := val["context"]
 		_, hasSelector := val["selector"]
 		_, hasType := val["type"]
-		for _, key := range semanticKeys(val) {
+		for _, key := range sortedKeys(val) {
 			item := val[key]
 			// In an Any union a selector-looking literal remains ordinary data.
 			// Its selector string must not become an Arazzo expression merely
@@ -369,19 +368,8 @@ func (v *validation) checkDialectSyntax(kind, version, s, path string, code Code
 }
 
 func validatePointer(s string) error {
-	if !utf8.ValidString(s) {
-		return fmt.Errorf("invalid UTF-8")
-	}
-	if s != "" && s[0] != '/' {
-		return fmt.Errorf("JSON Pointer must be empty or start with '/'")
-	}
-	for i := 0; i < len(s); i++ {
-		if s[i] == '~' {
-			if i+1 == len(s) || s[i+1] != '0' && s[i+1] != '1' {
-				return fmt.Errorf("invalid JSON Pointer escape")
-			}
-			i++
-		}
+	if _, ok := linkedPointerTokens(s); !ok {
+		return fmt.Errorf("invalid JSON Pointer syntax or UTF-8")
 	}
 	return nil
 }

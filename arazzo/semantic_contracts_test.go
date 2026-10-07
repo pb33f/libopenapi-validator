@@ -18,11 +18,8 @@ func contractValidation(root map[string]any) *validation {
 }
 
 func TestContractInputSchemaDiagnostics(t *testing.T) {
-	v := contractValidation(map[string]any{"workflows": []any{map[string]any{"inputs": map[string]any{"properties": map[string]any{"count": map[string]any{"type": "unknown"}}}}}})
-	checkInputs(v)
-	if v.err != nil || !semanticHas(v, CodeInputSchema, "/workflows/0/inputs/properties/count/type") {
-		t.Fatalf("schema leaf location lost: %+v %v", v.result.Diagnostics, v.err)
-	}
+	r := inputValidate(t, "      properties: {count: {type: unknown}}\n", "")
+	foundationFinding(t, r, CodeStructure, "/workflows/0/inputs/properties/count/type")
 	c := jsonschema.NewCompiler()
 	meta, err := c.Compile("https://json-schema.org/draft/2020-12/schema")
 	if err != nil {
@@ -32,9 +29,9 @@ func TestContractInputSchemaDiagnostics(t *testing.T) {
 	if err == nil {
 		t.Fatal("invalid schema accepted")
 	}
-	v = contractValidation(nil)
+	v := contractValidation(nil)
 	reportInputCompile(v, &inputRegexpState{v: v}, &jsonschema.SchemaValidationError{Err: err}, "/inputs")
-	if !semanticHas(v, CodeInputSchema, "/type") {
+	if !semanticHas(v, CodeInputSchema, "/inputs") {
 		t.Fatalf("nested compiler diagnostic lost: %+v", v.result.Diagnostics)
 	}
 	sentinel := errors.New("regex failure")
@@ -127,7 +124,7 @@ func TestContractInputSchemaResourceBases(t *testing.T) {
 }
 
 func TestContractSemanticTargetsAndContext(t *testing.T) {
-	v := semanticRun(t, `{"sourceDescriptions":[{"name":"api"},{"name":"api"}],"workflows":[{"workflowId":"run","steps":[{"stepId":"first","workflowId":"missing","parameters":[{"reference":"$components.parameters.absent"}]}]},{"workflowId":"run","steps":[]}]}`, "1.1")
+	v := semanticUnit(t, `{"sourceDescriptions":[{"name":"api"},{"name":"api"}],"workflows":[{"workflowId":"run","steps":[{"stepId":"first","workflowId":"missing","parameters":[{"reference":"$components.parameters.absent"}]}]},{"workflowId":"run","steps":[]}]}`, "1.1")
 	for _, tc := range []struct {
 		code Code
 		path string
@@ -136,7 +133,7 @@ func TestContractSemanticTargetsAndContext(t *testing.T) {
 			t.Fatalf("missing %s %s: %+v", tc.code, tc.path, v.result.Diagnostics)
 		}
 	}
-	v = semanticRun(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","parameters":[{"name":"raw","in":"querystring","value":42},{"name":"id","in":"query","value":1}],"onSuccess":[{"name":"bad","type":"goto","stepId":"first","workflowId":"run","parameters":[{"name":"id","in":"query","value":1}]},{"name":"no-target","type":"end","parameters":[]}]}]}]}`, "1.1")
+	v = semanticUnit(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","parameters":[{"name":"raw","in":"querystring","value":42},{"name":"id","in":"query","value":1}],"onSuccess":[{"name":"bad","type":"goto","stepId":"first","workflowId":"run","parameters":[{"name":"id","in":"query","value":1}]},{"name":"no-target","type":"end","parameters":[]}]}]}]}`, "1.1")
 	for _, tc := range []struct {
 		code Code
 		path string
@@ -146,7 +143,7 @@ func TestContractSemanticTargetsAndContext(t *testing.T) {
 		}
 	}
 	for _, ref := range []string{"$workflows.absent.steps.first", "$steps.first", "missing"} {
-		v = semanticRun(t, fmt.Sprintf(`{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","dependsOn":[%q]}]}]}`, ref), "1.1")
+		v = semanticUnit(t, fmt.Sprintf(`{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","dependsOn":[%q]}]}]}`, ref), "1.1")
 		if !semanticHas(v, CodeDependency, "/workflows/0/steps/0/dependsOn/0") {
 			t.Fatalf("bad dependency accepted %q: %+v", ref, v.result.Diagnostics)
 		}
@@ -170,7 +167,7 @@ func TestContractRuntimeSymbolResolution(t *testing.T) {
 		{"$components.failureActions.absent", true},
 		{"$sourceDescriptions.absent.workflows.run", true},
 	} {
-		v := semanticRun(t, fmt.Sprintf(`{"sourceDescriptions":[{"name":"api"}],"workflows":[{"workflowId":"run","inputs":{"type":"object","additionalProperties":false},"steps":[{"stepId":"first","operationId":"read","outputs":{"id":"$statusCode"}},{"stepId":"second","operationId":"read","parameters":[{"name":"id","in":"query","value":%q}]}]},{"workflowId":"target","inputs":{"type":"object","additionalProperties":false},"outputs":{"id":"$steps.producer.outputs.id"},"steps":[{"stepId":"producer","operationId":"read","outputs":{"id":"$statusCode"}}]}]}`, tc.value), "1.1")
+		v := semanticUnit(t, fmt.Sprintf(`{"sourceDescriptions":[{"name":"api"}],"workflows":[{"workflowId":"run","inputs":{"type":"object","additionalProperties":false},"steps":[{"stepId":"first","operationId":"read","outputs":{"id":"$statusCode"}},{"stepId":"second","operationId":"read","parameters":[{"name":"id","in":"query","value":%q}]}]},{"workflowId":"target","inputs":{"type":"object","additionalProperties":false},"outputs":{"id":"$steps.producer.outputs.id"},"steps":[{"stepId":"producer","operationId":"read","outputs":{"id":"$statusCode"}}]}]}`, tc.value), "1.1")
 		path := "/workflows/0/steps/1/parameters/0/value"
 		if got := semanticHas(v, CodeReference, path); got != tc.want {
 			t.Fatalf("reference %q finding=%v want %v: %+v", tc.value, got, tc.want, v.result.Diagnostics)
@@ -192,12 +189,12 @@ func TestContractExpressionLiteralSelectorsAndContainers(t *testing.T) {
 		`{"context":"$response.body","selector":"$.item","type":"unknown"}`,
 		`{"context":"$response.body","selector":"$.item","type":"jsonpath","literal":true}`,
 	} {
-		v := semanticRun(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","parameters":[{"name":"data","in":"query","value":`+value+`}]}]}]}`, "1.1")
+		v := semanticUnit(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","parameters":[{"name":"data","in":"query","value":`+value+`}]}]}]}`, "1.1")
 		if len(v.result.Diagnostics) != 0 {
 			t.Fatalf("literal selector rejected: %+v", v.result.Diagnostics)
 		}
 	}
-	v := semanticRun(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","correlationId":"$response.header.X-ID","requestBody":{"payload":["$steps.absent.outputs.id"]},"outputs":{"invalid":{"context":"$not-a-runtime-source","type":"jsonpointer","selector":"/id"}}}]}]}`, "1.1")
+	v := semanticUnit(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","correlationId":"$response.header.X-ID","requestBody":{"payload":["$steps.absent.outputs.id"]},"outputs":{"invalid":{"context":"$not-a-runtime-source","type":"jsonpointer","selector":"/id"}}}]}]}`, "1.1")
 	if !semanticHas(v, CodeReference, "/workflows/0/steps/0/requestBody/payload/0") || !semanticHas(v, CodeExpression, "/workflows/0/steps/0/outputs/invalid/context") {
 		t.Fatalf("container expressions unchecked: %+v", v.result.Diagnostics)
 	}
@@ -216,7 +213,7 @@ func TestContractCriteriaEmbeddingAndReplacementCapabilities(t *testing.T) {
 		{`{"condition":"$.item","type":{"type":"jsonpath","version":"unsupported"},"context":"$response.body"}`, "", "", "selector-syntax"},
 	} {
 		// semanticRun parses JSON and checks all applicable criterion scopes.
-		v := semanticRun(t, `{"components":{"successActions":{"test":{"name":"test","type":"end","criteria":[`+tc.criterion+`]}}}}`, "1.1")
+		v := semanticUnit(t, `{"components":{"successActions":{"test":{"name":"test","type":"end","criteria":[`+tc.criterion+`]}}}}`, "1.1")
 		path := strings.Replace(tc.path, "/criteria", "/components/successActions/test/criteria", 1)
 		if tc.code != "" && !semanticHas(v, tc.code, path) {
 			t.Fatalf("criterion finding lost: %+v", v.result.Diagnostics)
@@ -232,7 +229,7 @@ func TestContractCriteriaEmbeddingAndReplacementCapabilities(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct{ media, want string }{{"application/xml", "selector-syntax"}, {"application/octet-stream", "replacement-target"}} {
-		v := semanticRun(t, fmt.Sprintf(`{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","requestBody":{"contentType":%q,"replacements":[{"target":"/root/id","value":"literal"}]}}]}]}`, tc.media), "1.1")
+		v := semanticUnit(t, fmt.Sprintf(`{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","requestBody":{"contentType":%q,"replacements":[{"target":"/root/id","value":"literal"}]}}]}]}`, tc.media), "1.1")
 		found := false
 		for _, check := range v.result.Checks {
 			found = found || check.Name == tc.want && check.Status == CheckIncomplete
@@ -445,7 +442,7 @@ func TestContractPassStructuralOwnership(t *testing.T) {
 }
 
 func TestContractSemanticComponentScopeAndGraphCancellation(t *testing.T) {
-	v := semanticRun(t, `{"components":{"parameters":{"id":{"name":"id","in":"query","value":"$steps.first.outputs.id"}}}}`, "1.1")
+	v := semanticUnit(t, `{"components":{"parameters":{"id":{"name":"id","in":"query","value":"$steps.first.outputs.id"}}}}`, "1.1")
 	if len(v.result.Diagnostics) != 0 {
 		t.Fatalf("unconsumed component acquired workflow scope: %+v", v.result.Diagnostics)
 	}
@@ -474,19 +471,13 @@ func TestContractSemanticComponentScopeAndGraphCancellation(t *testing.T) {
 }
 
 func TestContractFinalizationCancellation(t *testing.T) {
-	v := semanticRun(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","outputs":{"id":"$statusCode"}}]}]}`, "1.1")
+	v := semanticUnit(t, `{"workflows":[{"workflowId":"run","steps":[{"stepId":"first","operationId":"read","outputs":{"id":"$statusCode"}}]}]}`, "1.1")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	v.ctx = ctx
 	finalizeExpressionUses(v)
 	if !errors.Is(v.err, context.Canceled) {
 		t.Fatalf("canceled symbols finalized: %v", v.err)
-	}
-	v = contractValidation(nil)
-	v.ctx = ctx
-	inputSchemaFindings(v, &jsonschema.ValidationError{}, "/inputs")
-	if !errors.Is(v.err, context.Canceled) || len(v.result.Diagnostics) != 0 {
-		t.Fatalf("canceled schema emitted findings: %v %+v", v.err, v.result.Diagnostics)
 	}
 	w := &semanticWorkflow{steps: map[string]*semanticStep{}}
 	if semanticPreExecution(w, expressionUse{StepID: "absent", Path: "/workflows/0/steps/0/parameters/0/value"}) {

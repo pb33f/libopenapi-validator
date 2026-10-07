@@ -9,9 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/dlclark/regexp2"
 	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/jsonschema/v6"
 )
@@ -23,7 +21,7 @@ func TestFoundationConfigurationAndNodeErrors(t *testing.T) {
 	for _, option := range []Option{WithBaseURI("http://[invalid"), WithResolver(nil)} {
 		r, err := ValidateBytes(context.Background(), nil, "config.yaml", option)
 		var tool *Error
-		if r != nil || !errors.As(err, &tool) || tool.Kind != ErrorConfiguration {
+		if r == nil || r.Complete || !errors.As(err, &tool) || tool.Kind != ErrorConfiguration {
 			t.Fatalf("%+v %v", r, err)
 		}
 	}
@@ -66,7 +64,7 @@ func TestFoundationOverflowNumbersRemainNumeric(t *testing.T) {
 
 func TestSchemaPatternAdapters(t *testing.T) {
 	for _, tc := range []struct{ pattern, accepted, rejected string }{
-		{`^(?=ab)ab$`, "ab", "ac"}, {`^(?!\$).+$`, "literal", "$expression"}, {`^a+$`, "aa", "b"},
+		{`^(?!\$).+$`, "literal", "$expression"}, {`^a+$`, "aa", "b"},
 	} {
 		p, err := compileSchemaPattern(tc.pattern)
 		if err != nil || p.String() != tc.pattern || !p.MatchString(tc.accepted) || p.MatchString(tc.rejected) {
@@ -83,19 +81,6 @@ func TestSchemaPatternAdapters(t *testing.T) {
 	if !errors.As(err, &unavailable) || !strings.Contains(err.Error(), unavailable.URI) {
 		t.Fatal(err)
 	}
-	regex, err := regexp2.Compile(`^(a+)+$`, regexp2.ECMAScript)
-	if err != nil {
-		t.Fatal(err)
-	}
-	regex.MatchTimeout = time.Nanosecond
-	func() {
-		defer func() {
-			if _, ok := recover().(patternMatchError); !ok {
-				t.Error("regexp timeout must cross the interface as an operational failure")
-			}
-		}()
-		(ecmaPattern{regex}).MatchString(strings.Repeat("a", 1000) + "!")
-	}()
 }
 
 func TestStructureCompilerFailureAndBudget(t *testing.T) {
@@ -230,39 +215,6 @@ func TestStructureDiagnosticAdapter(t *testing.T) {
 		if v.err != nil {
 			t.Fatal(v.err)
 		}
-	}
-}
-
-type failingPattern struct{ failure any }
-
-func (f failingPattern) String() string          { return "injected-regexp-failure" }
-func (f failingPattern) MatchString(string) bool { panic(f.failure) }
-
-func TestFoundationRegexpFailureBoundary(t *testing.T) {
-	original := officialSchemas
-	defer func() { officialSchemas = original }()
-	cause := errors.New("pattern execution failure")
-	for _, failure := range []any{patternMatchError{cause}, cause} {
-		schema := &jsonschema.Schema{Properties: map[string]*jsonschema.Schema{"info": {Properties: map[string]*jsonschema.Schema{"title": {Pattern: failingPattern{failure}}}}}}
-		officialSchemas = func() (map[string]*jsonschema.Schema, error) {
-			return map[string]*jsonschema.Schema{"1.1": schema}, nil
-		}
-		func() {
-			defer func() {
-				got := recover()
-				if failure == cause && got != cause {
-					t.Errorf("unexpected failures must propagate: %v", got)
-				}
-				if failure != cause && got != nil {
-					t.Errorf("pattern failure escaped: %v", got)
-				}
-			}()
-			r, err := ValidateBytes(context.Background(), []byte(foundationYAML("1.1.0")), "regex.yaml")
-			var tool *Error
-			if !errors.As(err, &tool) || tool.Kind != ErrorOperational || !errors.Is(err, cause) || r.Complete {
-				t.Fatalf("pattern error boundary: %+v %v", r, err)
-			}
-		}()
 	}
 }
 

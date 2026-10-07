@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	upstream "github.com/pb33f/libopenapi/arazzo"
 	"github.com/pb33f/libopenapi/arazzo/expression"
@@ -223,6 +224,9 @@ func (s *sourceSession) pointer(value, path, field string, step map[string]any, 
 }
 
 func linkedPointerTokens(pointer string) ([]string, bool) {
+	if !utf8.ValidString(pointer) {
+		return nil, false
+	}
 	if pointer == "" {
 		return nil, true
 	}

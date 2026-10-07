@@ -22,7 +22,7 @@ import (
 // resource charges. Each test sets only the budget that its behavior requires.
 func sourceContractSession() *sourceSession {
 	v := &validation{ctx: context.Background(), opts: options{limits: DefaultLimits()}, result: &Result{}, nodes: map[string]nodeLocation{}}
-	return &sourceSession{v: v, base: "https://example.test/main.yaml", byURI: map[string]*linkedSource{}, byName: map[string]map[string]any{}, requests: map[string]*linkedSource{}, descriptionPaths: map[string]string{}}
+	return &sourceSession{v: v, sourceState: &sourceState{byURI: map[string]*linkedSource{}, requests: map[string]*linkedSource{}}, sourceScope: sourceScope{base: "https://example.test/main.yaml", byName: map[string]map[string]any{}, descriptionPaths: map[string]string{}}}
 }
 
 func sourceContractError(t *testing.T, s *sourceSession, kind ErrorKind) {

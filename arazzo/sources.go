@@ -18,17 +18,27 @@ import (
 // sourceSession holds only request-local source metadata. SourceDescription names
 // belong to their containing document; canonical identities belong to documents.
 type sourceSession struct {
-	v                   *validation
-	base                string
+	v *validation
+	*sourceState
+	sourceScope
+}
+
+// sourceState owns the shared caches and resource totals for one validation.
+type sourceState struct {
 	byURI               map[string]*linkedSource
-	byName              map[string]map[string]any
 	requests            map[string]*linkedSource
 	count, bytes, nodes int
 	graphVisited        map[*linkedSource]bool
-	scopePath           string
-	scopeSource         *linkedSource
-	descriptionPaths    map[string]string
 	targets             map[dependencyID]*linkedTarget
+}
+
+// sourceScope resolves names and locations within one containing document.
+type sourceScope struct {
+	base             string
+	byName           map[string]map[string]any
+	scopePath        string
+	scopeSource      *linkedSource
+	descriptionPaths map[string]string
 }
 
 type linkedSource struct {
@@ -56,7 +66,7 @@ type linkedTarget struct {
 type linkedParameterKey struct{ name, in string }
 
 func checkSources(v *validation) {
-	s := &sourceSession{v: v, byURI: make(map[string]*linkedSource), byName: make(map[string]map[string]any), requests: make(map[string]*linkedSource), graphVisited: make(map[*linkedSource]bool)}
+	s := &sourceSession{v: v, sourceState: &sourceState{byURI: make(map[string]*linkedSource), requests: make(map[string]*linkedSource), graphVisited: make(map[*linkedSource]bool)}, sourceScope: sourceScope{byName: make(map[string]map[string]any)}}
 	v.sources = s
 	s.descriptionPaths = make(map[string]string)
 	s.targets = make(map[dependencyID]*linkedTarget)
@@ -149,7 +159,7 @@ func checkSources(v *validation) {
 	s.requestExpressions(v.expressionUses)
 	for _, collection := range []string{"successActions", "failureActions"} {
 		definitions := object(object(v.root["components"])[collection])
-		for _, name := range semanticKeys(definitions) {
+		for _, name := range sortedKeys(definitions) {
 			value := definitions[name]
 			action := object(value)
 			path := joinPtr("/components/"+collection, name)
@@ -244,10 +254,6 @@ func (s *sourceSession) build(source *upstream.ResolvedSource) *linkedSource {
 		}
 		s.nodes += stats.nodes
 		s.bytes += stats.bytes
-		if s.nodes > s.v.opts.limits.MaxNodes {
-			s.fail(ErrorLimit, "total source node limit exceeded")
-			return nil
-		}
 		item.root = object(value)
 		item.nodes = nodes
 		switch {

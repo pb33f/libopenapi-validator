@@ -35,9 +35,8 @@ type inputSchemaLoader struct{}
 func (inputSchemaLoader) Load(uri string) (any, error) { return nil, &inputResourceUnavailable{uri} }
 
 type inputRegexpState struct {
-	v       *validation
-	err     error
-	trusted bool
+	v   *validation
+	err error
 }
 type inputRegexp struct {
 	re    *regexp2.Regexp
@@ -59,7 +58,7 @@ func (r *inputRegexp) MatchString(s string) bool {
 }
 
 func (r *inputRegexpState) compile(pattern string) (jsonschema.Regexp, error) {
-	if !r.trusted && len(pattern) > r.v.opts.limits.MaxPatternBytes {
+	if len(pattern) > r.v.opts.limits.MaxPatternBytes {
 		r.v.err = &Error{Kind: ErrorLimit, Cause: fmt.Errorf("input schema pattern exceeds %d bytes", r.v.opts.limits.MaxPatternBytes)}
 		return nil, r.v.err
 	}
@@ -79,37 +78,8 @@ func checkInputs(v *validation) {
 	compiler := jsonschema.NewCompiler()
 	compiler.DefaultDraft(jsonschema.Draft2020)
 	compiler.UseLoader(inputSchemaLoader{})
-	regex := &inputRegexpState{v: v, trusted: true}
+	regex := &inputRegexpState{v: v}
 	compiler.UseRegexpEngine(regex.compile)
-	meta, err := compiler.Compile("https://json-schema.org/draft/2020-12/schema")
-	regex.trusted = false
-	if err != nil {
-		v.err = &Error{Kind: ErrorOperational, Cause: fmt.Errorf("compile input metaschema: %w", err)}
-		return
-	}
-	valid := true
-	for _, slot := range slots {
-		if !v.check() {
-			return
-		}
-		if err := meta.Validate(slot.value); err != nil {
-			var ve *jsonschema.ValidationError
-			if errors.As(err, &ve) {
-				inputSchemaFindings(v, ve, slot.path)
-			} else {
-				v.err = &Error{Kind: ErrorOperational, Location: v.location(slot.path), Cause: err}
-				return
-			}
-			valid = false
-		}
-		if regex.err != nil {
-			v.err = &Error{Kind: ErrorOperational, Location: v.location(slot.path), Cause: regex.err}
-			return
-		}
-	}
-	if !valid {
-		return
-	}
 	base := inputSchemaBase(v)
 	if err := compiler.AddResource(base, v.root); err != nil {
 		v.err = &Error{Kind: ErrorOperational, Cause: err}
@@ -190,23 +160,6 @@ func inputSchemaBase(v *validation) string {
 	return u.String()
 }
 
-func inputSchemaFindings(v *validation, e *jsonschema.ValidationError, base string) {
-	if !v.check() {
-		return
-	}
-	if len(e.Causes) > 0 {
-		for _, cause := range e.Causes {
-			inputSchemaFindings(v, cause, base)
-		}
-		return
-	}
-	path := base
-	for _, token := range e.InstanceLocation {
-		path = joinPtr(path, token)
-	}
-	v.add(CodeInputSchema, path, e.Error())
-}
-
 func schemaReferencePath(value any, path string) string {
 	m := object(value)
 	for _, keyword := range []string{"$ref", "$dynamicRef", "$id", "$anchor", "$dynamicAnchor", "$schema"} {
@@ -214,37 +167,16 @@ func schemaReferencePath(value any, path string) string {
 			return joinPtr(path, keyword)
 		}
 	}
-	// Only schema-bearing keywords count as schema references. In particular,
-	// objects inside const/default/examples are data, not subschema declarations.
-	for _, keyword := range []string{"$defs", "properties", "patternProperties", "dependentSchemas"} {
-		children := object(m[keyword])
-		keys := make([]string, 0, len(children))
-		for key := range children {
-			keys = append(keys, key)
+	found := ""
+	forEachSubschema(m, path, func(child any, childPath string) bool {
+		if candidate := schemaReferencePath(child, childPath); candidate != childPath {
+			found = candidate
+			return false
 		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			childPath := joinPtr(joinPtr(path, keyword), key)
-			if candidate := schemaReferencePath(children[key], childPath); candidate != childPath {
-				return candidate
-			}
-		}
-	}
-	for _, keyword := range []string{"allOf", "anyOf", "oneOf", "prefixItems"} {
-		for i, child := range array(m[keyword]) {
-			childPath := joinPtr(joinPtr(path, keyword), strconv.Itoa(i))
-			if candidate := schemaReferencePath(child, childPath); candidate != childPath {
-				return candidate
-			}
-		}
-	}
-	for _, keyword := range []string{"items", "contains", "not", "if", "then", "else", "additionalProperties", "unevaluatedProperties", "unevaluatedItems", "propertyNames", "contentSchema"} {
-		if child, ok := m[keyword]; ok {
-			childPath := joinPtr(path, keyword)
-			if candidate := schemaReferencePath(child, childPath); candidate != childPath {
-				return candidate
-			}
-		}
+		return true
+	})
+	if found != "" {
+		return found
 	}
 	return strings.TrimSuffix(path, "/")
 }
@@ -266,14 +198,6 @@ func reportInputCompile(v *validation, regex *inputRegexpState, err error, path 
 	if errors.As(err, &unavailable) || unavailable != nil {
 		v.incomplete("input-schema-reference", path, unavailable.uri, "external JSON Schema resource is not supplied")
 		return
-	}
-	var invalid *jsonschema.SchemaValidationError
-	if errors.As(err, &invalid) {
-		var ve *jsonschema.ValidationError
-		if errors.As(invalid.Err, &ve) {
-			inputSchemaFindings(v, ve, "")
-			return
-		}
 	}
 	v.add(CodeInputSchema, path, err.Error())
 }
@@ -302,27 +226,10 @@ func collectInputReferences(value any, path, base string, out *[]inputReference,
 			}
 		}
 	}
-	for _, keyword := range []string{"$defs", "properties", "patternProperties", "dependentSchemas"} {
-		children := object(m[keyword])
-		keys := make([]string, 0, len(children))
-		for key := range children {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			collectInputReferences(children[key], joinPtr(joinPtr(path, keyword), key), base, out, index)
-		}
-	}
-	for _, keyword := range []string{"allOf", "anyOf", "oneOf", "prefixItems"} {
-		for i, child := range array(m[keyword]) {
-			collectInputReferences(child, joinPtr(joinPtr(path, keyword), strconv.Itoa(i)), base, out, index)
-		}
-	}
-	for _, keyword := range []string{"items", "contains", "not", "if", "then", "else", "additionalProperties", "unevaluatedProperties", "unevaluatedItems", "propertyNames", "contentSchema"} {
-		if child, ok := m[keyword]; ok {
-			collectInputReferences(child, joinPtr(path, keyword), base, out, index)
-		}
-	}
+	forEachSubschema(m, path, func(child any, childPath string) bool {
+		collectInputReferences(child, childPath, base, out, index)
+		return true
+	})
 }
 
 // checkInputLimits runs before Arazzo structural validation invokes its embedded
@@ -334,7 +241,7 @@ func checkInputLimits(v *validation) {
 				v.err = &Error{Kind: ErrorLimit, Location: v.location(joinPtr(path, "pattern")), Cause: fmt.Errorf("input schema pattern exceeds %d bytes", v.opts.limits.MaxPatternBytes)}
 				return
 			}
-			for _, key := range semanticKeys(object(schema["patternProperties"])) {
+			for _, key := range sortedKeys(object(schema["patternProperties"])) {
 				if len(key) > v.opts.limits.MaxPatternBytes {
 					v.err = &Error{Kind: ErrorLimit, Location: v.location(joinPtr(joinPtr(path, "patternProperties"), key)), Cause: fmt.Errorf("input schema property pattern exceeds %d bytes", v.opts.limits.MaxPatternBytes)}
 					return
@@ -374,25 +281,35 @@ func walkInputSchemas(v *validation, value any, path string, visit func(map[stri
 	if v.err != nil {
 		return
 	}
+	forEachSubschema(m, path, func(child any, childPath string) bool {
+		walkInputSchemas(v, child, childPath, visit)
+		return v.err == nil
+	})
+}
+
+// forEachSubschema visits only schema-bearing keywords. Annotation data such as
+// const, default and examples must not become schemas or source references.
+func forEachSubschema(m map[string]any, path string, visit func(any, string) bool) {
 	for _, keyword := range []string{"$defs", "properties", "patternProperties", "dependentSchemas"} {
 		children := object(m[keyword])
-		keys := make([]string, 0, len(children))
-		for key := range children {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			walkInputSchemas(v, children[key], joinPtr(joinPtr(path, keyword), key), visit)
+		for _, key := range sortedKeys(children) {
+			if !visit(children[key], joinPtr(joinPtr(path, keyword), key)) {
+				return
+			}
 		}
 	}
 	for _, keyword := range []string{"allOf", "anyOf", "oneOf", "prefixItems"} {
 		for i, child := range array(m[keyword]) {
-			walkInputSchemas(v, child, joinPtr(joinPtr(path, keyword), strconv.Itoa(i)), visit)
+			if !visit(child, joinPtr(joinPtr(path, keyword), strconv.Itoa(i))) {
+				return
+			}
 		}
 	}
 	for _, keyword := range []string{"items", "contains", "not", "if", "then", "else", "additionalProperties", "unevaluatedProperties", "unevaluatedItems", "propertyNames", "contentSchema"} {
 		if child, ok := m[keyword]; ok {
-			walkInputSchemas(v, child, joinPtr(path, keyword), visit)
+			if !visit(child, joinPtr(path, keyword)) {
+				return
+			}
 		}
 	}
 }
