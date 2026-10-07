@@ -6,8 +6,8 @@ package arazzo
 import (
 	"bytes"
 	"embed"
-	"errors"
 	"fmt"
+	"io/fs"
 	"regexp"
 	"sort"
 	"strconv"
@@ -23,21 +23,23 @@ import (
 //go:embed schemas/*.json
 var schemaFiles embed.FS
 
-var officialSchemas = sync.OnceValues(compileOfficialSchemas)
+var officialSchemas = sync.OnceValues(func() (map[string]*jsonschema.Schema, error) {
+	return compileOfficialSchemas(schemaFiles)
+})
 
-func compileOfficialSchemas() (map[string]*jsonschema.Schema, error) {
+func compileOfficialSchemas(files fs.ReadFileFS) (map[string]*jsonschema.Schema, error) {
 	compiled := make(map[string]*jsonschema.Schema, 2)
 	for _, entry := range []struct{ version, file string }{
 		{"1.0", "schemas/arazzo-1.0-2025-10-15.json"},
 		{"1.1", "schemas/arazzo-1.1-2026-04-15.json"},
 	} {
-		data, err := schemaFiles.ReadFile(entry.file)
+		data, err := files.ReadFile(entry.file)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("read embedded schema %s: %w", entry.file, err)
 		}
 		value, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decode embedded schema %s: %w", entry.file, err)
 		}
 		compiler := jsonschema.NewCompiler()
 		compiler.UseLoader(denyLoader{})
@@ -67,11 +69,11 @@ func compileOfficialSchemas() (map[string]*jsonschema.Schema, error) {
 		}
 		id := text(object(value)["$id"])
 		if err := compiler.AddResource(id, value); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("register embedded schema %s: %w", entry.file, err)
 		}
 		schema, err := compiler.Compile(id)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("compile embedded schema %s: %w", entry.file, err)
 		}
 		compiled[entry.version] = schema
 	}
@@ -134,24 +136,18 @@ func checkStructure(v *validation) {
 	if err == nil {
 		return
 	}
-	var validationError *jsonschema.ValidationError
-	if !errors.As(err, &validationError) {
-		v.err = &Error{Kind: ErrorOperational, Cause: err}
-		return
-	}
+	// Schema.Validate returns only *jsonschema.ValidationError on failure.
+	validationError := err.(*jsonschema.ValidationError)
 	printer := message.NewPrinter(language.English)
 	seen := make(map[struct{ path, message string }]bool)
-	var collect func(*jsonschema.ValidationError, string)
-	collect = func(failure *jsonschema.ValidationError, keyPath string) {
+	var collect func(*jsonschema.ValidationError)
+	collect = func(failure *jsonschema.ValidationError) {
 		if !v.check() {
 			return
 		}
 		path := ""
 		for _, token := range failure.InstanceLocation {
 			path = joinPtr(path, token)
-		}
-		if keyPath != "" {
-			path = keyPath
 		}
 		schemaPath := failure.SchemaURL
 		for _, token := range failure.ErrorKind.KeywordPath() {
@@ -228,13 +224,11 @@ func checkStructure(v *validation) {
 				return a.ErrorKind.LocalizedString(printer) < b.ErrorKind.LocalizedString(printer)
 			})
 			for _, child := range children {
-				collect(child, keyPath)
+				collect(child)
 			}
 			return
 		}
 		switch failure.ErrorKind.(type) {
-		case *kind.Schema, *kind.Group, *kind.Reference:
-			return
 		case *kind.FalseSchema:
 			if strings.Contains(failure.SchemaURL, "/unevaluatedProperties") {
 				emit(path, "property is not permitted", true)
@@ -243,8 +237,5 @@ func checkStructure(v *validation) {
 		}
 		emit(path, failure.ErrorKind.LocalizedString(printer), false)
 	}
-	collect(validationError, "")
-	if len(v.result.Diagnostics) == 0 && v.err == nil {
-		v.add(CodeStructure, "", err.Error())
-	}
+	collect(validationError)
 }

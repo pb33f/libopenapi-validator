@@ -73,9 +73,6 @@ func ValidateBytes(ctx context.Context, data []byte, uri string, opts ...Option)
 	for len(stack) > 0 {
 		n := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
-		if n == nil {
-			continue
-		}
 		if n.Kind == yaml.ScalarNode && n.Style == 0 && n.ShortTag() == "!!str" && len(n.Value) > 0 && (n.Value[0] == '-' || n.Value[0] >= '0' && n.Value[0] <= '9') && json.Valid([]byte(n.Value)) {
 			n.Tag = "!!int"
 			if strings.ContainsAny(n.Value, ".eE") {

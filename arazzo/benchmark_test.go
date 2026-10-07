@@ -93,7 +93,7 @@ func BenchmarkValidateManyFindings(b *testing.B) {
 func BenchmarkCompileOfficialSchemas(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := compileOfficialSchemas(); err != nil {
+		if _, err := compileOfficialSchemas(schemaFiles); err != nil {
 			b.Fatal(err)
 		}
 	}
