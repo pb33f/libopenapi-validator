@@ -110,3 +110,30 @@ func BenchmarkValidateSharedDependencies(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkValidateExternalSteps(b *testing.B) {
+	for _, count := range []int{10, 100, 1000} {
+		b.Run(fmt.Sprintf("dependencies-%d", count), func(b *testing.B) {
+			var main, external strings.Builder
+			main.WriteString("arazzo: 1.1.0\ninfo: {title: Main, version: '1'}\nsourceDescriptions: [{name: other, url: other.yaml, type: arazzo}]\nworkflows:\n- workflowId: noop\n  steps: [{stepId: noop, workflowId: noop}]\n- workflowId: run\n  steps:\n")
+			external.WriteString("arazzo: 1.1.0\ninfo: {title: Other, version: '1'}\nsourceDescriptions: [{name: api, url: api.yaml, type: openapi}]\nworkflows:\n- workflowId: target\n  steps:\n")
+			for i := range count {
+				fmt.Fprintf(&main, "  - {stepId: s%d, workflowId: noop, dependsOn: ['$sourceDescriptions.other.target.steps.s%d']}\n", i, count-1)
+				fmt.Fprintf(&external, "  - {stepId: s%d, operationId: read}\n", i)
+			}
+			doc := Document{Root: benchmarkNodes(b, main.String()), URI: "https://example.test/main.yaml"}
+			options := []Option{WithSources(upstream.CandidateDocument{RootNode: benchmarkNodes(b, external.String()), RetrievalURI: "https://example.test/other.yaml"})}
+			ctx := context.Background()
+			if result, err := Validate(ctx, doc, options...); err != nil || !result.Valid() || !result.Complete {
+				b.Fatalf("%+v %v", result, err)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if _, err := Validate(ctx, doc, options...); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}

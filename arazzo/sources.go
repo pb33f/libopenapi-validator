@@ -35,6 +35,7 @@ type linkedSource struct {
 	owner                           *sourceSession
 	nodes                           map[string]nodeLocation
 	unresolvedRefs                  bool
+	partialExpressions              bool
 	refMemo                         map[string]map[string]any
 	kind, identity, retrieval, base string
 	root                            map[string]any
@@ -42,6 +43,7 @@ type linkedSource struct {
 	operations                      map[string][]*linkedTarget
 	pointers                        map[string]*linkedTarget
 	workflows                       map[string]map[string]any
+	steps                           map[string]map[string]map[string]any
 }
 
 type linkedTarget struct {
@@ -297,6 +299,7 @@ func (s *sourceSession) build(source *upstream.ResolvedSource) *linkedSource {
 	} else if source.OpenAPIDocument != nil {
 		item.indexOpenAPI(source.OpenAPIDocument, s)
 	} else if source.ArazzoDocument != nil {
+		item.partialExpressions = true
 		item.root = map[string]any{"arazzo": source.ArazzoDocument.Arazzo, "$self": source.ArazzoDocument.Self}
 		descriptions := []any{}
 		for _, description := range source.ArazzoDocument.SourceDescriptions {
@@ -356,6 +359,7 @@ func (s *sourceSession) build(source *upstream.ResolvedSource) *linkedSource {
 			item.workflows[workflow.WorkflowId] = wf
 		}
 		item.root["workflows"] = workflows
+		item.indexSteps()
 	}
 
 	return item

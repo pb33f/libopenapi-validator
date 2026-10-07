@@ -49,10 +49,15 @@ func compileOfficialSchemas() (map[string]*jsonschema.Schema, error) {
 		// The semantic advice pass applies this pattern only when requested.
 		delete(object(object(object(object(value)["$defs"])["source-description-object"])["properties"])["name"].(map[string]any), "pattern")
 		if entry.version == "1.1" {
+			defs := object(object(value)["$defs"])
+			// Source names are advisory conventions. Keep the same decision for
+			// qualified step prerequisites; the semantic pass resolves exact names.
+			dependencies := object(object(object(defs["step-object-base"])["properties"])["dependsOn"])
+			alternatives := array(object(dependencies["items"])["oneOf"])
+			object(alternatives[2])["pattern"] = `^\$sourceDescriptions\.[\s\S]+\.[^.]+\.steps\.[^.]+$`
 			// Parameter.value is Any in the normative field table (5.8.6.1).
 			// The dated schema omits literal objects from this union. Correct only
 			// this slot in the compilation view; preserve the embedded snapshot.
-			defs := object(object(value)["$defs"])
 			object(object(defs["parameter-object"])["properties"])["value"] = true
 			// Actions accept the same Parameter/Reusable union (5.8.7/5.8.8).
 			// The dated schema's items:true otherwise accepts numbers and null.
