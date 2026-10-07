@@ -1,25 +1,38 @@
 # Validation record
 
 Checked on 7 October 2026 in isolated branch `codex/arazzo-validation`, based on
-`b1808fec4e5a405c08332df7b64f747b4a2d2c5a`. This record covers local checks before
-PR publication. The primary checkout remains unchanged.
+`b1808fec4e5a405c08332df7b64f747b4a2d2c5a`. This record covers local validation of the package. The primary checkout remains unchanged.
 
 All checks use Go 1.26.8, `GOWORK=off`, and the module's released dependencies.
 
 | Check | Result |
 | --- | --- |
 | `go test ./... -count=1` | All module tests pass, including the external-package mixed-source example. |
-| `go test -race -coverprofile=… ./arazzo -count=1` | Pass; 77.3% package statement coverage. |
+| `go test -coverprofile=… ./... -count=1` | Pass; 98.8% repository statement coverage, including the CLI. Existing packages measure 98.662%; Arazzo measures 99.130%. |
+| `go test -race -coverprofile=… ./arazzo -count=1` | Pass; 99.1% package statement coverage. |
 | `go test -race ./arazzo -run TestResultDoesNotRetainSourceGraphs -count=20` | Pass; retained diagnostics do not retain primary/source root graphs. |
 | `go build ./...` | Pass. |
 | `go vet ./...` | Pass. |
 | `go mod tidy -diff` | Pass, no module or checksum changes. |
-| `golangci-lint run ./arazzo/...` | Pass, zero issues. |
+| `golangci-lint run ./...` | Pass, zero issues. |
 | gofumpt, gci and `git diff --check` | Pass. |
-| Schema snapshot checksums and all 69 ledger test references | Pass. |
+| Schema snapshot checksums and all 77 ledger test references | Pass. |
 | Independent correctness and resource reviews | All reported findings repaired and verified; no remaining P0–P2 findings in the reviewed scope. |
 
 Statement coverage is measured coverage, not a claim of full branch coverage.
+The five boundary test files cover source/model projection, references, target
+metadata, dependency graphs, expressions, schema diagnostics, cancellation and
+resource limits. Tests assert findings and capabilities, with external source
+coordinates and caller immutability where applicable. Disabling integer or float
+retagging makes the public numeric-bound regression fail. Independent correctness
+and de-slop reviews found no remaining material issues in these tests.
+
+The initial `f8f46d2` report measured 68.44% Codecov patch coverage and 91.38%
+project coverage against the 98.27% base. The updated tests and six review repairs
+have passed local validation. Codecov line coverage on the final published head
+must meet or exceed the base before the PR is ready. Thresholds, exclusions and
+the CI coverage command are unchanged.
+
 The [requirements ledger](REQUIREMENTS.md) records semantic fixtures and capability
 limits. The [package guide](README.md) explains the result and coverage contract.
 
@@ -32,16 +45,19 @@ The cold benchmark compiles both embedded schemas without the global cache.
 
 | Case | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| Warm: 10 steps, operations and expressions | 254,632 | 342,606 | 4,058 |
-| Warm: 100 steps, operations and expressions | 2,429,607 | 3,237,388 | 38,691 |
-| Warm: 1,000 steps, operations and expressions | 21,610,055 | 33,074,060 | 387,775 |
-| 10 findings | 163,165 | 211,506 | 2,851 |
-| 100 findings | 1,585,993 | 1,988,292 | 27,090 |
-| 500 findings | 7,223,785 | 9,953,842 | 136,037 |
-| 10 workflows sharing a source prerequisite and reusable parameter | 396,294 | 340,435 | 3,967 |
-| 100 workflows sharing a source prerequisite and reusable parameter | 3,042,558 | 2,964,794 | 35,805 |
-| 1,000 workflows sharing a source prerequisite and reusable parameter | 21,864,433 | 29,375,616 | 356,961 |
-| Cold: compile both official schemas | 4,679,181 | 5,043,806 | 66,463 |
+| Warm: 10 steps, operations and expressions | 304,601 | 343,487 | 4,065 |
+| Warm: 100 steps, operations and expressions | 2,375,296 | 3,241,226 | 38,697 |
+| Warm: 1,000 steps, operations and expressions | 23,764,141 | 33,128,780 | 387,783 |
+| 10 findings | 182,586 | 212,284 | 2,858 |
+| 100 findings | 1,709,425 | 1,991,975 | 27,096 |
+| 500 findings | 7,729,827 | 9,981,505 | 136,043 |
+| 10 workflows sharing a source prerequisite and reusable parameter | 280,759 | 344,519 | 4,007 |
+| 100 workflows sharing a source prerequisite and reusable parameter | 2,459,634 | 3,000,619 | 36,122 |
+| 1,000 workflows sharing a source prerequisite and reusable parameter | 22,486,128 | 29,770,868 | 360,728 |
+| 10 prerequisites sharing the final external step | 301,489 | 360,126 | 4,432 |
+| 100 prerequisites sharing the final external step | 2,991,594 | 3,126,669 | 38,691 |
+| 1,000 prerequisites sharing the final external step | 23,188,979 | 30,686,837 | 386,776 |
+| Cold: compile both official schemas | 5,419,673 | 5,042,258 | 66,395 |
 
 Time and allocation growth are approximately linear across these workloads.
 These are local measurements, not service latency promises. Resolver transport
