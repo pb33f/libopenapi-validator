@@ -4,6 +4,7 @@
 package arazzo
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ func (source *linkedSource) indexRaw() {
 				source.workflows[id] = workflow
 			}
 		}
+		source.indexSteps()
 	case "openapi":
 		for _, collection := range []string{"paths", "webhooks"} {
 			values := object(source.root[collection])
@@ -69,6 +71,29 @@ func (source *linkedSource) indexRaw() {
 				source.operations[name] = append(source.operations[name], target)
 			}
 		}
+	}
+}
+
+// indexSteps gives every source-qualified dependency and expression the same
+// scoped lookup. Repeated references never rescan a workflow's step array.
+func (source *linkedSource) indexSteps() {
+	source.steps = make(map[string]map[string]map[string]any)
+	for wi, raw := range array(source.root["workflows"]) {
+		workflow := object(raw)
+		items := array(workflow["steps"])
+		path := source.owner.sourcePath(source, fmt.Sprintf("/workflows/%d/steps", wi))
+		if !source.owner.v.work(len(items)+1, path) {
+			return
+		}
+		steps := make(map[string]map[string]any, len(items))
+		for _, raw := range items {
+			if !source.owner.v.check() {
+				return
+			}
+			step := object(raw)
+			steps[text(step["stepId"])] = step
+		}
+		source.steps[text(workflow["workflowId"])] = steps
 	}
 }
 
@@ -175,7 +200,13 @@ func (source *linkedSource) indexOpenAPI(document *v3.Document, s *sourceSession
 		}
 		operations := map[string]*v3.Operation{"get": item.Get, "put": item.Put, "post": item.Post, "delete": item.Delete, "options": item.Options, "head": item.Head, "patch": item.Patch, "trace": item.Trace, "query": item.Query}
 		if item.AdditionalOperations != nil {
+			if !s.charge(item.AdditionalOperations.Len(), 0) {
+				return
+			}
 			for method, operation := range item.AdditionalOperations.FromOldest() {
+				if !s.charge(1, len("additionalOperations/")+3*len(method)) {
+					return
+				}
 				operations["additionalOperations/"+strings.ReplaceAll(strings.ReplaceAll(method, "~", "~0"), "/", "~1")] = operation
 			}
 		}

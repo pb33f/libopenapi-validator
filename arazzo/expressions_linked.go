@@ -87,11 +87,7 @@ func finalizeLinkedExpressionUses(v *validation) {
 				continue
 			}
 		case strings.HasPrefix(tail, "steps."):
-			steps := make(map[string]map[string]any)
-			for _, raw := range array(target.node["steps"]) {
-				step := object(raw)
-				steps[text(step["stepId"])] = step
-			}
+			steps := source.steps[id]
 			sid, member := semanticReferenceParts(strings.TrimPrefix(tail, "steps."), func(id string) bool { _, ok := steps[id]; return ok })
 			if sid == "" {
 				v.add(CodeReference, use.Path, "runtime expression references an unknown external workflow step")

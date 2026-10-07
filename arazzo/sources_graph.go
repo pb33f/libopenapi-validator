@@ -26,11 +26,9 @@ func (s *sourceSession) externalStep(value, path string) (dependencyID, bool) {
 		s.v.incomplete("step-dependency", path, name, "adapter does not expose workflow steps")
 		return dependencyID{}, false
 	}
-	for _, entry := range array(target.node["steps"]) {
-		if text(object(entry)["stepId"]) == step {
-			s.graphSource(target.source, path, 1)
-			return dependencyID{document: target.source.identity, workflow: wf, step: step}, true
-		}
+	if target.source.steps[wf][step] != nil {
+		s.graphSource(target.source, path, 1)
+		return dependencyID{document: target.source.identity, workflow: wf, step: step}, true
 	}
 	s.v.add(CodeReference, path, fmt.Sprintf("step %q does not exist in workflow %q", step, wf))
 	return dependencyID{}, false
@@ -115,13 +113,7 @@ func (s *sourceSession) graphSource(source *linkedSource, path string, depth int
 					if target == nil {
 						continue
 					}
-					found := false
-					for _, candidate := range array(target.node["steps"]) {
-						if text(object(candidate)["stepId"]) == otherStep {
-							found = true
-							break
-						}
-					}
+					found := target.source.steps[other][otherStep] != nil
 					if !found {
 						if target.node == nil {
 							s.v.incomplete("external-prerequisites", path, target.source.identity, "workflow step metadata unavailable")
@@ -139,13 +131,7 @@ func (s *sourceSession) graphSource(source *linkedSource, path string, depth int
 						s.v.add(CodeReference, path, "invalid cross-workflow step dependency")
 						continue
 					}
-					found := false
-					for _, candidate := range array(source.workflows[other]["steps"]) {
-						if text(object(candidate)["stepId"]) == otherStep {
-							found = true
-							break
-						}
-					}
+					found := source.steps[other][otherStep] != nil
 					if !found {
 						s.v.add(CodeReference, path, "external cross-workflow step prerequisite does not exist")
 						continue
@@ -160,7 +146,11 @@ func (s *sourceSession) graphSource(source *linkedSource, path string, depth int
 		}
 	}
 	child.graphExpressions(source)
-	s.complete("external-prerequisites", path, source.identity)
+	if source.partialExpressions {
+		s.v.incomplete("external-prerequisites", path, source.identity, "rootless Arazzo model lacks complete expression-bearing fields; supply original nodes or bytes")
+	} else {
+		s.complete("external-prerequisites", path, source.identity)
+	}
 	s.count = child.count
 	s.bytes = child.bytes
 	s.nodes = child.nodes
@@ -222,6 +212,9 @@ func (s *sourceSession) graphExpressions(source *linkedSource) {
 	if nested.err == nil {
 		child.requestExpressions(nested.expressionUses)
 		finalizeExpressionUses(nested)
+		if nested.check() {
+			finalizeLinkedExpressionUses(nested)
+		}
 	}
 	if nested.err != nil {
 		s.v.err = nested.err
