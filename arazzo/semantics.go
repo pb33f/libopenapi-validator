@@ -43,9 +43,10 @@ type semanticIndex struct {
 // effectiveObject retains the consuming slot independently from its component
 // definition. Overrides copy only the object envelope, leaving values immutable.
 type effectiveObject struct {
-	value      map[string]any
-	path       string
-	definition string
+	value         map[string]any
+	path          string
+	definition    string
+	authoredValue bool
 }
 
 func checkSemantics(v *validation) {
@@ -94,7 +95,7 @@ func checkSemantics(v *validation) {
 	}
 	// Every component body is checked, including definitions with no uses.
 	for _, kind := range []string{"successActions", "failureActions"} {
-		for _, key := range semanticKeys(v.local.components[kind]) {
+		for _, key := range sortedKeys(v.local.components[kind]) {
 			item := effectiveObject{value: object(v.local.components[kind][key]), path: joinPtr("/components/"+kind, key)}
 			v.checkAction(item, nil)
 		}
@@ -151,7 +152,11 @@ func checkSemantics(v *validation) {
 				v.checkWorkflowInputParameters(effective, text(s.value["workflowId"]))
 			}
 			for _, p := range effective {
-				v.checkParameterExpressions(p.value, p.path, exprScope{workflowID: w.id, stepID: s.id})
+				// The expression pass owns authored inline values. Only inherited
+				// or reusable values need an additional check in the consuming scope.
+				if p.definition != "" && !p.authoredValue || !strings.HasPrefix(p.path, s.path+"/parameters/") {
+					v.checkParameterExpressions(p.value, p.path, exprScope{workflowID: w.id, stepID: s.id})
+				}
 			}
 			for _, group := range []struct {
 				field, kind string
@@ -161,9 +166,15 @@ func checkSemantics(v *validation) {
 				v.uniqueActions(inline)
 				for _, action := range v.mergeEffective(group.defaults, inline, actionIdentity, s.path+"/"+group.field) {
 					v.checkAction(action, w)
-					v.checkActionExpressions(action.value, action.path, exprScope{workflowID: w.id, stepID: s.id})
+					scope := exprScope{workflowID: w.id, stepID: s.id}
+					inherited := action.definition != "" || !strings.HasPrefix(action.path, s.path+"/"+group.field+"/")
+					if inherited {
+						v.checkCriteria(action.value["criteria"], action.path+"/criteria", scope)
+					}
 					for _, p := range v.resolveList(action.value["parameters"], action.path+"/parameters", "parameters") {
-						v.checkParameterExpressions(p.value, p.path, exprScope{workflowID: w.id, stepID: s.id})
+						if inherited || p.definition != "" && !p.authoredValue {
+							v.checkParameterExpressions(p.value, p.path, scope)
+						}
 					}
 				}
 			}
@@ -179,7 +190,7 @@ func checkSemantics(v *validation) {
 	}
 }
 
-func semanticKeys(m map[string]any) []string {
+func sortedKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)
@@ -226,6 +237,7 @@ func (v *validation) resolveList(raw any, path, kind string) []effectiveObject {
 }
 
 func (v *validation) resolveReusable(m map[string]any, path, kind string) (effectiveObject, bool) {
+	_, authoredValue := m["value"]
 	if !v.work(1, path+"/reference") {
 		return effectiveObject{}, false
 	}
@@ -279,7 +291,7 @@ func (v *validation) resolveReusable(m map[string]any, path, kind string) (effec
 		}
 		m = clone
 	}
-	return effectiveObject{value: m, path: path, definition: definition}, true
+	return effectiveObject{value: m, path: path, definition: definition, authoredValue: authoredValue}, true
 }
 
 type parameterKey struct{ name, location string }

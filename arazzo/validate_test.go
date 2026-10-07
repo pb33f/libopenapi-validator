@@ -93,7 +93,7 @@ func TestFoundationVersionsAndJSONParity(t *testing.T) {
 			if err := yaml.Unmarshal(data, &root); err != nil {
 				t.Fatal(err)
 			}
-			value, _, _, err := normalize(context.Background(), Document{Root: &root}, DefaultLimits())
+			value, _, _, _, err := normalizeWithStats(context.Background(), Document{Root: &root}, DefaultLimits())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -151,7 +151,7 @@ func TestFoundationStructuralLocations(t *testing.T) {
 			if err := yaml.Unmarshal([]byte(data), &root); err != nil {
 				t.Fatal(err)
 			}
-			_, nodes, _, err := normalize(context.Background(), Document{Root: &root}, DefaultLimits())
+			_, nodes, _, _, err := normalizeWithStats(context.Background(), Document{Root: &root}, DefaultLimits())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -252,7 +252,7 @@ func TestFoundationYAMLGraphsAndNumbers(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(data), &root); err != nil {
 		t.Fatal(err)
 	}
-	value, _, diags, err := normalize(context.Background(), Document{Root: &root}, DefaultLimits())
+	value, _, diags, _, err := normalizeWithStats(context.Background(), Document{Root: &root}, DefaultLimits())
 	if err != nil || len(diags) > 0 {
 		t.Fatalf("%v %+v", err, diags)
 	}
@@ -264,20 +264,20 @@ func TestFoundationYAMLGraphsAndNumbers(t *testing.T) {
 		if err := yaml.Unmarshal([]byte(data), &root); err != nil {
 			t.Fatal(err)
 		}
-		_, _, diags, err := normalize(context.Background(), Document{Root: &root}, DefaultLimits())
+		_, _, diags, _, err := normalizeWithStats(context.Background(), Document{Root: &root}, DefaultLimits())
 		if err != nil || len(diags) == 0 {
 			t.Fatalf("%q: %+v %v", data, diags, err)
 		}
 	}
 	root = yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 	root.Content = []*yaml.Node{&root}
-	_, _, diags, err = normalize(context.Background(), Document{Root: &root}, DefaultLimits())
+	_, _, diags, _, err = normalizeWithStats(context.Background(), Document{Root: &root}, DefaultLimits())
 	if err != nil || len(diags) != 1 {
 		t.Fatalf("recursive graph: %+v %v", diags, err)
 	}
 	limits := DefaultLimits()
 	limits.MaxNodes = 1
-	_, _, _, err = normalize(context.Background(), Document{Root: &root}, limits)
+	_, _, _, _, err = normalizeWithStats(context.Background(), Document{Root: &root}, limits)
 	var tool *Error
 	if !errors.As(err, &tool) || tool.Kind != ErrorLimit {
 		t.Fatal(err)

@@ -142,7 +142,16 @@ type Limits struct {
 }
 
 // DefaultLimits returns the default per-call limits.
-func DefaultLimits() Limits { return Limits{16 << 20, 200000, 128, 50, 1000, 65536} }
+func DefaultLimits() Limits {
+	return Limits{
+		MaxBytes:        16 << 20,
+		MaxNodes:        200000,
+		MaxDepth:        128,
+		MaxSources:      50,
+		MaxDiagnostics:  1000,
+		MaxPatternBytes: 65536,
+	}
+}
 
 // Option configures one validation call. Options do not modify shared state.
 type (

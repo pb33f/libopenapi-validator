@@ -38,7 +38,7 @@ func TestNodeMalformedGraphs(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			before := cloneNodeGraph(tc.root)
-			_, _, ds, err := normalize(context.Background(), Document{Root: tc.root, URI: "nodes.yaml"}, DefaultLimits())
+			_, _, ds, _, err := normalizeWithStats(context.Background(), Document{Root: tc.root, URI: "nodes.yaml"}, DefaultLimits())
 			if tc.kind != "" {
 				var tool *Error
 				if !errors.As(err, &tool) || tool.Kind != tc.kind {
@@ -64,14 +64,14 @@ func TestNodeNumericSpellings(t *testing.T) {
 		{"!!int", "0o17", "15"},
 	} {
 		root := &yaml.Node{Kind: yaml.ScalarNode, Tag: tc.tag, Value: tc.value}
-		v, _, ds, err := normalize(context.Background(), Document{Root: root}, DefaultLimits())
+		v, _, ds, _, err := normalizeWithStats(context.Background(), Document{Root: root}, DefaultLimits())
 		if err != nil || len(ds) != 0 || v != json.Number(tc.want) {
 			t.Fatalf("%s: %v %+v %v", tc.value, v, ds, err)
 		}
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, _, _, err := normalize(ctx, Document{Root: &yaml.Node{}}, DefaultLimits())
+	_, _, _, _, err := normalizeWithStats(ctx, Document{Root: &yaml.Node{}}, DefaultLimits())
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestNodeMergePrecedenceAndLocations(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(data), &root); err != nil {
 		t.Fatal(err)
 	}
-	v, locations, ds, err := normalize(context.Background(), Document{Root: &root}, DefaultLimits())
+	v, locations, ds, _, err := normalizeWithStats(context.Background(), Document{Root: &root}, DefaultLimits())
 	if err != nil || len(ds) != 0 {
 		t.Fatalf("%+v %v", ds, err)
 	}
@@ -112,7 +112,7 @@ func TestNodeLimitsAtEachBoundary(t *testing.T) {
 	} {
 		l := DefaultLimits()
 		l.MaxNodes, l.MaxBytes, l.MaxDiagnostics = tc.nodes, tc.bytes, tc.diagnostics
-		_, _, _, err := normalize(context.Background(), Document{Root: tc.root}, l)
+		_, _, _, _, err := normalizeWithStats(context.Background(), Document{Root: tc.root}, l)
 		var tool *Error
 		if !errors.As(err, &tool) || (tool.Kind != ErrorLimit && tool.Kind != ErrorInput) {
 			t.Fatalf("expected bounded failure: %v", err)

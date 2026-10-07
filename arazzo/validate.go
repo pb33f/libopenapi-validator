@@ -44,10 +44,11 @@ func configure(ctx context.Context, opts []Option) (options, error) {
 
 // ValidateBytes parses exactly one JSON or YAML document and validates it through
 // the same path as Validate. Parse failures and multiple documents are input errors.
+// Every failure returns a non-nil incomplete result.
 func ValidateBytes(ctx context.Context, data []byte, uri string, opts ...Option) (*Result, error) {
 	o, err := configure(ctx, opts)
 	if err != nil {
-		return nil, err
+		return &Result{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return &Result{}, &Error{Kind: ErrorOperational, Location: Location{URI: uri}, Cause: err}
@@ -58,13 +59,13 @@ func ValidateBytes(ctx context.Context, data []byte, uri string, opts ...Option)
 	var root, extra yaml.Node
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&root); err != nil {
-		return nil, &Error{Kind: ErrorInput, Location: Location{URI: uri}, Cause: err}
+		return &Result{}, &Error{Kind: ErrorInput, Location: Location{URI: uri}, Cause: err}
 	}
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		if err == nil {
 			err = fmt.Errorf("multiple YAML documents are not permitted")
 		}
-		return nil, &Error{Kind: ErrorInput, Location: Location{URI: uri, Line: extra.Line, Column: extra.Column}, Cause: err}
+		return &Result{}, &Error{Kind: ErrorInput, Location: Location{URI: uri, Line: extra.Line, Column: extra.Column}, Cause: err}
 	}
 	// The YAML resolver falls back to string when a plain number overflows
 	// float64. Keep numeric syntax and precision on this parser-owned tree.
@@ -95,7 +96,7 @@ func ValidateBytes(ctx context.Context, data []byte, uri string, opts ...Option)
 func Validate(ctx context.Context, doc Document, opts ...Option) (*Result, error) {
 	o, err := configure(ctx, opts)
 	if err != nil {
-		return nil, err
+		return &Result{}, err
 	}
 	return validate(ctx, doc, o)
 }
@@ -104,13 +105,6 @@ func validate(ctx context.Context, doc Document, opts options) (result *Result, 
 	result = &Result{}
 	v := &validation{ctx: ctx, doc: doc, opts: opts, result: result, budget: &workBudget{}}
 	defer func() {
-		if recovered := recover(); recovered != nil {
-			if patternError, ok := recovered.(patternMatchError); ok {
-				v.err = &Error{Kind: ErrorOperational, Cause: patternError.err}
-			} else {
-				panic(recovered)
-			}
-		}
 		if v.err != nil {
 			var toolError *Error
 			if !errors.As(v.err, &toolError) {
@@ -199,10 +193,8 @@ func validate(ctx context.Context, doc Document, opts options) (result *Result, 
 	if v.check() {
 		finalizeLinkedExpressionUses(v)
 	}
-	if v.check() && v.graph != nil {
-		if err := v.graph.check(ctx, func(path, msg string) { v.add(CodeDependency, path, msg) }); err != nil {
-			v.err = err
-		}
+	if v.check() {
+		checkDependencyGraph(v)
 	}
 	if v.check() {
 		v.complete("local-semantics", "")

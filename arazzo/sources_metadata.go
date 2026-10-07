@@ -27,21 +27,21 @@ func (source *linkedSource) indexRaw() {
 	case "openapi":
 		for _, collection := range []string{"paths", "webhooks"} {
 			values := object(source.root[collection])
-			for _, key := range semanticKeys(values) {
+			for _, key := range sortedKeys(values) {
 				value := values[key]
 				source.indexPathItem(object(value), joinPtr("/"+collection, key), true, make(map[string]bool))
 			}
 		}
 		items := object(object(source.root["components"])["pathItems"])
-		for _, key := range semanticKeys(items) {
+		for _, key := range sortedKeys(items) {
 			value := items[key]
 			source.indexPathItem(object(value), joinPtr("/components/pathItems", key), false, make(map[string]bool))
 		}
 		callbacks := object(object(source.root["components"])["callbacks"])
-		for _, key := range semanticKeys(callbacks) {
+		for _, key := range sortedKeys(callbacks) {
 			value := callbacks[key]
 			callback := source.deref(object(value))
-			for _, expression := range semanticKeys(callback) {
+			for _, expression := range sortedKeys(callback) {
 				item := callback[expression]
 				if !strings.HasPrefix(expression, "x-") {
 					source.indexPathItem(object(item), joinPtr(joinPtr("/components/callbacks", key), expression), false, make(map[string]bool))
@@ -51,7 +51,7 @@ func (source *linkedSource) indexRaw() {
 
 	case "asyncapi":
 		channels := object(source.root["channels"])
-		for _, name := range semanticKeys(channels) {
+		for _, name := range sortedKeys(channels) {
 			value := channels[name]
 			channel := source.deref(object(value))
 			source.pointers[joinPtr("/channels", name)] = &linkedTarget{source: source, kind: "channel", node: channel}
@@ -63,7 +63,7 @@ func (source *linkedSource) indexRaw() {
 			}
 		}
 		operations := object(source.root["operations"])
-		for _, name := range semanticKeys(operations) {
+		for _, name := range sortedKeys(operations) {
 			value := operations[name]
 			operation := source.deref(object(value))
 			target := source.addOperation(operation, joinPtr("/operations", name), nil)
@@ -316,14 +316,14 @@ func (source *linkedSource) indexPathItem(raw map[string]any, path string, regis
 		return
 	}
 	operations := map[string]map[string]any{}
-	for _, method := range semanticKeys(item) {
+	for _, method := range sortedKeys(item) {
 		value := item[method]
 		if httpMethod(method) {
 			operations[method] = source.deref(object(value))
 		}
 	}
 	additional := object(item["additionalOperations"])
-	for _, method := range semanticKeys(additional) {
+	for _, method := range sortedKeys(additional) {
 		value := additional[method]
 		operations[joinPtr("additionalOperations", method)] = source.deref(object(value))
 	}
@@ -337,7 +337,7 @@ func (source *linkedSource) indexPathItem(raw map[string]any, path string, regis
 		opPath := path + "/" + method
 		source.addOperationMetadata(operation, opPath, item["parameters"], registerID)
 		callbacks := object(operation["callbacks"])
-		for _, name := range semanticKeys(callbacks) {
+		for _, name := range sortedKeys(callbacks) {
 			value := callbacks[name]
 			rawCallback := object(value)
 			ref := text(rawCallback["$ref"])
@@ -349,7 +349,7 @@ func (source *linkedSource) indexPathItem(raw map[string]any, path string, regis
 				active[ref] = true
 			}
 			callback := source.deref(rawCallback)
-			for _, expression := range semanticKeys(callback) {
+			for _, expression := range sortedKeys(callback) {
 				value := callback[expression]
 				if !strings.HasPrefix(expression, "x-") {
 					source.indexPathItem(object(value), joinPtr(joinPtr(opPath+"/callbacks", name), expression), registerID, active)

@@ -13,9 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/dlclark/regexp2"
 	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/jsonschema/v6/kind"
 	"golang.org/x/text/language"
@@ -100,23 +98,6 @@ func (nonDollarPattern) MatchString(s string) bool {
 	return s != "" && s[0] != '$' && !strings.ContainsAny(s, "\r\n")
 }
 
-type (
-	patternMatchError struct{ err error }
-	ecmaPattern       struct{ regex *regexp2.Regexp }
-)
-
-func (p ecmaPattern) String() string { return p.regex.String() }
-func (p ecmaPattern) MatchString(s string) bool {
-	match, err := p.regex.MatchString(s)
-	// The compiler's Regexp interface cannot return an error. A private panic
-	// transports this operational failure to the validation boundary; it cannot
-	// silently turn a timeout into a clean or invalid document result.
-	if err != nil {
-		panic(patternMatchError{err})
-	}
-	return match
-}
-
 func compileSchemaPattern(pattern string) (jsonschema.Regexp, error) {
 	if len(pattern) > DefaultLimits().MaxPatternBytes {
 		return nil, fmt.Errorf("pattern exceeds compile limit")
@@ -124,18 +105,11 @@ func compileSchemaPattern(pattern string) (jsonschema.Regexp, error) {
 	if pattern == `^(?!\$).+$` {
 		return nonDollarPattern{}, nil
 	}
-	if compiled, err := regexp.Compile(pattern); err == nil {
-		return compiled, nil
-	}
-	compiled, err := regexp2.Compile(pattern, regexp2.ECMAScript)
-	if err != nil {
-		return nil, err
-	}
-	compiled.MatchTimeout = 50 * time.Millisecond
-	return ecmaPattern{compiled}, nil
+	return regexp.Compile(pattern)
 }
 
 func checkStructure(v *validation) {
+	invalidTargets := make(map[string]bool)
 	for wi, raw := range array(v.root["workflows"]) {
 		for si, raw := range array(object(raw)["steps"]) {
 			count := 0
@@ -145,7 +119,9 @@ func checkStructure(v *validation) {
 				}
 			}
 			if count != 1 {
-				v.add(CodeStructure, "/workflows/"+strconv.Itoa(wi)+"/steps/"+strconv.Itoa(si), "step must specify exactly one operation, workflow or channel target")
+				path := "/workflows/" + strconv.Itoa(wi) + "/steps/" + strconv.Itoa(si)
+				invalidTargets[path] = true
+				v.add(CodeStructure, path, "step must specify exactly one operation, workflow or channel target")
 			}
 		}
 	}
@@ -164,6 +140,7 @@ func checkStructure(v *validation) {
 		return
 	}
 	printer := message.NewPrinter(language.English)
+	seen := make(map[struct{ path, message string }]bool)
 	var collect func(*jsonschema.ValidationError, string)
 	collect = func(failure *jsonschema.ValidationError, keyPath string) {
 		if !v.check() {
@@ -181,6 +158,35 @@ func checkStructure(v *validation) {
 			schemaPath = joinPtr(schemaPath, token)
 		}
 		emit := func(path, msg string, key bool) {
+			// Suppress only the target alternatives' fallout. Common step fields
+			// still need diagnostics even when the step selects several targets.
+			for parent := path; parent != ""; parent = parent[:strings.LastIndex(parent, "/")] {
+				if !invalidTargets[parent] {
+					continue
+				}
+				field, _, _ := strings.Cut(strings.TrimPrefix(path[len(parent):], "/"), "/")
+				switch field {
+				case "", "operationId", "operationPath", "workflowId", "channelPath", "action":
+					return
+				case "stepId", "description", "timeout", "dependsOn", "parameters", "requestBody", "successCriteria", "onSuccess", "onFailure", "outputs", "correlationId":
+					// Parameter item shape depends on the selected target. The base
+					// array contract still applies while that selection is invalid.
+					if field == "parameters" && path != joinPtr(parent, field) {
+						return
+					}
+					// Failed property validation leaves a known field unevaluated.
+					// Keep its type/shape error, without also calling it unknown.
+					if _, ok := failure.ErrorKind.(*kind.FalseSchema); ok && strings.Contains(failure.SchemaURL, "/unevaluatedProperties") && path == joinPtr(parent, field) {
+						return
+					}
+				}
+				break
+			}
+			identity := struct{ path, message string }{path, msg}
+			if seen[identity] {
+				return
+			}
+			seen[identity] = true
 			before := len(v.result.Diagnostics)
 			if key {
 				v.addKey(CodeStructure, path, msg)

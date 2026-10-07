@@ -31,7 +31,7 @@ func targetContractSession(t *testing.T, kind string, adapter upstream.SourceDoc
 	v.graph = newDependencyGraph()
 	v.graph.run = v
 	v.local = &semanticIndex{workflows: map[string]*semanticWorkflow{}, components: map[string]map[string]any{}, sources: map[string]string{"api": "api.yaml"}}
-	s := &sourceSession{v: v, base: v.doc.URI, byName: map[string]map[string]any{"api": {"name": "api", "url": "api.yaml", "type": kind}}, byURI: map[string]*linkedSource{}, requests: map[string]*linkedSource{}, graphVisited: map[*linkedSource]bool{}, targets: map[dependencyID]*linkedTarget{}, descriptionPaths: map[string]string{"api": "/sourceDescriptions/0"}}
+	s := &sourceSession{v: v, sourceState: &sourceState{byURI: map[string]*linkedSource{}, requests: map[string]*linkedSource{}, graphVisited: map[*linkedSource]bool{}, targets: map[dependencyID]*linkedTarget{}}, sourceScope: sourceScope{base: v.doc.URI, byName: map[string]map[string]any{"api": {"name": "api", "url": "api.yaml", "type": kind}}, descriptionPaths: map[string]string{"api": "/sourceDescriptions/0"}}}
 	v.sources = s
 	source := s.build(&upstream.ResolvedSource{Type: kind, RetrievalURI: "https://example.test/api.yaml", Adapter: adapter, SourceBytes: []byte(data)})
 	if v.err != nil || source == nil || !s.register(source) {

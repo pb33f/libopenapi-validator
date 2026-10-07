@@ -49,12 +49,10 @@ func (s *sourceSession) graphSource(source *linkedSource, path string, depth int
 		s.v.incomplete("external-prerequisites", path, source.identity, "adapter does not expose workflow dependency metadata")
 		return
 	}
-	child := *s
-	child.base = source.base
-	child.scopePath = path
-	child.scopeSource = source
-	child.descriptionPaths = make(map[string]string)
-	child.byName = make(map[string]map[string]any)
+	child := &sourceSession{v: s.v, sourceState: s.sourceState, sourceScope: sourceScope{
+		base: source.base, scopePath: path, scopeSource: source,
+		descriptionPaths: make(map[string]string), byName: make(map[string]map[string]any),
+	}}
 	for i, value := range array(source.root["sourceDescriptions"]) {
 		description := object(value)
 		child.byName[text(description["name"])] = description
@@ -151,9 +149,6 @@ func (s *sourceSession) graphSource(source *linkedSource, path string, depth int
 	} else {
 		s.complete("external-prerequisites", path, source.identity)
 	}
-	s.count = child.count
-	s.bytes = child.bytes
-	s.nodes = child.nodes
 }
 
 // graphExpressions reuses the expression traversal and symbol checks on supplied
@@ -201,10 +196,12 @@ func (s *sourceSession) graphExpressions(source *linkedSource) {
 		uri = source.identity
 	}
 	nested := &validation{identity: source.identity, budget: s.v.budget, ctx: s.v.ctx, doc: Document{URI: uri}, opts: s.v.opts, result: s.v.result, root: source.root, nodes: source.nodes, version: feature, local: local, graph: s.v.graph, foreignLocations: locations}
-	child := *s
-	child.v = nested
-	nested.sources = &child
+	child := &sourceSession{v: nested, sourceState: s.sourceState, sourceScope: s.sourceScope}
+	nested.sources = child
 	checkExpressions(nested)
+	if nested.check() {
+		checkInputs(nested)
+	}
 	for i := range nested.expressionUses {
 		nested.expressionUses[i].Path = s.sourcePath(source, nested.expressionUses[i].Path)
 	}
@@ -219,5 +216,4 @@ func (s *sourceSession) graphExpressions(source *linkedSource) {
 	if nested.err != nil {
 		s.v.err = nested.err
 	}
-	s.count, s.bytes, s.nodes = child.count, child.bytes, child.nodes
 }

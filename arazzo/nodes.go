@@ -31,14 +31,9 @@ type normalizer struct {
 	count, bytes int
 }
 
-// normalize converts the JSON-compatible node graph once, indexing each instance
+// normalizeWithStats converts the JSON-compatible node graph once, indexing each instance
 // pointer. Alias visits count against the budget, so a small graph cannot expand
 // into an unbounded JSON tree. Merge keys are expanded without editing any node.
-func normalize(ctx context.Context, doc Document, limits Limits) (any, map[string]nodeLocation, []Diagnostic, error) {
-	value, nodes, diagnostics, _, err := normalizeWithStats(ctx, doc, limits)
-	return value, nodes, diagnostics, err
-}
-
 type nodeStats struct{ nodes, bytes int }
 
 func normalizeWithStats(ctx context.Context, doc Document, limits Limits) (any, map[string]nodeLocation, []Diagnostic, nodeStats, error) {
