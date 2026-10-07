@@ -22,6 +22,23 @@ func benchmarkNodes(b *testing.B, data string) *yaml.Node {
 	return &root
 }
 
+func BenchmarkValidateInputs(b *testing.B) {
+	data := strings.Replace(foundationYAML("1.1.0"), "    steps:", "    inputs: {type: object, properties: {id: {type: string}}, additionalProperties: false}\n    steps:", 1)
+	doc := Document{Root: benchmarkNodes(b, data), URI: "https://example.test/main.yaml"}
+	opts := []Option{WithSources(upstream.CandidateDocument{RootNode: benchmarkNodes(b, sourceOpenAPI), RetrievalURI: "https://example.test/api.yaml"})}
+	ctx := context.Background()
+	if r, err := Validate(ctx, doc, opts...); err != nil || !r.Valid() || !r.Complete {
+		b.Fatalf("%+v %v", r, err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := Validate(ctx, doc, opts...); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkValidate(b *testing.B) {
 	for _, count := range []int{10, 100, 1000} {
 		b.Run(fmt.Sprintf("steps-%d", count), func(b *testing.B) {
