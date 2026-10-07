@@ -521,20 +521,32 @@ func (p *simpleParser) atom() error {
 			return fmt.Errorf("unclosed string literal")
 		}
 	case '$':
-		p.pos++
-		pointer := false
-		for p.pos < len(p.input) {
-			c := p.input[p.pos]
-			if strings.ContainsRune(" \t\r\n()", rune(c)) {
-				break
+		if prefix := simpleHeaderPrefix(p.input[start:]); prefix != "" {
+			p.pos += len(prefix)
+			// Header names consume the full RFC 7230 tchar token. Whitespace
+			// separates logical operators from otherwise ambiguous header names.
+			for p.pos < len(p.input) && simpleHeaderTchar(p.input[p.pos]) {
+				if strings.HasPrefix(p.input[p.pos:], "!=") && !strings.HasPrefix(p.input[p.pos:], "!==") {
+					break
+				}
+				p.pos++
 			}
-			if c == '#' {
-				pointer = true
-			}
-			if !pointer && strings.ContainsRune("[]!<>=&|", rune(c)) {
-				break
-			}
+		} else {
 			p.pos++
+			pointer := false
+			for p.pos < len(p.input) {
+				c := p.input[p.pos]
+				if strings.ContainsRune(" \t\r\n()", rune(c)) {
+					break
+				}
+				if c == '#' {
+					pointer = true
+				}
+				if !pointer && strings.ContainsRune("[]!<>=&|", rune(c)) {
+					break
+				}
+				p.pos++
+			}
 		}
 		if err := p.v.recordExpression(p.input[start:p.pos], p.path, p.scope, true); err != nil {
 			return err
@@ -590,4 +602,18 @@ func (p *simpleParser) atom() error {
 			return nil
 		}
 	}
+}
+
+// simpleHeaderPrefix isolates header-name token rules from other runtime sources.
+func simpleHeaderPrefix(s string) string {
+	for _, prefix := range []string{"$request.header.", "$response.header.", "$message.header."} {
+		if strings.HasPrefix(s, prefix) {
+			return prefix
+		}
+	}
+	return ""
+}
+
+func simpleHeaderTchar(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("!#$%&'*+-.^_`|~", rune(c))
 }
