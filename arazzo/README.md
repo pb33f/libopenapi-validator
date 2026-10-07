@@ -58,6 +58,11 @@ have static parsers. Runtime-substituted condition syntax records incomplete
 coverage after checking the embedded expressions. Presence-only source adapters
 record the detailed metadata checks they cannot prove. Receive-step success can
 also require message semantics that are unavailable statically.
+Rootless Arazzo high models expose only a partial expression projection; their
+prerequisite coverage remains incomplete. Supply original nodes or bytes to
+check all expression-bearing fields.
+Separate logical operators from bare header expressions with whitespace:
+`&` and `|` are legal characters inside header names.
 
 `WithLimits` replaces positive per-call limits. Defaults are 16 MiB of input and
 expanded bytes, 200,000 nodes/derived work units, depth 128, 50 source documents,
