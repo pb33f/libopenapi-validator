@@ -94,10 +94,6 @@ func checkInputs(v *validation) {
 			return
 		}
 		_, _ = compiler.Compile(base + "#" + url.PathEscape(slot.path))
-		if regex.err != nil {
-			v.err = &Error{Kind: ErrorOperational, Location: v.location(slot.path), Cause: regex.err}
-			return
-		}
 	}
 	// Resolve each authored reference separately. An unavailable external sibling
 	// must not prevent diagnostics for a definite missing local target.
@@ -120,15 +116,8 @@ func checkInputs(v *validation) {
 			return
 		}
 		_, err := compiler.Compile(base + "#" + url.PathEscape(slot.path))
-		if regex.err != nil {
-			v.err = &Error{Kind: ErrorOperational, Location: v.location(slot.path), Cause: regex.err}
-			return
-		}
 		if err == nil {
 			continue
-		}
-		if v.err != nil {
-			return
 		}
 		reportInputCompile(v, regex, err, schemaReferencePath(slot.value, slot.path))
 	}

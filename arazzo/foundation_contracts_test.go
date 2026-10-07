@@ -5,10 +5,13 @@ package arazzo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io/fs"
 	"reflect"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/jsonschema/v6"
@@ -148,10 +151,15 @@ func TestValidationSharedBudgetAndOrdering(t *testing.T) {
 		{Name: "c", URI: "a", Pointer: "/a", Source: "z"},
 		{Name: "c", URI: "a", Pointer: "/a", Source: "a", Reason: "z"},
 		{Name: "c", URI: "a", Pointer: "/a", Source: "a", Reason: "a"},
+		{Name: "c", URI: "a", Pointer: "/a", Status: CheckIncomplete, Source: "a"},
+		{Name: "c", URI: "a", Pointer: "/a", Status: CheckComplete, Source: "a"},
 	}
 	v.finish()
 	if len(v.result.Diagnostics) != 5 || v.result.Diagnostics[1].Column != 1 || v.result.Checks[0].Reason != "a" {
 		t.Fatalf("ordering/dedup: %+v", v.result)
+	}
+	if v.result.Checks[3].Status != CheckComplete || v.result.Checks[4].Status != CheckIncomplete || v.result.Complete {
+		t.Fatalf("mixed coverage status ordering/completeness: %+v", v.result)
 	}
 	before := *v.result
 	before.Diagnostics = append([]Diagnostic(nil), before.Diagnostics...)
@@ -233,5 +241,70 @@ func TestFoundationCancellationAtEveryPhase(t *testing.T) {
 		if !errors.Is(err, context.Canceled) || r.Complete {
 			t.Fatalf("cancellation check %d: %+v %v", check, r, err)
 		}
+	}
+}
+
+func TestOfficialSchemaBundleFailures(t *testing.T) {
+	const first = "schemas/arazzo-1.0-2025-10-15.json"
+	const second = "schemas/arazzo-1.1-2026-04-15.json"
+	data, err := schemaFiles.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := schemaFiles.ReadFile(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, defect := range []string{"missing", "json", "resource", "compile"} {
+		t.Run(defect, func(t *testing.T) {
+			files := fstest.MapFS{
+				first:  &fstest.MapFile{Data: data},
+				second: &fstest.MapFile{Data: other},
+			}
+			switch defect {
+			case "missing":
+				delete(files, first)
+			case "json":
+				files[first] = &fstest.MapFile{Data: []byte("!")}
+			case "resource", "compile":
+				var document map[string]any
+				if err := json.Unmarshal(data, &document); err != nil {
+					t.Fatal(err)
+				}
+				if defect == "resource" {
+					document["$id"] = "http://[invalid"
+				} else {
+					document["pattern"] = "["
+				}
+				modified, err := json.Marshal(document)
+				if err != nil {
+					t.Fatal(err)
+				}
+				files[first] = &fstest.MapFile{Data: modified}
+			}
+			_, err := compileOfficialSchemas(files)
+			if err == nil {
+				t.Fatal("malformed schema bundle accepted")
+			}
+			var syntax *json.SyntaxError
+			switch defect {
+			case "missing":
+				if !errors.Is(err, fs.ErrNotExist) {
+					t.Fatal(err)
+				}
+			case "json":
+				if !errors.As(err, &syntax) {
+					t.Fatal(err)
+				}
+			case "resource":
+				if !strings.Contains(err.Error(), "register embedded schema "+first) {
+					t.Fatal(err)
+				}
+			case "compile":
+				if !strings.Contains(err.Error(), "compile embedded schema "+first) || !strings.Contains(err.Error(), "error parsing regexp") {
+					t.Fatal(err)
+				}
+			}
+		})
 	}
 }
