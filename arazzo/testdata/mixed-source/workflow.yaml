@@ -1,0 +1,13 @@
+arazzo: 1.1.0
+$self: https://example.test/main.yaml
+info: {title: Mixed sources, version: '1'}
+sourceDescriptions:
+  - {name: api, url: api.yaml, type: openapi}
+  - {name: events, url: events.yaml, type: asyncapi}
+  - {name: flows, url: flows.yaml, type: arazzo}
+workflows:
+  - workflowId: run
+    steps:
+      - {stepId: read, operationId: $sourceDescriptions.api.read}
+      - {stepId: publish, operationId: $sourceDescriptions.events.publish, action: send}
+      - {stepId: remote, workflowId: $sourceDescriptions.flows.remote}

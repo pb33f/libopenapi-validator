@@ -13,6 +13,10 @@ A validation module for [libopenapi](https://github.com/pb33f/libopenapi).
 
 Document validation is explicitly covered for OpenAPI 3.0, 3.1, and 3.2.
 
+The additive [`arazzo` package](arazzo/README.md) validates Arazzo 1.0 and 1.1
+structure and static semantics. It accepts parsed YAML/JSON nodes and caller-supplied
+source documents, with detached diagnostics and explicit coverage records.
+
 `libopenapi-validator` will validate the following elements against an OpenAPI 3+ specification
 
 - *http.Request* - Validates the request against the OpenAPI specification

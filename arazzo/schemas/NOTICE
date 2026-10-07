@@ -1,0 +1,10 @@
+The schema snapshots in this directory are published by the OpenAPI Initiative
+under the Apache License, Version 2.0. The license text is in LICENSE.
+
+Original resources:
+https://spec.openapis.org/arazzo/1.0/schema/2025-10-15
+https://spec.openapis.org/arazzo/1.1/schema/2026-04-15
+
+The snapshots are unmodified. metadata.json records their provenance, sizes and
+SHA-256 checksums. The compilation view makes the small normative corrections
+documented in ../REQUIREMENTS.md. These corrections do not change the snapshots.
