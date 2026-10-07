@@ -1,0 +1,4 @@
+arazzo: 1.1.0
+info: {title: Flows, version: '1'}
+sourceDescriptions: [{name: api, url: api.yaml, type: openapi}]
+workflows: [{workflowId: remote, steps: [{stepId: first, operationId: read}]}]

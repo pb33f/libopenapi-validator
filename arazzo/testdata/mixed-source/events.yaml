@@ -1,0 +1,8 @@
+asyncapi: 3.0.0
+info: {title: Events, version: '1'}
+channels:
+  pets: {address: pets, messages: {created: {$ref: '#/components/messages/created'}}}
+operations:
+  publish: {action: send, channel: {$ref: '#/channels/pets'}}
+components:
+  messages: {created: {payload: {type: object, properties: {id: {type: string}}}}}
