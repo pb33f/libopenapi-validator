@@ -335,6 +335,10 @@ func TestFoundationCapsBeforeCompilation(t *testing.T) {
 	}{
 		{strings.Replace(foundationYAML("1.1.0"), "    steps:", "    inputs: {type: string, pattern: 'a very long pattern'}\n    steps:", 1), func() Limits { l := DefaultLimits(); l.MaxPatternBytes = 4; return l }()},
 		{strings.Replace(foundationYAML("1.1.0"), "operationId: read", "operationId: read, requestBody: {payload: 1e99999999999999}", 1), DefaultLimits()},
+		// big.Rat.SetString accepts a decimal exponent of 1000000 and rejects 1000001.
+		// The byte budget is 16MiB, so this value used to reach schema minimum checks and panic.
+		{strings.Replace(foundationYAML("1.1.0"), "operationId: read", "operationId: read, onFailure: [{name: again, type: retry, retryAfter: 1e1000001}]", 1), DefaultLimits()},
+		{strings.Replace(foundationYAML("1.1.0"), "operationId: read", "operationId: read, onFailure: [{name: again, type: retry, retryAfter: 1e-1000001}]", 1), DefaultLimits()},
 		{strings.Replace(foundationYAML("1.1.0"), "    steps:", "    x-a: {x-b: {x-c: {x-d: value}}}\n    steps:", 1), func() Limits { l := DefaultLimits(); l.MaxDepth = 4; return l }()},
 	}
 	for i, tt := range tests {
@@ -343,6 +347,11 @@ func TestFoundationCapsBeforeCompilation(t *testing.T) {
 		if !errors.As(err, &tool) || tool.Kind != ErrorLimit || r.Complete {
 			t.Fatalf("case %d: %+v %v", i, r, err)
 		}
+	}
+	accepted := strings.Replace(foundationYAML("1.1.0"), "operationId: read", "operationId: read, onFailure: [{name: again, type: retry, retryAfter: 1e1000000}]", 1)
+	r, err := ValidateBytes(context.Background(), []byte(accepted), "input.yaml")
+	if err != nil || !r.Valid() {
+		t.Fatalf("exponent 1000000 is representable: %+v %v", r, err)
 	}
 }
 

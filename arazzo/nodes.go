@@ -14,6 +14,10 @@ import (
 	"github.com/pb33f/go-yaml"
 )
 
+// maxSchemaExponent is the largest absolute decimal exponent math/big.Rat
+// SetString accepts. One past this value makes JSON Schema minimum checks panic.
+const maxSchemaExponent = 1_000_000
+
 func object(v any) map[string]any { m, _ := v.(map[string]any); return m }
 func array(v any) []any           { a, _ := v.([]any); return a }
 func text(v any) string           { s, _ := v.(string); return s }
@@ -144,12 +148,14 @@ func (n *normalizer) value(node *yaml.Node, path string, depth int) (any, error)
 			}
 			// JSON's number grammar rejects NaN, infinity and YAML-only spellings.
 			if json.Valid([]byte(clean)) && len(clean) > 0 && (clean[0] == '-' || clean[0] >= '0' && clean[0] <= '9') {
-				// Schema integer and numeric checks use arbitrary-precision numbers.
-				// Charge exponent expansion before those checks allocate 10^exponent.
+				// Schema numeric checks parse with big.Rat. SetString rejects a
+				// decimal exponent above 1_000_000, then panics comparing minimum
+				// or maximum. The byte budget is much larger, so it does not
+				// stop those values. Charge both limits before validation.
 				if i := strings.IndexAny(clean, "eE"); i >= 0 {
 					exponent := strings.TrimLeft(clean[i+1:], "+-")
 					growth, err := strconv.Atoi(exponent)
-					if err != nil || growth > n.limits.MaxBytes-n.bytes {
+					if err != nil || growth > maxSchemaExponent || growth > n.limits.MaxBytes-n.bytes {
 						return nil, &Error{Kind: ErrorLimit, Cause: fmt.Errorf("numeric exponent exceeds expanded byte limit")}
 					}
 					n.bytes += growth
