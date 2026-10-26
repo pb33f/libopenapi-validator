@@ -4,6 +4,7 @@
 package schema_validation
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/pb33f/libopenapi"
@@ -411,6 +412,44 @@ paths:
 
 	assert.True(t, valid)
 	assert.Len(t, errs, 0)
+}
+
+func TestValidatePathParameters_ConcurrentValidationDontRace(t *testing.T) {
+	spec := `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK`
+
+	doc, err := libopenapi.NewDocument([]byte(spec))
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+
+	totalGoroutines := 10
+
+	wg.Add(totalGoroutines)
+	for range totalGoroutines {
+		go func() {
+			defer wg.Done()
+			valid, errs := ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+			assert.True(t, valid)
+			assert.Empty(t, errs)
+		}()
+	}
+
+	wg.Wait()
 }
 
 func TestValidatePathParameters_ModelCouldNotBeBuilt(t *testing.T) {
