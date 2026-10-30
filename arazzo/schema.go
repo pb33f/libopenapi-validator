@@ -97,7 +97,7 @@ type nonDollarPattern struct{}
 
 func (nonDollarPattern) String() string { return `^(?!\$).+$` }
 func (nonDollarPattern) MatchString(s string) bool {
-	return s != "" && s[0] != '$' && !strings.ContainsAny(s, "\r\n")
+	return s != "" && s[0] != '$' && !strings.ContainsAny(s, "\r\n\u2028\u2029")
 }
 
 func compileSchemaPattern(pattern string) (jsonschema.Regexp, error) {

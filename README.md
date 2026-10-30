@@ -84,7 +84,7 @@ go run github.com/pb33f/libopenapi-validator/cmd/validate@latest --regexengine=e
 - ignorecase
 - multiline
 - explicitcapture
-- compiled
+- compiled (legacy no-op, equivalent to none)
 - singleline
 - ignorepatternwhitespace
 - righttoleft

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dlclark/regexp2"
+	"github.com/dlclark/regexp2/v2"
 	"github.com/pb33f/jsonschema/v6"
 )
 
