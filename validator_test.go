@@ -17,7 +17,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/dlclark/regexp2"
+	"github.com/dlclark/regexp2/v2"
 	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/testify/assert"

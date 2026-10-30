@@ -1,3 +1,6 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package main
 
 import (
@@ -7,7 +10,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/dlclark/regexp2"
+	"github.com/dlclark/regexp2/v2"
 	"github.com/goccy/go-yaml"
 	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/libopenapi"
@@ -28,7 +31,7 @@ func (re *customRegexp) String() string {
 }
 
 type regexEngine struct {
-	runtimeOption regexp2.RegexOptions
+	runtimeOption regexp2.CompileOption
 }
 
 func (e *regexEngine) run(s string) (jsonschema.Regexp, error) {
@@ -39,16 +42,16 @@ func (e *regexEngine) run(s string) (jsonschema.Regexp, error) {
 	return (*customRegexp)(re), nil
 }
 
-var regexParsingOptionsMap = map[string]regexp2.RegexOptions{
+var regexParsingOptionsMap = map[string]regexp2.CompileOption{
 	"none":                    regexp2.None,
 	"ignorecase":              regexp2.IgnoreCase,
 	"multiline":               regexp2.Multiline,
 	"explicitcapture":         regexp2.ExplicitCapture,
-	"compiled":                regexp2.Compiled,
+	"compiled":                regexp2.None, // Legacy no-op; regexp2/v2 removed the unused flag.
 	"singleline":              regexp2.Singleline,
 	"ignorepatternwhitespace": regexp2.IgnorePatternWhitespace,
 	"righttoleft":             regexp2.RightToLeft,
-	"debug":                   regexp2.Debug,
+	"debug":                   regexp2.OptionDebug(),
 	"ecmascript":              regexp2.ECMAScript,
 	"re2":                     regexp2.RE2,
 	"unicode":                 regexp2.Unicode,
