@@ -31,6 +31,7 @@ func TestNewValidationOptions_Defaults(t *testing.T) {
 	assert.True(t, opts.OpenAPIMode)                    // Default is true
 	assert.False(t, opts.AllowScalarCoercion)           // Default is false
 	assert.False(t, opts.AllowXMLBodyValidation)        // Default is false
+	assert.False(t, opts.ValidateDocumentPathParams)    // Default is false
 	assert.False(t, opts.AllowURLEncodedBodyValidation) // Default is false
 	assert.False(t, opts.ValidateContentParameters)
 	assert.Nil(t, opts.RegexEngine)
@@ -236,12 +237,14 @@ func TestMultipleOptions(t *testing.T) {
 		WithFormatAssertions(),
 		WithContentAssertions(),
 		WithXmlBodyValidation(),
+		WithPathParameterDocumentValidation(),
 	)
 
 	assert.True(t, opts.FormatAssertions)
 	assert.True(t, opts.ContentAssertions)
 	assert.True(t, opts.SecurityValidation)
 	assert.True(t, opts.AllowXMLBodyValidation)
+	assert.True(t, opts.ValidateDocumentPathParams)
 	assert.True(t, opts.OpenAPIMode)          // Default is true
 	assert.False(t, opts.AllowScalarCoercion) // Default is false
 	assert.Nil(t, opts.RegexEngine)

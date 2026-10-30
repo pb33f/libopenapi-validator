@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/jsonschema/v6"
@@ -22,6 +23,8 @@ import (
 	liberrors "github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
+
+var buildModelMu sync.Mutex
 
 type nonStringMappingKey struct {
 	Value    string
@@ -423,6 +426,24 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 		}
 		validationErrors = append(validationErrors, documentError)
 	}
+
+	if options.ValidateDocumentPathParams {
+		buildModelMu.Lock()
+		model, modelErr := doc.BuildV3Model()
+		buildModelMu.Unlock()
+
+		if model != nil {
+			validationErrors = append(validationErrors, validatePathParameters(&model.Model)...)
+		} else {
+			validationErrors = append(validationErrors, &liberrors.ValidationError{
+				ValidationType: helpers.Schema,
+				Message:        "Document does not pass path parameter validation",
+				Reason:         fmt.Sprintf("The document model could not be build: %v", modelErr),
+				HowToFix:       fmt.Sprintf("ensure the document is valid according to the OpenAPI %s spec", doc.GetVersion()),
+			})
+		}
+	}
+
 	if len(validationErrors) > 0 {
 		return false, validationErrors
 	}
