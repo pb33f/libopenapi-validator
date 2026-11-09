@@ -159,6 +159,14 @@ func TestValidatePathParameters_EmptyPathItemIsExempt(t *testing.T) {
 	assert.Empty(t, reasons)
 }
 
+func TestValidatePathParameters_OnlyRealEmptyPathsAreExempt(t *testing.T) {
+	spec := `{"openapi":"3.1.0","info":{"title":"Test","version":"1.0.0"},"paths":{"/test/{param}":{"summary": "something"}}}`
+
+	valid, reasons := validateDocWithPathParams(t, spec)
+	assert.False(t, valid)
+	assert.Contains(t, reasons[0], `template variable "param"`)
+}
+
 func TestValidatePathParameters_MultipleTemplateVars(t *testing.T) {
 	spec := `openapi: 3.1.0
 info:

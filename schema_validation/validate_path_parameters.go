@@ -36,13 +36,12 @@ func validatePathItemParameters(pathKey string, pathItem *v3.PathItem, keyNode *
 		return nil
 	}
 
-	operations := pathItem.GetOperations()
-	hasOperations := operations != nil && operations.Len() > 0
-	hasPathLevelParams := len(pathItem.Parameters) > 0
-
-	if !hasOperations && !hasPathLevelParams {
+	if pathItemIsEmpty(pathItem) {
 		return nil
 	}
+
+	operations := pathItem.GetOperations()
+	hasOperations := operations != nil && operations.Len() > 0
 
 	templateVars := extractTemplateVars(pathKey)
 
@@ -88,6 +87,16 @@ func validatePathItemParameters(pathKey string, pathItem *v3.PathItem, keyNode *
 	}
 
 	return errs
+}
+
+func pathItemIsEmpty(pathItem *v3.PathItem) bool {
+	if low := pathItem.GoLow(); low != nil {
+		if root := low.GetRootNode(); root != nil {
+			return len(root.Content) == 0
+		}
+	}
+
+	return true
 }
 
 func extractTemplateVars(pathKey string) map[string]bool {
