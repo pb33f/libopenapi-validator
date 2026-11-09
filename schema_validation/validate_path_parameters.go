@@ -43,7 +43,7 @@ func validatePathItemParameters(pathKey string, pathItem *v3.PathItem, keyNode *
 	operations := pathItem.GetOperations()
 	hasOperations := operations != nil && operations.Len() > 0
 
-	templateVars := extractTemplateVars(pathKey)
+	templateVarOrder, templateVars := extractTemplateVars(pathKey)
 
 	var errs []*liberrors.ValidationError
 
@@ -72,14 +72,14 @@ func validatePathItemParameters(pathKey string, pathItem *v3.PathItem, keyNode *
 			for name := range pathLevelParams {
 				effective[name] = true
 			}
-			for name := range templateVars {
+			for _, name := range templateVarOrder {
 				if !effective[name] {
 					errs = append(errs, missingParameterError(pathKey, op.Key(), name, keyNode))
 				}
 			}
 		}
 	} else {
-		for name := range templateVars {
+		for _, name := range templateVarOrder {
 			if !pathLevelParams[name] {
 				errs = append(errs, missingParameterError(pathKey, "", name, keyNode))
 			}
@@ -99,14 +99,16 @@ func pathItemIsEmpty(pathItem *v3.PathItem) bool {
 	return true
 }
 
-func extractTemplateVars(pathKey string) map[string]bool {
+func extractTemplateVars(pathKey string) ([]string, map[string]bool) {
+	var order []string
 	vars := make(map[string]bool)
 	for _, match := range pathTemplateVarRegex.FindAllStringSubmatch(pathKey, -1) {
-		if len(match) > 1 && match[1] != "" {
+		if len(match) > 1 && match[1] != "" && !vars[match[1]] {
 			vars[match[1]] = true
+			order = append(order, match[1])
 		}
 	}
-	return vars
+	return order, vars
 }
 
 func pathParamNames(params []*v3.Parameter) map[string]bool {
