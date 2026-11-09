@@ -350,6 +350,10 @@ func TestPathKeyNodes_NilLowReturnsEmpty(t *testing.T) {
 	assert.Empty(t, pathKeyNodes(&v3.Document{}))
 }
 
+func TestPathItemIsEmpty_NilLowReturnsTrue(t *testing.T) {
+	assert.True(t, pathItemIsEmpty(&v3.PathItem{}))
+}
+
 func TestValidatePathParameters_RunWithModelError(t *testing.T) {
 	spec := `openapi: 3.1.0
 info:
