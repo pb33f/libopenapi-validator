@@ -25,6 +25,7 @@ const (
 	PathValidation             = "path"
 	ValidationMissing          = "missing"
 	ValidationMissingOperation = "missingOperation"
+	ValidationAmbiguousPath    = "ambiguousPath"
 	ResponseBodyResponseCode   = "statusCode"
 	SecurityValidation         = "security"
 	DocumentValidation         = "document"

@@ -468,7 +468,7 @@ func TestServerHelperEdges(t *testing.T) {
 
 	_, _, ok := matchServer(nil, &v3.Server{URL: "/"})
 	assert.False(t, ok)
-	_, _, ok = matchCompiledServer(httptestRequest(http.MethodGet, "http://example.com/x"), &v3.Server{URL: "/"}, nil)
+	_, _, ok = matchCompiledServer(httptestRequest(http.MethodGet, "http://example.com/x"), "/x", &v3.Server{URL: "/"}, nil)
 	assert.False(t, ok)
 	_, _, ok = matchServer(&http.Request{}, &v3.Server{URL: "/"})
 	assert.False(t, ok)
@@ -498,15 +498,15 @@ func TestServerHelperEdges(t *testing.T) {
 
 func TestCompatibilityPathEdges(t *testing.T) {
 	request := &http.Request{URL: &url.URL{Path: "plain", Fragment: "frag"}}
-	assert.Equal(t, []compatibilityCandidate{{path: "/plain#frag"}}, compatibilityCandidates(request, nil))
+	assert.Equal(t, []compatibilityCandidate{{path: "/plain#frag"}}, compatibilityCandidates(request, request.URL.EscapedPath(), nil))
 
 	doc := &v3.Document{Servers: []*v3.Server{nil, {URL: "http://[::1"}, {URL: "/api"}, {URL: "/api/v2"}}}
 	request.URL = &url.URL{Path: "/api/v2/items"}
 	assert.Equal(t, []compatibilityCandidate{{"/v2/items", doc.Servers[2]}, {"/items", doc.Servers[3]}},
-		compatibilityCandidates(request, doc))
+		compatibilityCandidates(request, request.URL.EscapedPath(), doc))
 
 	request.URL = &url.URL{Path: "/other"}
-	assert.Equal(t, []compatibilityCandidate{{path: "/other"}}, compatibilityCandidates(request, doc))
+	assert.Equal(t, []compatibilityCandidate{{path: "/other"}}, compatibilityCandidates(request, request.URL.EscapedPath(), doc))
 }
 
 func TestRouterPathOnlyTriesEveryMatchingServer(t *testing.T) {
@@ -570,6 +570,87 @@ paths:
 	}
 	r.Release()
 	wg.Wait()
+}
+
+const ambiguitySpec = `openapi: 3.1.0
+info: {title: ambiguity, version: 1.0.0}
+servers: [{url: https://example.com/api}]
+paths:
+  /users/me:
+    get: {responses: {"200": {description: ok}}}
+  /users/{id}:
+    get: {responses: {"200": {description: ok}}}
+  /users/{id}/secrets:
+    get: {responses: {"200": {description: ok}}}
+  /items/{id}:
+    get: {responses: {"200": {description: ok}}}
+  /items/{a}/{b}:
+    get: {responses: {"200": {description: ok}}}
+  /status:
+    get: {responses: {"200": {description: ok}}}
+  /{id}:
+    get: {responses: {"200": {description: ok}}}
+`
+
+func TestRouterRejectsAmbiguousPaths(t *testing.T) {
+	doc := model(t, ambiguitySpec)
+	for name, r := range map[string]Router{
+		"path-only": NewRouter(doc, WithPathOnlyMatching()),
+		"strict":    NewRouter(doc),
+	} {
+		for _, target := range []string{
+			"https://example.com/api/users/m%65",
+			"https://example.com/api/users/%6D%65",
+			"https://example.com/api/users/5%2Fsecrets",
+			"https://example.com/api/items//5",
+			"https://example.com/api/users/../secrets",
+		} {
+			route, err := r.FindRoute(httptestRequest(http.MethodGet, target))
+			assert.Nil(t, route, "%s %s", name, target)
+			assert.ErrorIs(t, err, ErrAmbiguousPath, "%s %s", name, target)
+			assert.ErrorIs(t, err, ErrPathNotFound, "%s %s", name, target)
+		}
+
+		// readings that agree, or that match nothing, keep the route as sent
+		for target, expected := range map[string]string{
+			"https://example.com/api/users/a%20b":     "/users/{id}",
+			"https://example.com/api/users/%61lice":   "/users/{id}",
+			"https://example.com/api/status%2Fx":      "/{id}",
+			"https://example.com/api/users//alice":    "/users/{id}",
+			"https://example.com/api/users/me":        "/users/me",
+			"https://example.com/api/users/5/secrets": "/users/{id}/secrets",
+		} {
+			route, err := r.FindRoute(httptestRequest(http.MethodGet, target))
+			require.NoError(t, err, "%s %s", name, target)
+			assert.Equal(t, expected, route.Path, "%s %s", name, target)
+		}
+
+		// doubled slashes that match nothing, even collapsed, are not found
+		route, err := r.FindRoute(httptestRequest(http.MethodGet, "https://example.com/api/no//such/path/here"))
+		assert.Nil(t, route, name)
+		assert.ErrorIs(t, err, ErrPathNotFound, name)
+		assert.NotErrorIs(t, err, ErrAmbiguousPath, name)
+
+		// a method mismatch is reported as sent, before readings are compared
+		route, err = r.FindRoute(httptestRequest(http.MethodPost, "https://example.com/api/users/m%65"))
+		assert.ErrorIs(t, err, ErrMethodNotAllowed, name)
+		assert.Equal(t, "/users/{id}", route.Path, name)
+	}
+}
+
+func TestRouterBasePathEndsOnSegmentBoundary(t *testing.T) {
+	r := NewRouter(model(t, ambiguitySpec), WithPathOnlyMatching())
+
+	route, err := r.FindRoute(httptestRequest(http.MethodGet, "/apistatus"))
+	require.NoError(t, err)
+	assert.Equal(t, "/{id}", route.Path)
+	assert.Equal(t, map[string]string{"id": "apistatus"}, route.PathParams)
+	assert.Nil(t, route.Server)
+
+	route, err = r.FindRoute(httptestRequest(http.MethodGet, "/api/status"))
+	require.NoError(t, err)
+	assert.Equal(t, "/status", route.Path)
+	assert.NotNil(t, route.Server)
 }
 
 func httptestRequest(method, target string) *http.Request {
