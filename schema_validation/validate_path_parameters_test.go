@@ -4,8 +4,10 @@
 package schema_validation
 
 import (
+	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/pb33f/libopenapi"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
@@ -462,6 +464,127 @@ paths:
 	}
 
 	wg.Wait()
+	assert.Equal(t, 0, buildModelLocks.len())
+}
+
+func TestValidatePathParameters_DistinctDocumentsValidateConcurrently(t *testing.T) {
+	const totalDocs = 16
+
+	specFor := func(i int) string {
+		return fmt.Sprintf(`openapi: 3.1.0
+info:
+  title: Test %d
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK`, i)
+	}
+
+	docs := make([]libopenapi.Document, totalDocs)
+	for i := range docs {
+		doc, err := libopenapi.NewDocument([]byte(specFor(i)))
+		require.NoError(t, err)
+		docs[i] = doc
+	}
+
+	var wg sync.WaitGroup
+	for i := range docs {
+		wg.Add(1)
+		go func(doc libopenapi.Document) {
+			defer wg.Done()
+			valid, errs := ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+			assert.True(t, valid)
+			assert.Empty(t, errs)
+		}(docs[i])
+	}
+	wg.Wait()
+
+	assert.Equal(t, 0, buildModelLocks.len(), "per-document locks leaked after validation")
+}
+
+const concurrencyTestSpec = `openapi: 3.1.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /pets/{petId}:
+    get:
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK`
+
+func TestValidatePathParameters_SameDocumentLocks(t *testing.T) {
+	doc, err := libopenapi.NewDocument([]byte(concurrencyTestSpec))
+	require.NoError(t, err)
+
+	buildModelLocks.lock(doc)
+
+	done := make(chan struct{})
+	go func() {
+		ValidateOpenAPIDocument(doc, config.WithPathParameterDocumentValidation())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		buildModelLocks.unlock(doc)
+		t.Fatal("validation of the same document completed while its build lock was held")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	buildModelLocks.unlock(doc)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("validation did not complete after the build lock was released")
+	}
+
+	assert.Equal(t, 0, buildModelLocks.len(), "per-document lock leaked after validation")
+}
+
+func TestValidatePathParameters_IndependentDocumentsRunNormally(t *testing.T) {
+	docA, err := libopenapi.NewDocument([]byte(concurrencyTestSpec))
+	require.NoError(t, err)
+	docB, err := libopenapi.NewDocument([]byte(concurrencyTestSpec))
+	require.NoError(t, err)
+
+	buildModelLocks.lock(docA)
+	defer buildModelLocks.unlock(docA)
+
+	done := make(chan struct{})
+	var valid bool
+	var errs []string
+	go func() {
+		ok, verrs := ValidateOpenAPIDocument(docB, config.WithPathParameterDocumentValidation())
+		valid = ok
+		for _, e := range verrs {
+			errs = append(errs, e.Error())
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		assert.True(t, valid)
+		assert.Empty(t, errs)
+	case <-time.After(2 * time.Second):
+		t.Fatal("validation of an independent document was blocked by another document's lock")
+	}
 }
 
 func TestValidatePathParameters_ModelCouldNotBeBuilt(t *testing.T) {

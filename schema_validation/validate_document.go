@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/pb33f/go-yaml"
 	"github.com/pb33f/jsonschema/v6"
 	"github.com/pb33f/jsonschema/v6/kind"
 	"github.com/pb33f/libopenapi"
+	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
@@ -24,7 +24,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
-var buildModelMu sync.Mutex
+var buildModelLocks = newKeyedMutex()
 
 type nonStringMappingKey struct {
 	Value    string
@@ -428,9 +428,12 @@ func ValidateOpenAPIDocumentWithPrecompiled(doc libopenapi.Document, compiledSch
 	}
 
 	if options.ValidateDocumentPathParams {
-		buildModelMu.Lock()
-		model, modelErr := doc.BuildV3Model()
-		buildModelMu.Unlock()
+		var model *libopenapi.DocumentModel[v3high.Document]
+		var modelErr error
+
+		buildModelLocks.do(doc, func() {
+			model, modelErr = doc.BuildV3Model()
+		})
 
 		if model != nil {
 			validationErrors = append(validationErrors, validatePathParameters(&model.Model)...)
