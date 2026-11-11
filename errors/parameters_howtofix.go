@@ -34,6 +34,7 @@ const (
 	HowToFixMissingValue                       string = "Ensure the value has been set"
 	HowToFixPath                               string = "Check the path is correct, and check that the correct HTTP method has been used (e.g. GET, POST, PUT, DELETE)"
 	HowToFixPathMethod                         string = "Add the missing operation to the contract for the path"
+	HowToFixAmbiguousPath                      string = "Send the path in canonical form: do not percent-encode characters allowed in a path segment, do not encode '/', and remove empty and dot segments"
 	HowToFixInvalidMaxItems                    string = "Reduce the number of items in the array to %d or less"
 	HowToFixInvalidMinItems                    string = "Increase the number of items in the array to %d or more"
 	HowToFixMissingHeader                      string = "Make sure the service responding sets the required headers with this response code"

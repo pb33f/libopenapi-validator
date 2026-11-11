@@ -31,3 +31,13 @@ func BasePath(serverURL string) string {
 	}
 	return u.Path
 }
+
+// TrimBasePath removes base from the start of path when base ends on a segment boundary, so a
+// base of "/api" matches "/api" and "/api/pets" but not "/apistatus". It reports whether base matched.
+func TrimBasePath(path, base string) (string, bool) {
+	rest, ok := strings.CutPrefix(path, base)
+	if !ok || (rest != "" && rest[0] != '/' && !strings.HasSuffix(base, "/")) {
+		return path, false
+	}
+	return rest, true
+}

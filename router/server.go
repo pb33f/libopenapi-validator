@@ -90,7 +90,7 @@ func matchServer(request *http.Request, server *v3.Server) (string, map[string]s
 	if err != nil {
 		return "", nil, false
 	}
-	return matchCompiledServer(request, server, &compiledServer{expression: expression, names: names, absolute: absolute})
+	return matchCompiledServer(request, request.URL.EscapedPath(), server, &compiledServer{expression: expression, names: names, absolute: absolute})
 }
 
 func normalizeServerTemplate(server *v3.Server) (string, bool) {
@@ -109,11 +109,12 @@ func normalizeServerTemplate(server *v3.Server) (string, bool) {
 	return template, absolute
 }
 
-func matchCompiledServer(request *http.Request, server *v3.Server, compiled *compiledServer) (string, map[string]string, bool) {
+// matchCompiledServer matches escapedPath, one reading of the request path, against a server.
+func matchCompiledServer(request *http.Request, escapedPath string, server *v3.Server, compiled *compiledServer) (string, map[string]string, bool) {
 	if request == nil || request.URL == nil || server == nil || compiled == nil {
 		return "", nil, false
 	}
-	target := request.URL.EscapedPath()
+	target := escapedPath
 	if compiled.absolute {
 		scheme := request.URL.Scheme
 		if scheme == "" {
@@ -200,25 +201,28 @@ type compatibilityCandidate struct {
 	server *v3.Server
 }
 
-// compatibilityCandidates returns the paths path-only matching tries for a request: the request path
-// with the base path of each document server that prefixes it removed, in document order, or the
-// request path as sent when no server does. Trying every server lets a later, more specific server
-// match when an earlier one leaves a path the document does not declare.
-func compatibilityCandidates(request *http.Request, document *v3.Document) []compatibilityCandidate {
-	path := request.URL.EscapedPath()
+// compatibilityCandidates returns the paths path-only matching tries for escapedPath, one reading of
+// the request path: the path with the base path of each document server that prefixes it on a segment
+// boundary removed, in document order, or the path as given when no server does. Trying every server
+// lets a later, more specific server match when an earlier one leaves a path the document does not declare.
+func compatibilityCandidates(request *http.Request, escapedPath string, document *v3.Document) []compatibilityCandidate {
 	var candidates []compatibilityCandidate
 	if document != nil {
 		for _, server := range document.Servers {
 			if server == nil {
 				continue
 			}
-			if base := serverurl.BasePath(server.URL); base != "" && strings.HasPrefix(path, base) {
-				candidates = append(candidates, compatibilityCandidate{compatibilityPath(request, strings.TrimPrefix(path, base)), server})
+			base := serverurl.BasePath(server.URL)
+			if base == "" {
+				continue
+			}
+			if rest, ok := serverurl.TrimBasePath(escapedPath, base); ok {
+				candidates = append(candidates, compatibilityCandidate{compatibilityPath(request, rest), server})
 			}
 		}
 	}
 	if len(candidates) == 0 {
-		candidates = append(candidates, compatibilityCandidate{compatibilityPath(request, path), nil})
+		candidates = append(candidates, compatibilityCandidate{compatibilityPath(request, escapedPath), nil})
 	}
 	return candidates
 }

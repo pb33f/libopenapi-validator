@@ -17,6 +17,7 @@ import (
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
+	"github.com/pb33f/libopenapi-validator/internal/pathvariant"
 	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/internal/serverurl"
 	"github.com/pb33f/libopenapi-validator/router"
@@ -34,6 +35,10 @@ import (
 //
 // Path matching follows the OpenAPI specification: literal (concrete) paths take precedence over
 // parameterized paths, regardless of definition order in the specification.
+//
+// A request path that selects a different operation when its percent-encoding, encoded slashes, or
+// empty and dot segments are normalized is rejected as ambiguous, because a router could run an
+// operation other than the one validated.
 func FindPath(request *http.Request, document *v3.Document, options *config.ValidationOptions) (*v3.PathItem, []*errors.ValidationError, string) {
 	if options != nil && options.Router != nil {
 		route, validationErrors := ResolveRoute(request, document, options)
@@ -42,8 +47,35 @@ func FindPath(request *http.Request, document *v3.Document, options *config.Vali
 		}
 		return route.PathItem, validationErrors, route.Path
 	}
-	stripped := StripRequestPath(request, document)
+	pathItem, validationErrors, foundPath := findPath(request, document, options, StripRequestPath(request, document))
+	if requeststate.Route(request) != nil {
+		return pathItem, validationErrors, foundPath
+	}
+	escapedPath := request.URL.EscapedPath()
+	if pathItem == nil && strings.Contains(escapedPath, "//") {
+		// doubled slashes match as single ones when nothing matches them as sent
+		collapsed := stripPath(pathvariant.CollapseSlashes(escapedPath), request.URL.Fragment, getBasePaths(document))
+		pathItem, validationErrors, foundPath = findPath(request, document, options, collapsed)
+	}
+	if len(validationErrors) > 0 {
+		return pathItem, validationErrors, foundPath
+	}
+	// a router that reads the path another way must run the same operation, or the request is rejected
+	if variants := pathvariant.Variants(escapedPath); len(variants) > 0 {
+		operation := helpers.ExtractOperation(request, pathItem)
+		basePaths := getBasePaths(document)
+		for _, variant := range variants {
+			other, otherErrors, _ := findPath(request, document, options, stripPath(variant, request.URL.Fragment, basePaths))
+			if len(otherErrors) == 0 && helpers.ExtractOperation(request, other) != operation {
+				return nil, ambiguousPathError(request), ""
+			}
+		}
+	}
+	return pathItem, nil, foundPath
+}
 
+// findPath matches stripped, one reading of the request path without its base path.
+func findPath(request *http.Request, document *v3.Document, options *config.ValidationOptions, stripped string) (*v3.PathItem, []*errors.ValidationError, string) {
 	// Fast path: try radix tree first (O(k) where k = path depth)
 	// If no path lookup is provided, we will fall back to regex-based matching.
 	if options != nil && options.PathTree != nil {
@@ -147,6 +179,9 @@ func ResolveRoute(request *http.Request, document *v3.Document, options *config.
 	if stderrors.Is(err, router.ErrMethodNotAllowed) && route != nil {
 		return route, missingOperationError(request, route.Path)
 	}
+	if stderrors.Is(err, router.ErrAmbiguousPath) {
+		return nil, ambiguousPathError(request)
+	}
 	validationErrors := []*errors.ValidationError{{
 		ValidationType:    helpers.PathValidation,
 		ValidationSubType: helpers.ValidationMissing,
@@ -196,12 +231,15 @@ func StripRequestPath(request *http.Request, document *v3.Document) string {
 		}
 		return stripped
 	}
-	basePaths := getBasePaths(document)
+	return stripPath(request.URL.EscapedPath(), request.URL.Fragment, getBasePaths(document))
+}
 
-	// strip any base path
-	stripped := stripBaseFromPath(request.URL.EscapedPath(), basePaths)
-	if request.URL.Fragment != "" {
-		stripped = fmt.Sprintf("%s#%s", stripped, request.URL.Fragment)
+// stripPath removes the first matching base path from an escaped request path, appends the
+// fragment, and makes the result absolute.
+func stripPath(escapedPath, fragment string, basePaths []string) string {
+	stripped := stripBaseFromPath(escapedPath, basePaths)
+	if fragment != "" {
+		stripped = fmt.Sprintf("%s#%s", stripped, fragment)
 	}
 	if !strings.HasPrefix(stripped, "/") {
 		stripped = "/" + stripped
@@ -227,8 +265,8 @@ func checkPathAgainstBase(docPath, urlPath string, basePaths []string) bool {
 
 func stripBaseFromPath(path string, basePaths []string) string {
 	for i := range basePaths {
-		if strings.HasPrefix(path, basePaths[i]) {
-			return path[len(basePaths[i]):]
+		if rest, ok := serverurl.TrimBasePath(path, basePaths[i]); ok {
+			return rest
 		}
 	}
 	return path
@@ -270,6 +308,24 @@ func comparePaths(mapped, requested, basePaths []string, regexCache config.Regex
 	l := filepath.Join(imploded...)
 	r := filepath.Join(requested...)
 	return checkPathAgainstBase(l, r, basePaths)
+}
+
+// ambiguousPathError returns a validation error for a request path whose normalized readings select
+// different operations.
+func ambiguousPathError(request *http.Request) []*errors.ValidationError {
+	validationErrors := []*errors.ValidationError{{
+		ValidationType:    helpers.PathValidation,
+		ValidationSubType: helpers.ValidationAmbiguousPath,
+		Message:           fmt.Sprintf("%s Path '%s' is ambiguous", request.Method, request.URL.EscapedPath()),
+		Reason: fmt.Sprintf("The %s request path '%s' selects a different operation when its percent-encoding, "+
+			"encoded slashes, or empty and dot segments are normalized, so a router could run an operation "+
+			"other than the one validated", request.Method, request.URL.EscapedPath()),
+		SpecLine: -1,
+		SpecCol:  -1,
+		HowToFix: errors.HowToFixAmbiguousPath,
+	}}
+	errors.PopulateValidationErrors(validationErrors, request, "")
+	return validationErrors
 }
 
 // missingOperationError returns a validation error for when a path was found but the HTTP method doesn't exist.

@@ -23,6 +23,7 @@ import (
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
+	"github.com/pb33f/libopenapi-validator/internal/pathvariant"
 	"github.com/pb33f/libopenapi-validator/radix"
 )
 
@@ -32,6 +33,11 @@ var (
 	// ErrMethodNotAllowed identifies requests whose path exists but method does not.
 	// FindRoute returns a partial Route alongside this error.
 	ErrMethodNotAllowed = errors.New("openapi operation not found")
+	// ErrAmbiguousPath identifies requests whose path selects a different operation when its
+	// percent-encoding, encoded slashes, or empty and dot segments are normalized, so a router in
+	// front of or behind the validator could run an operation other than the one matched.
+	// It also matches ErrPathNotFound, so callers that only check for a missing path treat it as one.
+	ErrAmbiguousPath = fmt.Errorf("%w: ambiguous request path", ErrPathNotFound)
 )
 
 // RegexCache stores compiled path expressions. config.RegexCache satisfies this contract.
@@ -55,7 +61,9 @@ type Router interface {
 	//
 	// A method mismatch returns a non-nil partial Route and an error matching
 	// ErrMethodNotAllowed. A server or path mismatch returns a nil Route and an
-	// error matching ErrPathNotFound.
+	// error matching ErrPathNotFound. A path whose normalized readings select
+	// different operations returns a nil Route and an error matching both
+	// ErrAmbiguousPath and ErrPathNotFound.
 	FindRoute(*http.Request) (*Route, error)
 	// Release drops document and router-owned lookup references. Injected lookups
 	// and regex caches are borrowed and are never released by the router.
@@ -83,7 +91,7 @@ type Route struct {
 
 // RouteError retains partial match context while supporting errors.Is.
 type RouteError struct {
-	Kind  error  // Kind is ErrPathNotFound or ErrMethodNotAllowed.
+	Kind  error  // Kind is ErrPathNotFound, ErrAmbiguousPath, or ErrMethodNotAllowed.
 	Route *Route // Route is populated for method mismatches and nil for path misses.
 }
 
@@ -176,17 +184,37 @@ func (r *routeFinder) FindRoute(request *http.Request) (*Route, error) {
 		return nil, &RouteError{Kind: ErrPathNotFound}
 	}
 
+	escapedPath := request.URL.EscapedPath()
+	route, err := r.findRoute(request, escapedPath)
+	if route == nil && strings.Contains(escapedPath, "//") {
+		// doubled slashes match as single ones when nothing matches them as sent
+		route, err = r.findRoute(request, pathvariant.CollapseSlashes(escapedPath))
+	}
+	if err != nil {
+		return route, err
+	}
+	// a router that reads the path another way must run the same operation, or the request is rejected
+	for _, variant := range pathvariant.Variants(escapedPath) {
+		if other, otherErr := r.findRoute(request, variant); otherErr == nil && other.Operation != route.Operation {
+			return nil, &RouteError{Kind: ErrAmbiguousPath}
+		}
+	}
+	return route, nil
+}
+
+// findRoute matches one reading of the escaped request path.
+func (r *routeFinder) findRoute(request *http.Request, escapedPath string) (*Route, error) {
 	if r.pathOnly {
-		return r.findPathOnly(request)
+		return r.findPathOnly(request, escapedPath)
 	}
 
 	if len(r.servers) == 0 {
-		return r.find(request, request.URL.EscapedPath(), nil, nil)
+		return r.find(request, escapedPath, nil, nil)
 	}
 
 	var partial *Route
 	for _, server := range r.servers {
-		path, params, ok := matchCompiledServer(request, server, r.serverMatch[server])
+		path, params, ok := matchCompiledServer(request, escapedPath, server, r.serverMatch[server])
 		if !ok {
 			continue
 		}
@@ -202,7 +230,7 @@ func (r *routeFinder) FindRoute(request *http.Request) (*Route, error) {
 		}
 		partial = route
 	}
-	implicit, implicitErr := r.find(request, request.URL.EscapedPath(), nil, nil)
+	implicit, implicitErr := r.find(request, escapedPath, nil, nil)
 	if implicit != nil && usesImplicitServer(implicit.Operation, implicit.PathItem, r.document) {
 		if implicitErr == nil {
 			return implicit, nil
@@ -219,10 +247,10 @@ func (r *routeFinder) FindRoute(request *http.Request) (*Route, error) {
 
 // findPathOnly matches the request path, without its server base path, against the document paths.
 // Each candidate path is tried in order; a method mismatch is returned only when no candidate matches.
-func (r *routeFinder) findPathOnly(request *http.Request) (*Route, error) {
+func (r *routeFinder) findPathOnly(request *http.Request, escapedPath string) (*Route, error) {
 	var partial *Route
 	var partialErr error
-	for _, candidate := range compatibilityCandidates(request, r.document) {
+	for _, candidate := range compatibilityCandidates(request, escapedPath, r.document) {
 		route, err := r.find(request, candidate.path, candidate.server, nil)
 		if err == nil {
 			return route, nil

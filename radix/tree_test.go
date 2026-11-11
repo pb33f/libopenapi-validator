@@ -553,7 +553,7 @@ func TestSplitPath(t *testing.T) {
 		{"", nil},
 		{"users", []string{"users"}},
 		{"/a/b/c", []string{"a", "b", "c"}},
-		{"//a//b//", []string{"a", "b"}}, // double slashes filtered
+		{"//a//b//", []string{"a", "", "b"}}, // outer slashes trimmed, inner empty segment kept
 		{"/a/", []string{"a"}},
 		{"///", nil}, // all slashes
 	}
@@ -866,4 +866,31 @@ func BenchmarkTree_Lookup_VaryingIDs(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		tree.Lookup(testPaths[i%1000])
 	}
+}
+
+func TestTree_EmptySegments(t *testing.T) {
+	tree := New[string]()
+	tree.Insert("/items/{id}", "item")
+	tree.Insert("/items/{a}/{b}", "pair")
+	tree.Insert("/files/{name}", "file")
+	tree.Insert("/docs//raw", "raw")
+
+	// an empty segment matches a parameter, as the regex matcher does
+	val, path, found := tree.Lookup("/items//5")
+	assert.True(t, found)
+	assert.Equal(t, "pair", val)
+	assert.Equal(t, "/items/{a}/{b}", path)
+
+	// an empty segment is not skipped
+	_, _, found = tree.Lookup("/files//report")
+	assert.False(t, found)
+
+	// an empty literal segment matches exactly
+	val, path, found = tree.Lookup("/docs//raw")
+	assert.True(t, found)
+	assert.Equal(t, "raw", val)
+	assert.Equal(t, "/docs//raw", path)
+
+	_, _, found = tree.Lookup("/docs/x/raw")
+	assert.False(t, found)
 }

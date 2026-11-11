@@ -13,6 +13,8 @@ import (
 
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi-validator/config"
+	validationErrors "github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 	"github.com/pb33f/libopenapi-validator/internal/requeststate"
 	"github.com/pb33f/libopenapi-validator/radix"
 	"github.com/pb33f/libopenapi-validator/router"
@@ -678,6 +680,12 @@ func TestStripRequestPath(t *testing.T) {
 			servers: []string{"https://things.com/v1beta/weather"},
 			reqURL:  "https://things.com/v1beta/weather",
 			want:    "/",
+		},
+		{
+			name:    "base path that is not a whole segment is not stripped",
+			servers: []string{"https://things.com/api"},
+			reqURL:  "https://things.com/apiusers",
+			want:    "/apiusers",
 		},
 		{
 			name:    "fragment preserved after stripping",
@@ -1690,5 +1698,102 @@ paths:
 	assert.NotNil(t, errs)
 	assert.Len(t, errs, 1)
 	assert.True(t, errs[0].IsOperationMissingError())
+	assert.Equal(t, "/users/{id}", foundPath)
+}
+
+const ambiguousPathSpec = `openapi: 3.1.0
+servers: [{url: https://example.com/api}]
+paths:
+  /users/me:
+    get: {operationId: me}
+  /users/{id}:
+    get: {operationId: user}
+  /users/{id}/secrets:
+    get: {operationId: secrets}
+  /reports/latest:
+    put: {operationId: putLatest}
+  /reports/{id}:
+    get: {operationId: report}
+  /status:
+    get: {operationId: status}
+  /{id}:
+    get: {operationId: anything}
+`
+
+func ambiguousPathOptions(t *testing.T) (*v3.Document, map[string]*config.ValidationOptions) {
+	doc, err := libopenapi.NewDocument([]byte(ambiguousPathSpec))
+	assert.NoError(t, err)
+	m, _ := doc.BuildV3Model()
+	withRouter := config.NewValidationOptions()
+	withRouter.Router = router.NewRouter(&m.Model, router.WithPathOnlyMatching())
+	return &m.Model, map[string]*config.ValidationOptions{
+		"regex":  nil,
+		"radix":  config.NewValidationOptions(config.WithPathTree(radix.BuildPathTree(&m.Model))),
+		"router": withRouter,
+	}
+}
+
+func TestFindPath_RejectsAmbiguousPaths(t *testing.T) {
+	doc, options := ambiguousPathOptions(t)
+	for name, opts := range options {
+		for _, target := range []string{
+			"https://example.com/api/users/m%65",
+			"https://example.com/api/users/5%2Fsecrets",
+			"https://example.com/api/users/../secrets",
+		} {
+			request, _ := http.NewRequest(http.MethodGet, target, nil)
+			pathItem, errs, foundPath := FindPath(request, doc, opts)
+			assert.Nil(t, pathItem, "%s %s", name, target)
+			assert.Empty(t, foundPath, "%s %s", name, target)
+			if assert.Len(t, errs, 1, "%s %s", name, target) {
+				assert.Equal(t, helpers.PathValidation, errs[0].ValidationType)
+				assert.Equal(t, helpers.ValidationAmbiguousPath, errs[0].ValidationSubType)
+				assert.Equal(t, fmt.Sprintf("GET Path '%s' is ambiguous", request.URL.EscapedPath()), errs[0].Message)
+				assert.Equal(t, validationErrors.HowToFixAmbiguousPath, errs[0].HowToFix)
+			}
+		}
+
+		// readings that agree, match nothing, or lack the method keep the path as sent
+		for target, expected := range map[string]string{
+			"https://example.com/api/users/a%20b":      "/users/{id}",
+			"https://example.com/api/users/%61lice":    "/users/{id}",
+			"https://example.com/api/status%2Fx":       "/{id}",
+			"https://example.com/api/reports/l%61test": "/reports/{id}",
+			"https://example.com/api/users/me":         "/users/me",
+			"https://example.com/api/users//alice":     "/users/{id}",
+			"https://example.com/apistatus":            "/{id}",
+			"https://example.com/api/status":           "/status",
+		} {
+			request, _ := http.NewRequest(http.MethodGet, target, nil)
+			pathItem, errs, foundPath := FindPath(request, doc, opts)
+			assert.Empty(t, errs, "%s %s", name, target)
+			assert.NotNil(t, pathItem, "%s %s", name, target)
+			assert.Equal(t, expected, foundPath, "%s %s", name, target)
+		}
+	}
+}
+
+func TestFindPath_DoubledSlashesThatMatchNothing(t *testing.T) {
+	doc, options := ambiguousPathOptions(t)
+	for name, opts := range options {
+		request, _ := http.NewRequest(http.MethodGet, "https://example.com/api/no//such/path/here", nil)
+		pathItem, errs, _ := FindPath(request, doc, opts)
+		assert.Nil(t, pathItem, name)
+		if assert.Len(t, errs, 1, name) {
+			assert.Equal(t, helpers.ValidationMissing, errs[0].ValidationSubType, name)
+		}
+	}
+}
+
+func TestFindPath_AttachedRouteSkipsReadings(t *testing.T) {
+	doc, _ := ambiguousPathOptions(t)
+	request, _ := http.NewRequest(http.MethodGet, "https://example.com/api/users/m%65", nil)
+
+	// the router that attached the route has already compared the readings
+	restore := requeststate.AttachRoute(request, &router.Route{Document: doc, RequestPath: "/users/m%65"})
+	defer restore()
+	pathItem, errs, foundPath := FindPath(request, doc, nil)
+	assert.Empty(t, errs)
+	assert.NotNil(t, pathItem)
 	assert.Equal(t, "/users/{id}", foundPath)
 }

@@ -217,24 +217,16 @@ func (t *Tree[T]) walkRecursive(n *node[T], fn func(path string, value T) bool) 
 	return true
 }
 
-// splitPath splits a path into segments, removing empty segments.
-// "/users/{id}/posts" -> ["users", "{id}", "posts"]
+// splitPath splits a path into segments, ignoring leading and trailing slashes. An empty segment
+// between doubled slashes is kept and matched like any other, as the regex matcher does, so
+// "/items//5" finds "/items/{a}/{b}" and not "/items/{id}".
+// "/users/{id}/posts" -> ["users", "{id}", "posts"], "/a//b" -> ["a", "", "b"]
 func splitPath(path string) []string {
 	path = strings.Trim(path, "/")
 	if path == "" {
 		return nil
 	}
-
-	parts := strings.Split(path, "/")
-
-	// Filter out empty segments (from double slashes, etc.)
-	result := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p != "" {
-			result = append(result, p)
-		}
-	}
-	return result
+	return strings.Split(path, "/")
 }
 
 // isParam checks if a segment is a parameter (e.g., "{id}")
