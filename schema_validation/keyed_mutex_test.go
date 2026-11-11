@@ -46,7 +46,7 @@ func TestKeyedMutex_SameKeyBlocksConcurrentHolder(t *testing.T) {
 	km := newKeyedMutex()
 	const key = "doc"
 
-	km.lock(key) 
+	km.lock(key)
 
 	entered := make(chan struct{})
 	released := make(chan struct{})
@@ -66,7 +66,7 @@ func TestKeyedMutex_SameKeyBlocksConcurrentHolder(t *testing.T) {
 
 	assert.Equal(t, 1, km.len())
 
-	km.unlock(key) 
+	km.unlock(key)
 
 	select {
 	case <-entered:
@@ -88,7 +88,7 @@ func TestKeyedMutex_DifferentKeysRunConcurrently(t *testing.T) {
 		go func(key string) {
 			km.do(key, func() {
 				entered <- struct{}{}
-				<-release 
+				<-release
 			})
 		}(key)
 	}
