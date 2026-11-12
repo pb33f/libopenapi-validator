@@ -115,7 +115,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 				matches = matches[1:]
 
 				// Check if it is well-formed.
-				idxs, errBraces := helpers.BraceIndices(pathSegments[x])
+				idxs, errBraces := helpers.GetBraceIndicesForPath(pathSegments[x])
 				if errBraces != nil {
 					continue
 				}
@@ -442,14 +442,14 @@ func segmentReferencesParam(segment, name string) bool {
 // nonEmptyPathSegments splits a path on "/" and drops empty segments, so that
 // leading, trailing, or repeated slashes do not introduce empty entries that
 // would shift index alignment between submitted and template segments.
+// One pass with an iterator: strings.Split would allocate the raw slice and
+// copy the non-empty entries into a second slice.
 func nonEmptyPathSegments(path string) []string {
-	raw := strings.Split(path, helpers.Slash)
-	segments := make([]string, 0, len(raw))
-	for _, segment := range raw {
-		if segment == "" {
-			continue
+	segments := make([]string, 0, strings.Count(path, helpers.Slash)+1)
+	for segment := range strings.SplitSeq(path, helpers.Slash) {
+		if segment != "" {
+			segments = append(segments, segment)
 		}
-		segments = append(segments, segment)
 	}
 	return segments
 }
