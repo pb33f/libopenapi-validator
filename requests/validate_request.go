@@ -38,6 +38,12 @@ type ValidateRequestSchemaInput struct {
 	DecodedValue any             // Optional: A value produced by a registered body decoder
 	RawBody      []byte          // Optional: Original bytes used for diagnostics with DecodedValue
 	ValueDecoded bool            // Distinguishes an explicitly decoded nil from the legacy JSON path
+
+	// ValidationOptions carries pre-built options. When set, the function uses
+	// it directly and skips NewValidationOptions, which allocates fresh default
+	// schema caches on every call. The options are treated as read-only and
+	// must stay valid for the duration of the call.
+	ValidationOptions *config.ValidationOptions
 }
 
 func setRequestBody(request *http.Request, body []byte) {
@@ -53,7 +59,10 @@ func readAndResetRequestBody(request *http.Request) []byte {
 // If validation fails, it will return a list of validation errors as the second return value.
 // The schema will be stored and reused from cache if available, otherwise it will be compiled on each call.
 func ValidateRequestSchema(input *ValidateRequestSchemaInput) (bool, []*liberrors.ValidationError) {
-	validationOptions := config.NewValidationOptions(input.Options...)
+	validationOptions := input.ValidationOptions
+	if validationOptions == nil {
+		validationOptions = config.NewValidationOptions(input.Options...)
+	}
 	var validationErrors []*liberrors.ValidationError
 	var renderedSchema, jsonSchema []byte
 	var referenceSchema string

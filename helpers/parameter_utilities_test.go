@@ -1430,3 +1430,45 @@ func TestExtractRawQueryValues(t *testing.T) {
 		"novalue":      {""},
 	}, raw)
 }
+
+func TestExtractRawQueryValuesEmptyQuery(t *testing.T) {
+	require.Nil(t, ExtractRawQueryValues(""))
+}
+
+func TestExtractParamsForOperationOneSideEmpty(t *testing.T) {
+	operationOnly := &v3.Parameter{Name: "id", In: Path}
+
+	t.Run("no path level parameters returns operation slice untouched", func(t *testing.T) {
+		item := &v3.PathItem{Get: &v3.Operation{Parameters: []*v3.Parameter{operationOnly}}}
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+		require.Equal(t, []*v3.Parameter{operationOnly}, got)
+	})
+
+	t.Run("no operation parameters returns path slice untouched", func(t *testing.T) {
+		item := &v3.PathItem{Parameters: []*v3.Parameter{operationOnly}, Get: &v3.Operation{}}
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+		require.Equal(t, []*v3.Parameter{operationOnly}, got)
+	})
+
+	t.Run("both sides merge without writing into the model slice", func(t *testing.T) {
+		pathLevel := &v3.Parameter{Name: "shared", In: Path}
+		operationLevel := &v3.Parameter{Name: "id", In: Path}
+		item := &v3.PathItem{
+			Parameters: []*v3.Parameter{pathLevel},
+			Get:        &v3.Operation{Parameters: []*v3.Parameter{operationLevel}},
+		}
+		before := append([]*v3.Parameter(nil), item.Parameters...)
+
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+
+		require.Equal(t, []*v3.Parameter{pathLevel, operationLevel}, got)
+		// the model backing array stays untouched
+		require.Equal(t, before, item.Parameters)
+	})
+
+	t.Run("no operation parameters returns path slice untouched", func(t *testing.T) {
+		item := &v3.PathItem{Parameters: []*v3.Parameter{operationOnly}, Get: &v3.Operation{}}
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+		require.Equal(t, []*v3.Parameter{operationOnly}, got)
+	})
+}

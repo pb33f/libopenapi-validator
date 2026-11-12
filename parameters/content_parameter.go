@@ -126,7 +126,7 @@ func pathParameterValues(requestPath, template, target string) []string {
 		return nil
 	}
 	matches := expression.FindStringSubmatch(requestPath)
-	indices, err := helpers.BraceIndices(template)
+	indices, err := helpers.GetBraceIndicesForPath(template)
 	if err != nil || len(matches) != len(indices)/2+1 {
 		return nil
 	}

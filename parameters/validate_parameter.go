@@ -78,6 +78,11 @@ func GetRenderedSchema(schema *base.Schema, opts *config.ValidationOptions) stri
 	if opts != nil && opts.SchemaCache != nil && schema.GoLow() != nil {
 		hash := schema.GoLow().Hash()
 		if cached, ok := opts.SchemaCache.Load(hash); ok && cached != nil && len(cached.RenderedInline) > 0 {
+			// ReferenceSchema holds the string form of RenderedInline; return it
+			// instead of copying the bytes into a new string on every call.
+			if cached.ReferenceSchema != "" {
+				return cached.ReferenceSchema
+			}
 			return string(cached.RenderedInline)
 		}
 	}

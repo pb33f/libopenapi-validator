@@ -29,7 +29,11 @@ type QueryParam struct {
 
 // ExtractRawQueryValues parses a URL's RawQuery into a map of decoded key to raw
 // (still percent-encoded) values, index-aligned per key with request.URL.Query().
+// A query without parameters returns nil.
 func ExtractRawQueryValues(rawQuery string) map[string][]string {
+	if rawQuery == "" {
+		return nil
+	}
 	rawValues := make(map[string][]string)
 	for rawQuery != "" {
 		var segment string
@@ -53,42 +57,54 @@ func ExtractRawQueryValues(rawQuery string) map[string][]string {
 // ExtractParamsForOperation will extract the parameters for the operation based on the request method.
 // Both the path level params and the method level params will be returned.
 func ExtractParamsForOperation(request *http.Request, item *v3.PathItem) []*v3.Parameter {
-	params := item.Parameters
+	var operationParams []*v3.Parameter
 	switch request.Method {
 	case http.MethodGet:
 		if item.Get != nil {
-			params = append(params, item.Get.Parameters...)
+			operationParams = item.Get.Parameters
 		}
 	case http.MethodPost:
 		if item.Post != nil {
-			params = append(params, item.Post.Parameters...)
+			operationParams = item.Post.Parameters
 		}
 	case http.MethodPut:
 		if item.Put != nil {
-			params = append(params, item.Put.Parameters...)
+			operationParams = item.Put.Parameters
 		}
 	case http.MethodDelete:
 		if item.Delete != nil {
-			params = append(params, item.Delete.Parameters...)
+			operationParams = item.Delete.Parameters
 		}
 	case http.MethodOptions:
 		if item.Options != nil {
-			params = append(params, item.Options.Parameters...)
+			operationParams = item.Options.Parameters
 		}
 	case http.MethodHead:
 		if item.Head != nil {
-			params = append(params, item.Head.Parameters...)
+			operationParams = item.Head.Parameters
 		}
 	case http.MethodPatch:
 		if item.Patch != nil {
-			params = append(params, item.Patch.Parameters...)
+			operationParams = item.Patch.Parameters
 		}
 	case http.MethodTrace:
 		if item.Trace != nil {
-			params = append(params, item.Trace.Parameters...)
+			operationParams = item.Trace.Parameters
 		}
 	}
-	return params
+
+	// Return the model slices untouched when one side is empty: appending to
+	// item.Parameters can write into the model backing array, and the model
+	// stays shared across validators and requests.
+	if len(operationParams) == 0 {
+		return item.Parameters
+	}
+	if len(item.Parameters) == 0 {
+		return operationParams
+	}
+	merged := make([]*v3.Parameter, 0, len(item.Parameters)+len(operationParams))
+	merged = append(merged, item.Parameters...)
+	return append(merged, operationParams...)
 }
 
 // ExtractSecurityForOperation will extract the security requirements for the operation based on the request method.

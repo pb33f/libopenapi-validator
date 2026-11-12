@@ -144,6 +144,63 @@ func TestDefaultPatternCompileCache(t *testing.T) {
 	assert.Equal(t, res.String(), DefaultPatternRegexString)
 }
 
+func TestGetRegexForPathReturnsCachedRegex(t *testing.T) {
+	first, errFirst := GetRegexForPath("/cache-check/{id}")
+	second, errSecond := GetRegexForPath("/cache-check/{id}")
+
+	assert.NoError(t, errFirst)
+	assert.NoError(t, errSecond)
+	// the same compiled regex comes back for the same template
+	assert.True(t, first == second, "expected the cached regex pointer for repeated calls")
+}
+
+func TestGetRegexForPathDoesNotCacheErrors(t *testing.T) {
+	bad := "/cache-check/{:broken}"
+
+	_, errFirst := GetRegexForPath(bad)
+	_, errSecond := GetRegexForPath(bad)
+
+	// invalid templates stay uncached: every call reports the error again
+	assert.Error(t, errFirst)
+	assert.Error(t, errSecond)
+	assert.Equal(t, errFirst.Error(), errSecond.Error())
+}
+
+func TestClearRegexCache(t *testing.T) {
+	before, errBefore := GetRegexForPath("/cache-clear/{id}")
+	assert.NoError(t, errBefore)
+
+	ClearRegexCache()
+
+	after, errAfter := GetRegexForPath("/cache-clear/{id}")
+	assert.NoError(t, errAfter)
+	// the cleared entry is gone: this call compiled a new regex
+	assert.True(t, before != after, "expected a fresh regex after ClearRegexCache")
+}
+
+func TestGetBraceIndicesForPath(t *testing.T) {
+	tpl := "/orders/{id:[0-9]+}/items/{itemId}"
+
+	want, errWant := BraceIndices(tpl)
+	assert.NoError(t, errWant)
+
+	first, errFirst := GetBraceIndicesForPath(tpl)
+	second, errSecond := GetBraceIndicesForPath(tpl)
+
+	assert.NoError(t, errFirst)
+	assert.NoError(t, errSecond)
+	assert.Equal(t, want, first)
+	// the same cached indices come back for the same template
+	assert.True(t, &first[0] == &second[0], "expected the cached indices slice for repeated calls")
+}
+
+func TestGetBraceIndicesForPathInvalidTemplate(t *testing.T) {
+	idxs, err := GetBraceIndicesForPath("/orders/{id")
+
+	assert.Nil(t, idxs)
+	assert.Error(t, err)
+}
+
 func equal(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
@@ -154,4 +211,17 @@ func equal(a, b []int) bool {
 		}
 	}
 	return true
+}
+
+func TestGetRegexForPathInvalidCustomPattern(t *testing.T) {
+	// an unterminated character class fails regexp compilation
+	_, err := GetRegexForPath("/x/{id:[a-z}")
+	assert.Error(t, err)
+}
+
+func TestGetRegexForPathCapturingGroupRejected(t *testing.T) {
+	// capturing groups in custom patterns are rejected
+	_, err := GetRegexForPath("/x/{id:(abc)}")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "capture groups")
 }
