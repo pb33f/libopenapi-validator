@@ -4,6 +4,8 @@
 package schema_validation
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/pb33f/go-yaml"
@@ -114,4 +116,74 @@ func TestCachedInlineSchemaOwnsEnumValues(t *testing.T) {
 	v["v"] = "changed"
 	require.NoError(t, compiled.Validate(map[string]any{"v": "original"}))
 	require.Error(t, compiled.Validate(v))
+}
+
+func TestYAMLValidationInvalidInputs(t *testing.T) {
+	var c ExampleSchemaCache
+	compiled, err := c.CompileSchema(true, jsonschema.Draft7)
+	require.NoError(t, err)
+	require.Error(t, ValidateYAMLNode(nil, compiled))
+	_, err = DecodeYAMLValue(nil)
+	require.Error(t, err)
+	_, err = c.Compile(nil, jsonschema.Draft7, SchemaValidationPurposeGeneric, false)
+	require.Error(t, err)
+	_, err = c.CompileSchema(true, nil)
+	require.Error(t, err)
+	_, err = c.CompileSchema(make(chan int), jsonschema.Draft7)
+	require.Error(t, err)
+
+	var cyclic, complexKey yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("cycle: &cycle [*cycle]"), &cyclic))
+	require.NoError(t, yaml.Unmarshal([]byte("? [a,b]\n: value"), &complexKey))
+	for _, n := range []*yaml.Node{&cyclic, &complexKey, {Kind: yaml.AliasNode}} {
+		require.Error(t, ValidateYAMLNode(n, compiled))
+		_, err := c.Compile(n, jsonschema.Draft7, SchemaValidationPurposeGeneric, false)
+		require.Error(t, err)
+	}
+	for _, example := range []bool{false, true} {
+		key := exampleSchemaKey{draft: jsonschema.Draft7, example: example}
+		_, err := key.compileResource([]byte("{"))
+		require.Error(t, err)
+	}
+}
+
+func TestMergedExampleAndSwaggerParameter(t *testing.T) {
+	var node yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte("source: &defaults {type: string}\nvalue: {<<: *defaults, required: true, allOf: [{minLength: 2}]}"), &node))
+	var c ExampleSchemaCache
+	schema, err := c.Compile(mappingValue(node.Content[0], "value"), jsonschema.Draft4, SchemaValidationPurposeGeneric, true)
+	require.NoError(t, err)
+	require.NoError(t, schema.Validate("ok"))
+	require.Error(t, schema.Validate("x"))
+	require.NoError(t, yaml.Unmarshal([]byte("true"), &node))
+	boolean, err := c.Compile(&node, jsonschema.Draft7, SchemaValidationPurposeGeneric, false)
+	require.NoError(t, err)
+	require.NoError(t, boolean.Validate(nil))
+}
+
+func TestExampleSchemaCacheConcurrentReuseAndEviction(t *testing.T) {
+	var c ExampleSchemaCache
+	const workers = 8
+	var wg sync.WaitGroup
+	var schemas [workers]*jsonschema.Schema
+	var errs [workers]error
+	for i := range workers {
+		wg.Go(func() {
+			schemas[i], errs[i] = c.CompileSchema(true, jsonschema.Draft7)
+		})
+	}
+	wg.Wait()
+	for i := range workers {
+		require.NoError(t, errs[i])
+		require.Same(t, schemas[0], schemas[i])
+	}
+
+	for i := range 1024 {
+		_, err := c.CompileSchema(map[string]any{"title": fmt.Sprint(i)}, jsonschema.Draft7)
+		require.NoError(t, err)
+	}
+	again, err := c.CompileSchema(true, jsonschema.Draft7)
+	require.NoError(t, err)
+	require.NotSame(t, schemas[0], again)
+	require.NoError(t, schemas[0].Validate("still usable"))
 }
