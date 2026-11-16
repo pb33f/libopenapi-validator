@@ -10,7 +10,7 @@ require (
 	github.com/pb33f/go-yaml v0.1.1
 	github.com/pb33f/jsonpath v0.8.5
 	github.com/pb33f/jsonschema/v6 v6.0.3
-	github.com/pb33f/libopenapi v0.42.3
+	github.com/pb33f/libopenapi v0.42.5
 	github.com/pb33f/testify v0.1.1
 	golang.org/x/text v0.43.0
 )
@@ -20,5 +20,5 @@ require (
 	github.com/buger/jsonparser v1.6.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect
 	golang.org/x/net v0.62.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 )
