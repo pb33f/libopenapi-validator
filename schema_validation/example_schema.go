@@ -122,10 +122,7 @@ type exampleSchemaKey struct {
 	digest           [sha256.Size]byte
 }
 
-type compiledExample struct {
-	schema *jsonschema.Schema
-	err    error
-}
+type compiledExample func() (*jsonschema.Schema, error)
 
 // ExampleSchemaCache shares compiled inline example schemas by dialect and prepared content.
 // Its zero value is ready for concurrent use. External resources are never loaded.
@@ -163,56 +160,58 @@ func (c *ExampleSchemaCache) compile(schema any, key exampleSchemaKey) (*jsonsch
 	}
 	key.digest = sha256.Sum256(data)
 	c.mu.Lock()
-	cached, ok := c.schemas[key]
-	c.mu.Unlock()
-	if ok {
-		return cached.schema, cached.err
+	cached := c.schemas[key]
+	if cached == nil {
+		const maxSchemas = 1024
+		if c.schemas == nil {
+			c.schemas = make(map[exampleSchemaKey]compiledExample)
+		} else if len(c.schemas) >= maxSchemas {
+			clear(c.schemas)
+		}
+		cached = sync.OnceValues(func() (*jsonschema.Schema, error) {
+			return key.compileResource(data)
+		})
+		c.schemas[key] = cached
 	}
-	if key.example {
-		// Encode the already decoded data to own the schema tree and expand YAML merges.
-		// Do this only on cache misses. Never prune the document supplied by the caller.
-		var n yaml.Node
-		if err := n.Encode(schema); err != nil {
-			return nil, err
-		}
-		if key.swagger {
-			if i, v := mappingPair(&n, "required"); v != nil && v.ShortTag() == "!!bool" {
-				removeMappingPair(&n, i)
-			}
-		}
-		prepareExampleSchema(&n, key.purpose, key.swagger, false)
-		if err := n.Decode(&schema); err != nil {
-			return nil, err
-		}
-	} else {
-		// The compiler may retain enum and const values. Own them before caching.
-		schema, err = jsonschema.UnmarshalJSON(bytes.NewReader(data))
-		if err != nil {
-			return nil, err
-		}
+	c.mu.Unlock()
+	return cached()
+}
+
+func (key exampleSchemaKey) compileResource(data []byte) (*jsonschema.Schema, error) {
+	resource, err := key.decodeResource(data)
+	if err != nil {
+		return nil, err
 	}
 	compiler := jsonschema.NewCompiler()
 	compiler.UseLoader(jsonschema.SchemeURLLoader{})
 	compiler.DefaultDraft(key.draft)
 	const id = "urn:example:schema"
 	var compiled *jsonschema.Schema
-	err = compiler.AddResource(id, schema)
+	err = compiler.AddResource(id, resource)
 	if err == nil {
 		compiled, err = compiler.Compile(id)
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if cached, ok = c.schemas[key]; ok {
-		return cached.schema, cached.err
-	}
-	const maxSchemas = 1024
-	if c.schemas == nil {
-		c.schemas = make(map[exampleSchemaKey]compiledExample)
-	} else if len(c.schemas) >= maxSchemas {
-		clear(c.schemas)
-	}
-	c.schemas[key] = compiledExample{compiled, err}
 	return compiled, err
+}
+
+func (key exampleSchemaKey) decodeResource(data []byte) (any, error) {
+	if !key.example {
+		// The compiler can retain enum and const values. Give it an owned copy.
+		return jsonschema.UnmarshalJSON(bytes.NewReader(data))
+	}
+	// Work on a private node on cache misses. Merges were expanded before encoding.
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	n := schemaRootNode(&doc)
+	if key.swagger {
+		if i, v := mappingPair(n, "required"); v != nil && v.ShortTag() == "!!bool" {
+			removeMappingPair(n, i)
+		}
+	}
+	prepareExampleSchema(n, key.purpose, key.swagger, false)
+	return DecodeYAMLValue(n)
 }
 
 // Only schema-bearing keywords are traversed. A property named "not" or an
