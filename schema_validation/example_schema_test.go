@@ -142,7 +142,7 @@ func TestYAMLValidationInvalidInputs(t *testing.T) {
 	}
 	for _, example := range []bool{false, true} {
 		key := exampleSchemaKey{draft: jsonschema.Draft7, example: example}
-		_, err := key.compileResource([]byte("{"))
+		_, err := key.compileResource([]byte("{"), invalidExampleSchema{})
 		require.Error(t, err)
 	}
 }
@@ -186,4 +186,22 @@ func TestExampleSchemaCacheConcurrentReuseAndEviction(t *testing.T) {
 	require.NoError(t, err)
 	require.NotSame(t, schemas[0], again)
 	require.NoError(t, schemas[0].Validate("still usable"))
+}
+
+// The example compiler must propagate an error from the YAML encoder.
+type invalidExampleSchema struct{}
+
+func (invalidExampleSchema) MarshalYAML() (any, error) {
+	return nil, fmt.Errorf("cannot encode test schema")
+}
+
+func TestExampleSchemaPreservesUnicodeAndNumbers(t *testing.T) {
+	var doc yaml.Node
+	require.NoError(t, yaml.Unmarshal([]byte(`{const: ["\u0085", 9007199254740993]}`), &doc))
+	var cache ExampleSchemaCache
+	compiled, err := cache.Compile(&doc, jsonschema.Draft7, SchemaValidationPurposeGeneric, false)
+	require.NoError(t, err)
+	require.NoError(t, compiled.Validate([]any{"\u0085", int64(9007199254740993)}))
+	require.Error(t, compiled.Validate([]any{" ", int64(9007199254740993)}))
+	require.Error(t, compiled.Validate([]any{"\u0085", int64(9007199254740992)}))
 }

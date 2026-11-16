@@ -169,7 +169,7 @@ func (c *ExampleSchemaCache) compile(schema any, key exampleSchemaKey) (*jsonsch
 			clear(c.schemas)
 		}
 		cached = sync.OnceValues(func() (*jsonschema.Schema, error) {
-			return key.compileResource(data)
+			return key.compileResource(data, schema)
 		})
 		c.schemas[key] = cached
 	}
@@ -177,8 +177,8 @@ func (c *ExampleSchemaCache) compile(schema any, key exampleSchemaKey) (*jsonsch
 	return cached()
 }
 
-func (key exampleSchemaKey) compileResource(data []byte) (*jsonschema.Schema, error) {
-	resource, err := key.decodeResource(data)
+func (key exampleSchemaKey) compileResource(data []byte, schema any) (*jsonschema.Schema, error) {
+	resource, err := key.decodeResource(data, schema)
 	if err != nil {
 		return nil, err
 	}
@@ -194,17 +194,18 @@ func (key exampleSchemaKey) compileResource(data []byte) (*jsonschema.Schema, er
 	return compiled, err
 }
 
-func (key exampleSchemaKey) decodeResource(data []byte) (any, error) {
+func (key exampleSchemaKey) decodeResource(data []byte, schema any) (any, error) {
 	if !key.example {
 		// The compiler can retain enum and const values. Give it an owned copy.
 		return jsonschema.UnmarshalJSON(bytes.NewReader(data))
 	}
-	// Work on a private node on cache misses. Merges were expanded before encoding.
+	// Encode the decoded YAML value directly. Parsing JSON text as YAML would fold
+	// literal U+0085 characters inside strings.
 	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
+	if err := doc.Encode(schema); err != nil {
 		return nil, err
 	}
-	n := schemaRootNode(&doc)
+	n := &doc
 	if key.swagger {
 		if i, v := mappingPair(n, "required"); v != nil && v.ShortTag() == "!!bool" {
 			removeMappingPair(n, i)
