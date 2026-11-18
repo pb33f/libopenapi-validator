@@ -621,7 +621,7 @@ func TestSchemaResourceHelpers_EdgeCases(t *testing.T) {
 	assert.False(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{}))
 	assert.False(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte(`type: string`)}))
 	assert.True(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte(`$ref: '#/components/schemas/Thing'`)}))
-	assert.True(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte(":\n")}))
+	assert.True(t, renderedSchemaHasReachableRefs(&RenderedValidationSchema{RenderedInline: []byte("key: [unterminated\n")}))
 
 	rendered, err := renderRootSchemaForValidation(nil, SchemaValidationPurposeGeneric)
 	require.NoError(t, err)

@@ -351,7 +351,7 @@ func TestParamValidator_ValidateSecurity_PresetPath(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /products:
-    post:
+    post: {}
 `
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))

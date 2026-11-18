@@ -141,7 +141,7 @@ components:
 }
 
 func TestRenderSchemaBytesForValidation_Errors(t *testing.T) {
-	rendered, err := renderSchemaBytesForValidation([]byte(":\n"), SchemaValidationPurposeRequestBody)
+	rendered, err := renderSchemaBytesForValidation([]byte("key: [unterminated\n"), SchemaValidationPurposeRequestBody)
 	require.Error(t, err)
 	assert.Nil(t, rendered)
 	assert.Contains(t, err.Error(), "schema render decode failed")

@@ -1326,7 +1326,7 @@ func TestValidateBody_SchemaHasNoRequestBody(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
-    post:`
+    post: {}`
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
@@ -1415,7 +1415,7 @@ func TestValidateBody_NoBodyNoNothing(t *testing.T) {
 	spec := `openapi: 3.1.0
 paths:
   /burgers/createBurger:
-    post:`
+    post: {}`
 
 	doc, _ := libopenapi.NewDocument([]byte(spec))
 
