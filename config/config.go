@@ -96,6 +96,7 @@ type ValidationOptions struct {
 	ValidateResponseStatus        bool                      // ValidateResponseStatus rejects undocumented response status codes.
 	RequestDefaults               bool                      // RequestDefaults stages and atomically applies request defaults.
 	StrictServerMatching          bool                      // StrictServerMatching matches scheme, host, port, base path, and server variables.
+	ValidateDocumentPathParams    bool                      // ValidateDocumentPathParams rejects documents where path templates and declared path parameters do not correspond.
 	bodyDecoders                  []content.Registration
 	bodyEncoders                  []content.EncoderRegistration
 	borrowedState                 bool
@@ -223,6 +224,7 @@ func WithExistingOpts(options *ValidationOptions) Option {
 			o.ValidateResponseStatus = options.ValidateResponseStatus
 			o.RequestDefaults = options.RequestDefaults
 			o.StrictServerMatching = options.StrictServerMatching
+			o.ValidateDocumentPathParams = options.ValidateDocumentPathParams
 			o.StrictMode = options.StrictMode
 			o.StrictIgnorePaths = options.StrictIgnorePaths
 			o.StrictIgnoredHeaders = options.StrictIgnoredHeaders
@@ -431,6 +433,13 @@ func WithRequestDefaults() Option {
 // WithStrictServerMatching enables standalone-router server semantics in high-level validation.
 func WithStrictServerMatching() Option {
 	return func(o *ValidationOptions) { o.StrictServerMatching = true }
+}
+
+// WithPathParameterDocumentValidation enables document-level validation that each path template
+// variable has a corresponding `in: path` parameter, and that every declared `in: path`
+// parameter matches a template variable in the path.
+func WithPathParameterDocumentValidation() Option {
+	return func(o *ValidationOptions) { o.ValidateDocumentPathParams = true }
 }
 
 // WithSchemaCache sets a custom cache implementation or disables caching if nil.

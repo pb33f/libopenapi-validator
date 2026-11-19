@@ -245,6 +245,9 @@ func (v *validator) ValidateDocument() (bool, []*errors.ValidationError) {
 	var validationOpts []config.Option
 	if v.options != nil {
 		validationOpts = append(validationOpts, config.WithRegexEngine(v.options.RegexEngine))
+		if v.options.ValidateDocumentPathParams {
+			validationOpts = append(validationOpts, config.WithPathParameterDocumentValidation())
+		}
 	}
 	return schema_validation.ValidateOpenAPIDocument(v.document, validationOpts...)
 }
