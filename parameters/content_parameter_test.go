@@ -140,10 +140,13 @@ func TestCustomContentParameterDecoder(t *testing.T) {
 	assert.Same(t, request, inputs[0].Request)
 
 	request.Header.Set("X-Data", `"ok"`)
+	request.Header.Add("X-Data", `"second"`)
 	valid, validationErrors = validator.ValidateHeaderParams(request)
 	assert.False(t, valid)
 	require.NotEmpty(t, validationErrors)
 	assert.Contains(t, validationErrors[0].Reason, "custom failure")
+	require.Len(t, inputs, 2)
+	assert.Equal(t, []string{`"ok"`, `"second"`}, inputs[1].RawValues)
 }
 
 func TestCustomContentParameterSchemaIdentityAndUnsupportedMedia(t *testing.T) {

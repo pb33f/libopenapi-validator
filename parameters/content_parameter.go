@@ -61,7 +61,11 @@ func (v *paramValidator) validateContentParameters(request *http.Request, pathIt
 		if v.options.ContentParameterDecoder != nil {
 			value, schema, decodeErr = v.options.ContentParameterDecoder(request.Context(), input)
 		} else if strings.EqualFold(mediaType, helpers.JSONContentType) || strings.HasSuffix(strings.ToLower(mediaType), "+json") {
-			decodeErr = json.Unmarshal([]byte(raw[0]), &value)
+			encoded := raw[0]
+			if location == helpers.Header {
+				encoded = strings.Join(raw, ",")
+			}
+			decodeErr = json.Unmarshal([]byte(encoded), &value)
 		} else {
 			decodeErr = fmt.Errorf("no content-parameter decoder is registered for %s", mediaType)
 		}
