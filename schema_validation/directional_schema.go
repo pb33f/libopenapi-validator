@@ -144,10 +144,6 @@ func pruneDirectionalRequired(schemaNode *yaml.Node, purpose SchemaValidationPur
 }
 
 func pruneRequiredAtSchema(schemaNode *yaml.Node, purpose SchemaValidationPurpose) {
-	pruneRequiredProperties(schemaNode, purpose, propertySchemaHasDirectionalAnnotation)
-}
-
-func pruneRequiredProperties(schemaNode *yaml.Node, purpose SchemaValidationPurpose, exclude func(*yaml.Node, SchemaValidationPurpose) bool) {
 	if purpose != SchemaValidationPurposeRequestBody && purpose != SchemaValidationPurposeResponseBody {
 		return
 	}
@@ -168,7 +164,7 @@ func pruneRequiredProperties(schemaNode *yaml.Node, purpose SchemaValidationPurp
 			continue
 		}
 		propertySchema := mappingValue(propertiesNode, item.Value)
-		if exclude(propertySchema, purpose) {
+		if propertySchemaHasDirectionalAnnotation(propertySchema, purpose) {
 			continue
 		}
 		prunedRequired = append(prunedRequired, item)
@@ -186,8 +182,15 @@ func propertySchemaHasDirectionalAnnotation(schemaNode *yaml.Node, purpose Schem
 		return false
 	}
 
-	if directDirectionalAnnotation(schemaNode, purpose) {
-		return true
+	switch purpose {
+	case SchemaValidationPurposeRequestBody:
+		if boolMappingValue(schemaNode, "readOnly") {
+			return true
+		}
+	case SchemaValidationPurposeResponseBody:
+		if boolMappingValue(schemaNode, "writeOnly") {
+			return true
+		}
 	}
 
 	for _, key := range []string{"allOf", "anyOf", "oneOf"} {
@@ -200,20 +203,6 @@ func propertySchemaHasDirectionalAnnotation(schemaNode *yaml.Node, purpose Schem
 		}
 	}
 
-	return false
-}
-
-func directDirectionalAnnotation(schemaNode *yaml.Node, purpose SchemaValidationPurpose) bool {
-	switch purpose {
-	case SchemaValidationPurposeRequestBody:
-		if boolMappingValue(schemaNode, "readOnly") {
-			return true
-		}
-	case SchemaValidationPurposeResponseBody:
-		if boolMappingValue(schemaNode, "writeOnly") {
-			return true
-		}
-	}
 	return false
 }
 
