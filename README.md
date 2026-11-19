@@ -113,6 +113,10 @@ Example:
 go run github.com/pb33f/libopenapi-validator/cmd/validate@latest --yaml2json <file>
 ```
 
+## License
+
+Most code is [MIT licensed](LICENSE.md). The OpenLint adaptations in `schema_validation/example_schema.go` also use Apache-2.0; see [OPENLINT-OPENAPI-LICENSE](schema_validation/OPENLINT-OPENAPI-LICENSE).
+
 ## Documentation
 
 - [The structure of the validator](https://pb33f.io/libopenapi/validation/#the-structure-of-the-validator)

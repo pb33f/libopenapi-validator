@@ -4,6 +4,7 @@
 package schema_validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -98,6 +99,180 @@ properties:
 	require.Error(t, sch.Validate(map[string]any{"id": "present"}))
 }
 
+func TestCompileExamplePreservesConditionalRequired(t *testing.T) {
+	for _, direction := range []struct {
+		name, annotation string
+		purpose          SchemaValidationPurpose
+	}{
+		{"request", "readOnly", SchemaValidationPurposeRequestBody},
+		{"response", "writeOnly", SchemaValidationPurposeResponseBody},
+	} {
+		predicate := fmt.Sprintf(`{required: [id], properties: {id: {type: string, %s: true}}}`, direction.annotation)
+		for _, condition := range []struct{ name, schema string }{
+			{"direct", predicate},
+			{"allOf", "{allOf: [" + predicate + "]}"},
+			{"doubleNot", "{not: {not: " + predicate + "}}"},
+		} {
+			t.Run(direction.name+"/"+condition.name, func(t *testing.T) {
+				var node yaml.Node
+				require.NoError(t, yaml.Unmarshal([]byte("type: object\nif: "+condition.schema+"\nthen: {required: [kind]}\nelse: {required: [fallback]}"), &node))
+				original := cloneYAMLNode(&node)
+				var cache ExampleSchemaCache
+				compiled, err := cache.Compile(&node, jsonschema.Draft7, direction.purpose, false)
+				require.NoError(t, err)
+				require.NoError(t, compiled.Validate(map[string]any{"fallback": "ok"}))
+				require.NoError(t, compiled.Validate(map[string]any{"id": "present", "kind": "ok"}))
+				require.Error(t, compiled.Validate(map[string]any{}))
+				require.Error(t, compiled.Validate(map[string]any{"id": "present", "fallback": "ok"}))
+				require.Equal(t, original, &node)
+			})
+		}
+	}
+}
+
+func TestCompileExampleNullableDialect(t *testing.T) {
+	for _, tc := range []struct {
+		name, schema string
+		draft        *jsonschema.Draft
+		swagger      bool
+		acceptNull   bool
+	}{
+		{"openapi30", "{type: string, nullable: true}", jsonschema.Draft4, false, true},
+		{"draft6", "{type: string, nullable: true}", jsonschema.Draft6, false, false},
+		{"draft7", "{type: string, nullable: true}", jsonschema.Draft7, false, false},
+		{"draft2019", "{type: string, nullable: true}", jsonschema.Draft2019, false, false},
+		{"openapi31", "{type: string, nullable: true}", jsonschema.Draft2020, false, false},
+		{"openapi31NullType", "{type: [string, 'null']}", jsonschema.Draft2020, false, true},
+		{"swagger", "{type: string, x-nullable: true}", jsonschema.Draft4, true, true},
+		{"extensionWithoutSwagger", "{type: string, x-nullable: true}", jsonschema.Draft4, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var node yaml.Node
+			require.NoError(t, yaml.Unmarshal([]byte("type: object\nproperties:\n  value: "+tc.schema), &node))
+			var cache ExampleSchemaCache
+			compiled, err := cache.Compile(&node, tc.draft, SchemaValidationPurposeGeneric, tc.swagger)
+			require.NoError(t, err)
+			err = compiled.Validate(map[string]any{"value": nil})
+			if tc.acceptNull {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+			require.NoError(t, compiled.Validate(map[string]any{"value": "ok"}))
+			require.Error(t, compiled.Validate(map[string]any{"value": 1}))
+		})
+	}
+}
+
+func TestCompileExampleComposedDirectionalAnnotations(t *testing.T) {
+	for _, composition := range []string{"allOf", "anyOf", "oneOf"} {
+		t.Run(composition, func(t *testing.T) {
+			var node yaml.Node
+			require.NoError(t, yaml.Unmarshal([]byte(fmt.Sprintf(`type: object
+required: [id, secret, name]
+properties:
+  id: {%s: [{allOf: [{type: string, readOnly: true}]}]}
+  secret: {%s: [{allOf: [{type: string, writeOnly: true}]}]}
+  name: {type: string}`, composition, composition)), &node))
+			original := cloneYAMLNode(&node)
+			var cache ExampleSchemaCache
+			for _, purpose := range []SchemaValidationPurpose{SchemaValidationPurposeRequestBody, SchemaValidationPurposeResponseBody, SchemaValidationPurposeGeneric} {
+				compiled, err := cache.Compile(&node, jsonschema.Draft2020, purpose, false)
+				require.NoError(t, err)
+				value := map[string]any{"id": "public", "secret": "private", "name": "example"}
+				require.NoError(t, compiled.Validate(value))
+				switch purpose {
+				case SchemaValidationPurposeRequestBody:
+					delete(value, "id")
+				case SchemaValidationPurposeResponseBody:
+					delete(value, "secret")
+				}
+				require.NoError(t, compiled.Validate(value))
+				delete(value, "name")
+				require.Error(t, compiled.Validate(value))
+				require.Error(t, compiled.Validate(map[string]any{"name": "example"}))
+				require.Error(t, compiled.Validate(map[string]any{"id": 1, "secret": 2, "name": "example"}))
+			}
+			require.Equal(t, original, &node)
+		})
+	}
+}
+
+func TestExampleSchemaNonFiniteNumbers(t *testing.T) {
+	for _, value := range []string{".inf", "-.inf", ".nan"} {
+		t.Run(value, func(t *testing.T) {
+			var node yaml.Node
+			require.NoError(t, yaml.Unmarshal([]byte("type: object\nproperties:\n  value: {type: number, maximum: "+value+"}"), &node))
+			var cache ExampleSchemaCache
+			_, err := cache.Compile(&node, jsonschema.Draft2020, SchemaValidationPurposeGeneric, false)
+			require.ErrorContains(t, err, "non-finite")
+			require.ErrorContains(t, err, "JSON Schema")
+			var unsupported *json.UnsupportedValueError
+			require.ErrorAs(t, err, &unsupported)
+		})
+	}
+}
+
+func TestExampleSchemaCacheCustomLimit(t *testing.T) {
+	for _, limit := range []int{2, 1025} {
+		t.Run(fmt.Sprint(limit), func(t *testing.T) {
+			cache := ExampleSchemaCache{MaxSchemas: limit}
+			compiled := make([]*jsonschema.Schema, limit)
+			for i := range limit {
+				var err error
+				compiled[i], err = cache.CompileSchema(map[string]any{"const": i}, jsonschema.Draft7)
+				require.NoError(t, err)
+			}
+			// A second pass retains every schema, even above the default limit.
+			for i := range limit {
+				again, err := cache.CompileSchema(map[string]any{"const": i}, jsonschema.Draft7)
+				require.NoError(t, err)
+				require.Same(t, compiled[i], again)
+			}
+			// A new entry clears the full cache; existing pointers stay valid.
+			_, err := cache.CompileSchema(true, jsonschema.Draft7)
+			require.NoError(t, err)
+			again, err := cache.CompileSchema(map[string]any{"const": 0}, jsonschema.Draft7)
+			require.NoError(t, err)
+			require.NotSame(t, compiled[0], again)
+			require.NoError(t, compiled[0].Validate(0))
+			require.Error(t, compiled[0].Validate(1))
+		})
+	}
+}
+
+func TestExampleSchemaLocalReferences(t *testing.T) {
+	for _, example := range []bool{false, true} {
+		t.Run(fmt.Sprintf("example=%t", example), func(t *testing.T) {
+			var cache ExampleSchemaCache
+			compile := func(source string) (*jsonschema.Schema, error) {
+				t.Helper()
+				var node yaml.Node
+				require.NoError(t, yaml.Unmarshal([]byte(source), &node))
+				if example {
+					return cache.Compile(&node, jsonschema.Draft2020, SchemaValidationPurposeGeneric, false)
+				}
+				schema, err := DecodeYAMLValue(&node)
+				require.NoError(t, err)
+				return cache.CompileSchema(schema, jsonschema.Draft2020)
+			}
+			_, err := compile(`{$ref: '#/components/schemas/Pet'}`)
+			require.ErrorContains(t, err, "json-pointer")
+			compiled, err := compile(`$ref: '#/$defs/item'
+$defs:
+  item:
+    type: object
+    required: [name]
+    properties:
+      name: {type: string}
+      next: {$ref: '#/$defs/item'}`)
+			require.NoError(t, err)
+			require.NoError(t, compiled.Validate(map[string]any{"name": "first", "next": map[string]any{"name": "second"}}))
+			require.Error(t, compiled.Validate(map[string]any{"name": "first", "next": map[string]any{}}))
+		})
+	}
+}
+
 func TestCompileSchemaReusesFailures(t *testing.T) {
 	var c ExampleSchemaCache
 	invalid := map[string]any{"type": "not-a-type"}
@@ -131,6 +306,10 @@ func TestYAMLValidationInvalidInputs(t *testing.T) {
 	require.Error(t, err)
 	_, err = c.CompileSchema(make(chan int), jsonschema.Draft7)
 	require.Error(t, err)
+	cyclicValue := map[string]any{}
+	cyclicValue["cycle"] = cyclicValue
+	_, err = c.CompileSchema(cyclicValue, jsonschema.Draft7)
+	require.ErrorContains(t, err, "cycle")
 
 	var cyclic, complexKey yaml.Node
 	require.NoError(t, yaml.Unmarshal([]byte("cycle: &cycle [*cycle]"), &cyclic))

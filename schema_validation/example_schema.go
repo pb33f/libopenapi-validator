@@ -126,13 +126,23 @@ type compiledExample func() (*jsonschema.Schema, error)
 
 // ExampleSchemaCache shares compiled inline example schemas by dialect and prepared content.
 // Its zero value is ready for concurrent use. External resources are never loaded.
+// Inserting a new schema when the cache is full clears all cached entries.
+// Previously returned schemas remain usable after eviction.
 type ExampleSchemaCache struct {
+	// MaxSchemas limits cached entries. Values <= 0 use the default of 1024.
+	// Set this before the first use; do not change it during concurrent use.
+	MaxSchemas int
+
 	mu      sync.Mutex
 	schemas map[exampleSchemaKey]compiledExample
 }
 
 // Compile prepares a YAML schema for generic, request, or response examples.
+// Draft4 enables OpenAPI 3.0 nullable; newer drafts require an explicit null type.
 // swagger enables the Swagger 2.0 x-nullable and parameter required conventions.
+// References must resolve within node. Inline document-level and external $refs
+// before calling Compile. Circular references must target a schema retained within
+// node or be removed by the caller; unresolved references cause a compile error.
 func (c *ExampleSchemaCache) Compile(node *yaml.Node, draft *jsonschema.Draft, purpose SchemaValidationPurpose, swagger bool) (*jsonschema.Schema, error) {
 	if node == nil || draft == nil {
 		return nil, fmt.Errorf("example validation requires a schema and a draft")
@@ -146,6 +156,8 @@ func (c *ExampleSchemaCache) Compile(node *yaml.Node, draft *jsonschema.Draft, p
 
 // CompileSchema compiles a JSON-compatible inline schema under the supplied
 // default dialect, sharing the same offline cache as Compile.
+// References must resolve within schema, including circular references. Inline or
+// remove references to resources outside schema before calling CompileSchema.
 func (c *ExampleSchemaCache) CompileSchema(schema any, draft *jsonschema.Draft) (*jsonschema.Schema, error) {
 	return c.compile(schema, exampleSchemaKey{draft: draft})
 }
@@ -156,13 +168,23 @@ func (c *ExampleSchemaCache) compile(schema any, key exampleSchemaKey) (*jsonsch
 	}
 	data, err := json.Marshal(schema)
 	if err != nil {
+		var unsupported *json.UnsupportedValueError
+		if errors.As(err, &unsupported) {
+			switch unsupported.Str {
+			case "+Inf", "-Inf", "NaN":
+				return nil, fmt.Errorf("JSON Schema requires finite numbers; schema contains a non-finite number: %w", err)
+			}
+		}
 		return nil, err
 	}
 	key.digest = sha256.Sum256(data)
 	c.mu.Lock()
 	cached := c.schemas[key]
 	if cached == nil {
-		const maxSchemas = 1024
+		maxSchemas := c.MaxSchemas
+		if maxSchemas <= 0 {
+			maxSchemas = 1024
+		}
 		if c.schemas == nil {
 			c.schemas = make(map[exampleSchemaKey]compiledExample)
 		} else if len(c.schemas) >= maxSchemas {
@@ -211,24 +233,24 @@ func (key exampleSchemaKey) decodeResource(data []byte, schema any) (any, error)
 			removeMappingPair(n, i)
 		}
 	}
-	prepareExampleSchema(n, key.purpose, key.swagger, false)
+	key.prepareSchema(n, false)
 	return DecodeYAMLValue(n)
 }
 
 // Only schema-bearing keywords are traversed. A property named "not" or an
 // example containing "required" must not be interpreted as a schema keyword.
-func prepareExampleSchema(node *yaml.Node, purpose SchemaValidationPurpose, swagger, negated bool) {
+func (key exampleSchemaKey) prepareSchema(node *yaml.Node, preserveRequired bool) {
 	if node.Kind != yaml.MappingNode {
 		return
 	}
-	if boolMappingValue(node, "nullable") || swagger && boolMappingValue(node, "x-nullable") {
+	if key.draft == jsonschema.Draft4 && boolMappingValue(node, "nullable") || key.swagger && boolMappingValue(node, "x-nullable") {
 		if t := mappingValue(node, "type"); t != nil && t.ShortTag() == "!!str" && t.Value != "null" {
 			value := *t
 			*t = yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{&value, {Kind: yaml.ScalarNode, Tag: "!!str", Value: "null"}}}
 		}
 	}
-	if !negated {
-		pruneRequiredProperties(node, purpose, directDirectionalAnnotation)
+	if !preserveRequired {
+		pruneRequiredAtSchema(node, key.purpose)
 	}
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		k, v := node.Content[i].Value, node.Content[i+1]
@@ -236,16 +258,20 @@ func prepareExampleSchema(node *yaml.Node, purpose SchemaValidationPurpose, swag
 		case "properties", "patternProperties", "$defs", "definitions", "dependentSchemas", "dependencies":
 			if v.Kind == yaml.MappingNode {
 				for j := 1; j < len(v.Content); j += 2 {
-					prepareExampleSchema(v.Content[j], purpose, swagger, negated)
+					key.prepareSchema(v.Content[j], preserveRequired)
 				}
 			}
 		case "not", "if", "then", "else", "additionalProperties", "additionalItems", "propertyNames", "contains", "items", "allOf", "anyOf", "oneOf", "prefixItems", "unevaluatedProperties", "unevaluatedItems":
+			// Pruning inside if or not changes the predicate, including nested schemas.
+			// oneOf branches still use directional pruning, which can make previously
+			// distinct branches overlap and fail the exactly-one-match constraint.
+			preserve := preserveRequired || k == "not" || k == "if"
 			if v.Kind == yaml.SequenceNode {
 				for _, child := range v.Content {
-					prepareExampleSchema(child, purpose, swagger, negated)
+					key.prepareSchema(child, preserve)
 				}
 			} else {
-				prepareExampleSchema(v, purpose, swagger, negated != (k == "not"))
+				key.prepareSchema(v, preserve)
 			}
 		}
 	}
