@@ -373,7 +373,7 @@ func TestHeaderSchemaNoType(t *testing.T) {
 
 	assert.False(t, isSuccess)
 	assert.Len(t, valErrs, 1)
-	assert.Equal(t, "schema 'apiKey' is defined as an boolean or integer, however it failed to pass a schema validation", valErrs[0].Reason)
+	assert.Equal(t, "The header parameter 'apiKey' is defined as an boolean or integer, however it failed to pass a schema validation", valErrs[0].Reason)
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 2)
 	assert.Equal(t, "got string, want boolean", valErrs[0].SchemaValidationErrors[0].Reason)
 	assert.Equal(t, "got string, want integer", valErrs[0].SchemaValidationErrors[1].Reason)
@@ -464,7 +464,7 @@ func TestHeaderSchemaNoType_AllPoly(t *testing.T) {
 
 	assert.False(t, isSuccess)
 	assert.Len(t, valErrs, 1)
-	assert.Equal(t, "schema 'apiKey' is defined as an boolean and a integer, however it failed to pass a schema validation", valErrs[0].Reason)
+	assert.Equal(t, "The header parameter 'apiKey' is defined as an boolean and a integer, however it failed to pass a schema validation", valErrs[0].Reason)
 	assert.Len(t, valErrs[0].SchemaValidationErrors, 3)
 }
 
