@@ -56,7 +56,8 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 			if p.Schema == nil {
 				continue
 			}
-			if param := request.Header.Get(p.Name); param != "" {
+			// Repeated field lines form one comma-separated value (RFC 9110, section 5.2).
+			if param := strings.Join(request.Header.Values(p.Name), ","); param != "" {
 
 				var sch *base.Schema
 				if p.Schema != nil {
@@ -171,11 +172,10 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 						}
 
 					case helpers.Array:
-						if !p.IsExploded() { // only unexploded arrays are supported for cookie params
-							if sch.Items.IsA() {
-								validationErrors = append(validationErrors,
-									ValidateHeaderArray(sch, p, param, pathValue, operation, renderedSchema)...)
-							}
+						// Simple-style arrays use commas with either explode setting.
+						if sch.Items != nil && sch.Items.IsA() {
+							validationErrors = append(validationErrors,
+								ValidateHeaderArray(sch, p, param, pathValue, operation, renderedSchema)...)
 						}
 
 					case helpers.String:
