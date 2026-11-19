@@ -13,7 +13,6 @@ import (
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
-	lowbase "github.com/pb33f/libopenapi/datamodel/low/base"
 
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -215,8 +214,8 @@ func (v *paramValidator) ValidateHeaderParamsWithPathItem(request *http.Request,
 					// validate schema as there is no type information.
 					validationErrors = append(validationErrors, ValidateSingleParameterSchema(sch,
 						param,
-						p.Name,
-						lowbase.SchemaLabel, p.Name, helpers.ParameterValidation, helpers.ParameterValidationHeader, v.options,
+						"Header parameter",
+						"The header parameter", p.Name, helpers.ParameterValidation, helpers.ParameterValidationHeader, v.options,
 						pathValue,
 						operation)...)
 				}
