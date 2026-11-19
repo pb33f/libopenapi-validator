@@ -1,7 +1,9 @@
+// Copyright 2023-2026 Princess Beef Heavy Industries, LLC / Dave Shanley
+// SPDX-License-Identifier: MIT
+
 package helpers
 
 import (
-	"bytes"
 	"fmt"
 	"regexp"
 	"strings"
@@ -26,6 +28,10 @@ var (
 // The function ensures that the template is well-formed, with balanced and properly
 // nested braces. If the template is invalid, an error is returned.
 //
+// The function holds no state: every call compiles the template again. Validators
+// cache compiled regexes per validator in config.ValidationOptions.RegexCache;
+// set config.WithRegexCache to share or supply a cache.
+//
 // Parameters:
 //   - tpl: The path template string to convert into a regular expression.
 //
@@ -39,6 +45,12 @@ var (
 //	// regex: ^/orders/([0-9]+)/items/([^/]+)$
 //	// err: nil
 func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
+	return compilePathRegex(tpl)
+}
+
+// compilePathRegex builds and compiles a regular expression for the given
+// path template.
+func compilePathRegex(tpl string) (*regexp.Regexp, error) {
 	// Check if it is well-formed.
 	idxs, errBraces := BraceIndices(tpl)
 	if errBraces != nil {
@@ -48,7 +60,11 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 	// Backup the original.
 	template := tpl
 
-	pattern := bytes.NewBufferString("^")
+	// strings.Builder writes cannot fail: the builder grows on demand and
+	// panics on overflow instead of returning an error, so the pattern is
+	// assembled with plain writes and no error checks.
+	var pattern strings.Builder
+	pattern.WriteString("^")
 	var end int
 
 	for i := 0; i < len(idxs); i += 2 {
@@ -69,10 +85,10 @@ func GetRegexForPath(tpl string) (*regexp.Regexp, error) {
 		}
 
 		// Build the regexp pattern.
-		_, err := fmt.Fprintf(pattern, "%s(%s)", regexp.QuoteMeta(raw), patt)
-		if err != nil {
-			return nil, err
-		}
+		pattern.WriteString(regexp.QuoteMeta(raw))
+		pattern.WriteByte('(')
+		pattern.WriteString(patt)
+		pattern.WriteByte(')')
 
 	}
 

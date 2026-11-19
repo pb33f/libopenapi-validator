@@ -17,7 +17,6 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	lowv3 "github.com/pb33f/libopenapi/datamodel/low/v3"
 
-	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/content"
 	"github.com/pb33f/libopenapi-validator/errors"
 	"github.com/pb33f/libopenapi-validator/helpers"
@@ -107,7 +106,7 @@ func (v *responseBodyValidator) ValidateResponseBodyWithPathItem(request *http.R
 			if isDefault {
 				headerCode = lowv3.DefaultLabel
 			}
-			if ok, hErrs := ValidateResponseHeaders(request, response, foundResponse.Headers, pathFound, headerCode, config.WithExistingOpts(v.options)); !ok {
+			if ok, hErrs := validateResponseHeaders(request, response, foundResponse.Headers, pathFound, headerCode, v.options); !ok {
 				validationErrors = append(validationErrors, hErrs...)
 			}
 		}
@@ -161,7 +160,7 @@ func (v *responseBodyValidator) checkResponseSchema(
 		}
 		_, bodyErrors := ValidateResponseSchema(&ValidateResponseSchemaInput{
 			Request: request, Response: validationResponse, Schema: schema,
-			Version: helpers.VersionToFloat(v.document.Version), Options: []config.Option{config.WithExistingOpts(v.options)},
+			Version: helpers.VersionToFloat(v.document.Version), ValidationOptions: v.options,
 		})
 		return bodyErrors
 	}
@@ -209,14 +208,14 @@ func (v *responseBodyValidator) checkResponseSchema(
 
 	// Validate response schema
 	valid, vErrs := ValidateResponseSchema(&ValidateResponseSchemaInput{
-		Request:      request,
-		Response:     response,
-		Schema:       schema,
-		Version:      helpers.VersionToFloat(v.document.Version),
-		Options:      []config.Option{config.WithExistingOpts(v.options)},
-		DecodedValue: decodedValue,
-		RawBody:      responseBody,
-		ValueDecoded: decoded,
+		Request:           request,
+		Response:          response,
+		Schema:            schema,
+		Version:           helpers.VersionToFloat(v.document.Version),
+		ValidationOptions: v.options,
+		DecodedValue:      decodedValue,
+		RawBody:           responseBody,
+		ValueDecoded:      decoded,
 	})
 
 	if !valid {

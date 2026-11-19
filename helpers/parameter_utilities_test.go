@@ -1430,3 +1430,107 @@ func TestExtractRawQueryValues(t *testing.T) {
 		"novalue":      {""},
 	}, raw)
 }
+
+func TestExtractRawQueryValuesEmptyQuery(t *testing.T) {
+	require.Nil(t, ExtractRawQueryValues(""))
+}
+
+func TestExtractParamsForOperationOneSideEmpty(t *testing.T) {
+	operationOnly := &v3.Parameter{Name: "id", In: Path}
+
+	t.Run("no path level parameters returns the operation slice itself", func(t *testing.T) {
+		item := &v3.PathItem{Get: &v3.Operation{Parameters: []*v3.Parameter{operationOnly}}}
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+		require.Equal(t, []*v3.Parameter{operationOnly}, got)
+		// the operation's own slice is handed back, not a copy
+		require.Same(t, &got[0], &item.Get.Parameters[0])
+	})
+
+	t.Run("no operation parameters returns path slice untouched", func(t *testing.T) {
+		item := &v3.PathItem{Parameters: []*v3.Parameter{operationOnly}, Get: &v3.Operation{}}
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+		require.Equal(t, []*v3.Parameter{operationOnly}, got)
+		// the path level slice is returned as-is, not copied
+		require.Same(t, &got[0], &item.Parameters[0])
+	})
+
+	t.Run("both sides merge without writing into the model slice", func(t *testing.T) {
+		pathLevel := &v3.Parameter{Name: "shared", In: Path}
+		operationLevel := &v3.Parameter{Name: "id", In: Path}
+		// spare capacity: with len == cap the old append into the model
+		// slice reallocated and this test could not see the bug
+		item := &v3.PathItem{
+			Parameters: make([]*v3.Parameter, 1, 4),
+			Get:        &v3.Operation{Parameters: []*v3.Parameter{operationLevel}},
+		}
+		item.Parameters[0] = pathLevel
+
+		got := ExtractParamsForOperation(&http.Request{Method: http.MethodGet}, item)
+
+		require.Equal(t, []*v3.Parameter{pathLevel, operationLevel}, got)
+		// the model slice keeps its own length, and the capacity slot past
+		// its length stays empty: the old append wrote the merged result
+		// straight into the model backing array
+		require.Len(t, item.Parameters, 1)
+		require.Equal(t, pathLevel, item.Parameters[0])
+		require.Nil(t, item.Parameters[1:cap(item.Parameters)][0])
+	})
+}
+
+// The tests below pin the pre-existing gaps flagged in the PR 340 review.
+// They assert the CURRENT behavior; the fixes flip the assertions.
+
+var yesVar = true
+
+func TestExtractParamsForOperationHeadFallsBackToGet(t *testing.T) {
+	// ExtractOperation falls back to get for HEAD, so a HEAD request is
+	// validated as the GET operation. ExtractParamsForOperation makes the
+	// same fallback, so GET's required query and header parameters are
+	// checked for HEAD requests too.
+	item := &v3.PathItem{
+		Get:  &v3.Operation{Parameters: []*v3.Parameter{{Name: "limit", In: Query, Required: &yesVar}}},
+		Head: nil,
+	}
+
+	request, _ := http.NewRequest(http.MethodHead, "/reports", nil)
+
+	// the router and ExtractOperation resolve HEAD to the get operation
+	require.Same(t, item.Get, ExtractOperation(request, item))
+
+	// and the extracted parameters now carry the get operation's parameters
+	got := ExtractParamsForOperation(request, item)
+	require.Len(t, got, 1)
+	require.Equal(t, "limit", got[0].Name)
+}
+
+func TestExtractParamsForOperationQueryOperation(t *testing.T) {
+	// OpenAPI 3.2 query operations carry their own parameters, and QUERY
+	// requests resolve to them.
+	queryOperation := &v3.Operation{Parameters: []*v3.Parameter{{Name: "limit", In: Query, Required: &yesVar}}}
+	item := &v3.PathItem{Query: queryOperation}
+
+	request, _ := http.NewRequest("QUERY", "/search", nil)
+
+	require.Same(t, queryOperation, ExtractOperation(request, item))
+
+	got := ExtractParamsForOperation(request, item)
+	require.Len(t, got, 1, "query operation parameters should be extracted for QUERY requests")
+	require.Equal(t, "limit", got[0].Name)
+}
+
+func TestExtractParamsForOperationAdditionalOperations(t *testing.T) {
+	// the router resolves AdditionalOperations, and method extraction now
+	// resolves custom methods as well.
+	custom := &v3.Operation{Parameters: []*v3.Parameter{{Name: "range", In: Query, Required: &yesVar}}}
+	item := &v3.PathItem{}
+	item.AdditionalOperations = orderedmap.New[string, *v3.Operation]()
+	item.AdditionalOperations.Set("CUSTOM", custom)
+
+	request, _ := http.NewRequest("CUSTOM", "/search", nil)
+
+	require.Same(t, custom, ExtractOperation(request, item))
+
+	got := ExtractParamsForOperation(request, item)
+	require.Len(t, got, 1, "additional operation parameters should be extracted for custom methods")
+	require.Equal(t, "range", got[0].Name)
+}

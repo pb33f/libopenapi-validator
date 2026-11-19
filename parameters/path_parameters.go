@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 
@@ -62,6 +63,14 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 	// extract params for the operation
 	params := helpers.ExtractParamsForOperation(request, pathItem)
 	validationErrors := v.validateContentParameters(request, pathItem, pathValue, helpers.Path)
+
+	// the default regex cache is a *sync.Map: calling it concretely keeps
+	// the template key off the heap on every lookup. A custom cache keeps
+	// the interface path.
+	var syncRegexCache *sync.Map
+	if v.options != nil {
+		syncRegexCache, _ = v.options.RegexCache.(*sync.Map)
+	}
 	for _, p := range params {
 		if p.In == helpers.Path && p.Schema != nil {
 			// a mismatch in segment counts means the submitted path cannot be
@@ -77,7 +86,11 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 			for x := range pathSegments {
 				var rgx *regexp.Regexp
 
-				if v.options.RegexCache != nil {
+				if syncRegexCache != nil {
+					if cachedRegex, found := syncRegexCache.Load(pathSegments[x]); found {
+						rgx = cachedRegex.(*regexp.Regexp)
+					}
+				} else if v.options != nil && v.options.RegexCache != nil {
 					if cachedRegex, found := v.options.RegexCache.Load(pathSegments[x]); found {
 						rgx = cachedRegex.(*regexp.Regexp)
 					}
@@ -92,7 +105,10 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 
 					rgx = r
 
-					if v.options.RegexCache != nil {
+					switch {
+					case syncRegexCache != nil:
+						syncRegexCache.Store(pathSegments[x], r)
+					case v.options != nil && v.options.RegexCache != nil:
 						v.options.RegexCache.Store(pathSegments[x], r)
 					}
 				}
@@ -115,7 +131,7 @@ func (v *paramValidator) ValidatePathParamsWithPathItem(request *http.Request, p
 				matches = matches[1:]
 
 				// Check if it is well-formed.
-				idxs, errBraces := helpers.BraceIndices(pathSegments[x])
+				idxs, errBraces := v.braceIndicesFor(pathSegments[x])
 				if errBraces != nil {
 					continue
 				}
@@ -442,14 +458,14 @@ func segmentReferencesParam(segment, name string) bool {
 // nonEmptyPathSegments splits a path on "/" and drops empty segments, so that
 // leading, trailing, or repeated slashes do not introduce empty entries that
 // would shift index alignment between submitted and template segments.
+// One pass with an iterator: strings.Split would allocate the raw slice and
+// copy the non-empty entries into a second slice.
 func nonEmptyPathSegments(path string) []string {
-	raw := strings.Split(path, helpers.Slash)
-	segments := make([]string, 0, len(raw))
-	for _, segment := range raw {
-		if segment == "" {
-			continue
+	segments := make([]string, 0, strings.Count(path, helpers.Slash)+1)
+	for segment := range strings.SplitSeq(path, helpers.Slash) {
+		if segment != "" {
+			segments = append(segments, segment)
 		}
-		segments = append(segments, segment)
 	}
 	return segments
 }

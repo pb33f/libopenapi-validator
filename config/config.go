@@ -159,6 +159,11 @@ func (o *ValidationOptions) Release() {
 		releaseIfSupported(o.SchemaCache)
 		releaseIfSupported(o.SchemaResourceCache)
 		releaseIfSupported(o.PathTree)
+		// the default per-validator regex cache is owned by these options;
+		// empty it so a Release frees the compiled regexes eagerly.
+		if cache, ok := o.RegexCache.(interface{ Clear() }); ok {
+			cache.Clear()
+		}
 	}
 
 	o.RegexEngine = nil

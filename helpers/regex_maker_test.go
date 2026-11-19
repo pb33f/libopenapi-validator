@@ -144,6 +144,18 @@ func TestDefaultPatternCompileCache(t *testing.T) {
 	assert.Equal(t, res.String(), DefaultPatternRegexString)
 }
 
+// TestGetRegexForPathHoldsNoState pins the stateless contract: repeated
+// calls for one template each compile fresh regexes. Validators cache
+// compiled regexes per validator in config.ValidationOptions.RegexCache.
+func TestGetRegexForPathHoldsNoState(t *testing.T) {
+	first, errFirst := GetRegexForPath("/stateless/{id}")
+	second, errSecond := GetRegexForPath("/stateless/{id}")
+
+	assert.NoError(t, errFirst)
+	assert.NoError(t, errSecond)
+	assert.NotSame(t, first, second, "expected a fresh compile per call")
+}
+
 func equal(a, b []int) bool {
 	if len(a) != len(b) {
 		return false
@@ -154,4 +166,17 @@ func equal(a, b []int) bool {
 		}
 	}
 	return true
+}
+
+func TestGetRegexForPathInvalidCustomPattern(t *testing.T) {
+	// an unterminated character class fails regexp compilation
+	_, err := GetRegexForPath("/x/{id:[a-z}")
+	assert.Error(t, err)
+}
+
+func TestGetRegexForPathCapturingGroupRejected(t *testing.T) {
+	// capturing groups in custom patterns are rejected
+	_, err := GetRegexForPath("/x/{id:(abc)}")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "capture groups")
 }

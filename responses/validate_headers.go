@@ -32,8 +32,22 @@ func ValidateResponseHeaders(
 	statusCode string,
 	opts ...config.Option,
 ) (bool, []*errors.ValidationError) {
-	options := config.NewValidationOptions(opts...)
+	return validateResponseHeaders(request, response, headers, pathTemplate, statusCode,
+		config.NewValidationOptions(opts...))
+}
 
+// validateResponseHeaders holds the header validation flow for a response with
+// pre-built options. Building options here would allocate fresh default schema
+// caches on every call, so callers with built options pass them directly. The
+// options are treated as read-only.
+func validateResponseHeaders(
+	request *http.Request,
+	response *http.Response,
+	headers *orderedmap.Map[string, *v3.Header],
+	pathTemplate string,
+	statusCode string,
+	options *config.ValidationOptions,
+) (bool, []*errors.ValidationError) {
 	// locate headers
 	type headerPair struct {
 		name  string

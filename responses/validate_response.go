@@ -39,6 +39,15 @@ type ValidateResponseSchemaInput struct {
 	DecodedValue any             // Optional: A value produced by a registered body decoder
 	RawBody      []byte          // Optional: Original bytes used for diagnostics with DecodedValue
 	ValueDecoded bool            // Distinguishes an explicitly decoded nil from the legacy JSON path
+
+	// ValidationOptions carries pre-built options. When set, the function uses
+	// it directly and skips NewValidationOptions, which allocates fresh default
+	// schema caches on every call. The options are treated as read-only and
+	// must stay valid for the duration of the call.
+	//
+	// ValidationOptions and Options are mutually exclusive: when both are
+	// set, Options is ignored.
+	ValidationOptions *config.ValidationOptions
 }
 
 // ValidateResponseSchema will validate the response body for a http.Response pointer. The request is used to
@@ -48,7 +57,10 @@ type ValidateResponseSchemaInput struct {
 // This function is used by the ValidateResponseBody function, but can be used independently.
 // The schema will be compiled from cache if available, otherwise it will be compiled and cached.
 func ValidateResponseSchema(input *ValidateResponseSchemaInput) (bool, []*liberrors.ValidationError) {
-	validationOptions := config.NewValidationOptions(input.Options...)
+	validationOptions := input.ValidationOptions
+	if validationOptions == nil {
+		validationOptions = config.NewValidationOptions(input.Options...)
+	}
 	var validationErrors []*liberrors.ValidationError
 	var renderedSchema []byte
 	var referenceSchema string
