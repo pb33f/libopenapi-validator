@@ -12,6 +12,10 @@ import (
 
 // ExtractOperation extracts the operation from the path item based on the request method. If there is no
 // matching operation found, then nil is returned.
+//
+// HEAD requests fall back to the get operation, matching router behavior.
+// QUERY (OpenAPI 3.2) and methods declared under additionalOperations are
+// resolved as well.
 func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
 	switch request.Method {
 	case http.MethodGet:
@@ -33,6 +37,13 @@ func ExtractOperation(request *http.Request, item *v3.PathItem) *v3.Operation {
 		return item.Patch
 	case http.MethodTrace:
 		return item.Trace
+	case "QUERY":
+		return item.Query
+	}
+	if item.AdditionalOperations != nil {
+		if additional, found := item.AdditionalOperations.Get(request.Method); found {
+			return additional
+		}
 	}
 	return nil
 }

@@ -93,6 +93,13 @@ func NewValidatorFromV3Model(m *v3.Document, opts ...config.Option) Validator {
 	options := config.NewValidationOptions(opts...)
 	bodycodec.Apply(options)
 
+	// Default to a per-validator regex cache: compiled path regexes live for
+	// the life of the validator and Release drops them with it. A cache
+	// supplied through config.WithRegexCache is shared instead.
+	if options.RegexCache == nil {
+		options.RegexCache = &sync.Map{}
+	}
+
 	// Build radix tree for O(k) path lookup (where k = path depth)
 	// Skip if path tree is disabled or a custom tree was provided
 	if options.PathTree == nil && !options.IsPathTreeDisabled() {

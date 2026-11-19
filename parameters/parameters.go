@@ -5,11 +5,13 @@ package parameters
 
 import (
 	"net/http"
+	"sync"
 
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/pb33f/libopenapi-validator/config"
 	"github.com/pb33f/libopenapi-validator/errors"
+	"github.com/pb33f/libopenapi-validator/helpers"
 )
 
 // ParameterValidator is an interface that defines the methods for validating parameters
@@ -79,6 +81,24 @@ func NewParameterValidator(document *v3.Document, opts ...config.Option) Paramet
 type paramValidator struct {
 	options  *config.ValidationOptions
 	document *v3.Document
+	// braceIdxCache stores the brace indices of path templates seen by this
+	// validator. Entries live for the life of the validator and die with it,
+	// so Release needs no explicit clear.
+	braceIdxCache sync.Map
+}
+
+// braceIndicesFor returns the brace indices of a path template, cached for
+// the life of this validator. Invalid templates stay uncached.
+func (p *paramValidator) braceIndicesFor(template string) ([]int, error) {
+	if cached, ok := p.braceIdxCache.Load(template); ok {
+		return cached.([]int), nil
+	}
+	idxs, err := helpers.BraceIndices(template)
+	if err != nil {
+		return nil, err
+	}
+	p.braceIdxCache.LoadOrStore(template, idxs)
+	return idxs, nil
 }
 
 func (p *paramValidator) Release() {

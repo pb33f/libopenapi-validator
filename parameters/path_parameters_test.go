@@ -5,6 +5,7 @@ package parameters
 
 import (
 	"net/http"
+	"regexp"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -2527,4 +2528,39 @@ paths:
 		assert.True(t, valid, tc.mode)
 		assert.Empty(t, validationErrors, tc.mode)
 	}
+}
+
+// TestValidatePathParamsWithPathItem_SkipsUnbracedSegment pins the defensive
+// behavior when the user-supplied regex cache holds a regex for a segment
+// with unbalanced braces: the segment regex matches, but the segment carries
+// no brace indices, so validation skips it instead of mis-validating it.
+func TestValidatePathParamsWithPathItem_SkipsUnbracedSegment(t *testing.T) {
+	spec := `openapi: 3.1.0
+paths:
+  /burgers/{burgerId}/locate:
+    parameters:
+      - in: path
+        name: burgerId
+        schema:
+          type: integer
+    get:
+      operationId: locateBurgers`
+	doc, _ := libopenapi.NewDocument([]byte(spec))
+	m, _ := doc.BuildV3Model()
+
+	// a regex stored under a key with unbalanced braces: GetRegexForPath
+	// cannot produce it, so only a user-populated cache can hit this state.
+	cache := &sync.Map{}
+	cache.Store("{oops", regexp.MustCompile(".*"))
+
+	v := NewParameterValidator(&m.Model, config.WithRegexCache(cache))
+
+	request, _ := http.NewRequest(http.MethodGet, "https://things.com/burgers/123/locate", nil)
+	pathItem, _, _ := paths.FindPath(request, &m.Model, nil)
+	require.NotNil(t, pathItem)
+
+	// the crafted template adds a segment with unbalanced braces; the
+	// validator must skip that segment and still validate burgerId.
+	ok, errs := v.ValidatePathParamsWithPathItem(request, pathItem, "/burgers/{burgerId}/{oops")
+	assert.True(t, ok, "expected the unbraced segment to be skipped without errors: %v", errs)
 }
